@@ -1,5 +1,6 @@
-package eu.luftiger.bits.backend.events
+package eu.luftiger.bits.backend.event.internal
 
+import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.encode

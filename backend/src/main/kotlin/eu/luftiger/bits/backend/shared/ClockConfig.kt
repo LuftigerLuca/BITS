@@ -1,4 +1,4 @@
-package eu.luftiger.bits.backend.config
+package eu.luftiger.bits.backend.shared
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

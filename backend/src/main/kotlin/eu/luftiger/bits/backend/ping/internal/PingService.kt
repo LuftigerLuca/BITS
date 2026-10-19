@@ -1,6 +1,7 @@
-package eu.luftiger.bits.backend.ping
+package eu.luftiger.bits.backend.ping.internal
 
-import eu.luftiger.bits.backend.events.EventPublisher
+import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.ping.domain.PingLog
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.warera.WareraApiException

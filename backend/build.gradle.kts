@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":shared"))
     implementation(project(":warera-client"))
 
+    implementation(platform(libs.spring.modulith.bom))
+    implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-kotlinx-serialization-json")
@@ -25,6 +27,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.springframework.modulith:spring-modulith-starter-test")
 }
 
 allOpen {

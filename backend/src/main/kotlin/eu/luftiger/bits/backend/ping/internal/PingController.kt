@@ -1,4 +1,4 @@
-package eu.luftiger.bits.backend.ping
+package eu.luftiger.bits.backend.ping.internal
 
 import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse

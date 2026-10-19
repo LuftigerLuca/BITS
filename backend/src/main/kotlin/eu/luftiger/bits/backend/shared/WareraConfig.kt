@@ -1,6 +1,5 @@
-package eu.luftiger.bits.backend.warera
+package eu.luftiger.bits.backend.shared
 
-import eu.luftiger.bits.backend.config.BitsProperties
 import eu.luftiger.bits.warera.RestWareraClient
 import eu.luftiger.bits.warera.WareraClient
 import org.springframework.context.annotation.Bean

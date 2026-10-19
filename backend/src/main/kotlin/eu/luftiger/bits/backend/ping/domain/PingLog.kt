@@ -1,4 +1,4 @@
-package eu.luftiger.bits.backend.ping
+package eu.luftiger.bits.backend.ping.domain
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

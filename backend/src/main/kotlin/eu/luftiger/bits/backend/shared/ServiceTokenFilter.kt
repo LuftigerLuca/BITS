@@ -1,4 +1,4 @@
-package eu.luftiger.bits.backend.config
+package eu.luftiger.bits.backend.shared
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
