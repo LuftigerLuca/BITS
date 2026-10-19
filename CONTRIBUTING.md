@@ -8,7 +8,19 @@ changes are made and how they get into `main`.
 1. **Branch:** Create a new branch from the current `main` (or from the branch your work builds on).
 2. **Implement:** Code, tests and docs, if needed, go into the same branch.
 3. **Check:** `./gradlew build` must pass before you open a pull request.
-4. **Pull request:** Open it against `main`. It is merged after review.
+4. **Pull request:** Open it against `main`. It is squash-merged once CI passes and all review threads are
+   resolved. Nobody pushes to `main` directly.
+
+## CI
+
+GitHub Actions runs on every pull request and on `main`; all three jobs are required for merging:
+
+- **Gradle:** `./gradlew build` without the frontend, i.e. ktlint and all tests incl. Testcontainers
+- **Frontend:** `npm ci`, `npm run lint` and `npm run build`
+- **Conventions:** PR title and branch name follow the rules below
+
+Dependabot opens weekly update PRs for Gradle, npm, GitHub Actions and Docker images. The rules for `main` are
+kept in `.github/rulesets/main.json`; change them there and apply them to the repository.
 
 ## Branches
 
@@ -31,7 +43,8 @@ The body explains what changed and why, not how.
 
 ## Pull requests
 
-- The title follows the Conventional Commits format.
+- The title follows the Conventional Commits format. It becomes the commit message on `main`, since PRs are
+  squash-merged.
 - The description says what changed and why, and links the related issue if there is one.
 - Keep PRs small. Several focused PRs are better than one that changes everything at once.
 
