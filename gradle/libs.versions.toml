@@ -1,17 +1,17 @@
 [versions]
-kotlin = "2.3.21"
-spring-boot = "4.1.0"
+kotlin = "2.4.21"
+spring-boot = "4.1.1"
 spring-dependency-management = "1.1.7"
-spring-modulith = "2.1.0"
-ktlint = "14.1.0"
+spring-modulith = "2.1.1"
+ktlint = "14.2.0"
 kotlinx-serialization = "1.11.0"
-kotlinx-coroutines = "1.10.2"
-resilience4j = "2.3.0"
-jda = "6.6.0"
-ktor = "3.5.2"
-lettuce = "7.5.2.RELEASE"
-logback = "1.5.18"
-mockk = "1.14.9"
+kotlinx-coroutines = "1.11.0"
+resilience4j = "2.4.0"
+jda = "6.7.0"
+ktor = "3.6.0"
+lettuce = "7.9.0.RELEASE"
+logback = "1.6.5"
+mockk = "1.14.11"
 
 [libraries]
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
