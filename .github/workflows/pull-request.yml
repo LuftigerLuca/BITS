@@ -1,0 +1,35 @@
+name: Pull request
+
+# Separate from CI so that editing the title does not rerun the build.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  conventions:
+    name: Conventions
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check title and branch name
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          types='feat|fix|refactor|test|docs|chore|build|ci'
+          status=0
+
+          # The title becomes the squash commit message, see CONTRIBUTING.md.
+          if [[ ! "$TITLE" =~ ^($types)(\([a-z0-9-]+\))?!?:\ [a-z0-9].*[^.]$ ]]; then
+            echo "::error::PR title '$TITLE' does not follow Conventional Commits: '<type>: <lowercase subject>' without a trailing period, type one of ${types//|/, }"
+            status=1
+          fi
+
+          if [[ ! "$BRANCH" =~ ^(($types)/[a-z0-9._-]+|dependabot/.+)$ ]]; then
+            echo "::error::Branch name '$BRANCH' does not match '<type>/<short-name>', type one of ${types//|/, }"
+            status=1
+          fi
+
+          exit $status
