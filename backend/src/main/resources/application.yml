@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: bits-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/bits}
+    username: ${DB_USER:bits}
+    password: ${DB_PASSWORD:bits}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+bits:
+  service-token: ${BITS_SERVICE_TOKEN:}
+  warera:
+    base-url: ${WARERA_BASE_URL:https://api2.warera.io/trpc}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
