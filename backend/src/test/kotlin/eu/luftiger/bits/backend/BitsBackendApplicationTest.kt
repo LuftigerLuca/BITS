@@ -74,6 +74,14 @@ class BitsBackendApplicationTest {
         fun fakeWareraClient() =
             object : WareraClient {
                 override fun getAllCountries() = listOf(WareraCountry(id = "c1", name = "Germany", code = "de"))
+
+                override fun searchUserIds(text: String) = TODO()
+
+                override fun getUser(userId: String) = TODO()
+
+                override fun getCompanyIds(userId: String) = TODO()
+
+                override fun getCompany(companyId: String) = TODO()
             }
     }
 }

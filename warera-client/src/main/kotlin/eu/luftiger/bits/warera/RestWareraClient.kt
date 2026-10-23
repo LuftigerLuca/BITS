@@ -8,6 +8,9 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.ResourceAccessException
@@ -28,16 +31,47 @@ class RestWareraClient(
 ) : WareraClient {
     override fun getAllCountries(): List<WareraCountry> = query("country.getAllCountries", ListSerializer(WareraCountry.serializer()))
 
+    override fun searchUserIds(text: String): List<String> =
+        query("search.searchAnything", SearchResult.serializer(), buildJsonObject { put("searchText", text) }).userIds
+
+    override fun getUser(userId: String): WareraUser =
+        query("user.getUserLite", WareraUser.serializer(), buildJsonObject { put("userId", userId) })
+
+    override fun getCompanyIds(userId: String): List<String> {
+        val ids = mutableListOf<String>()
+        var cursor: String? = null
+        do {
+            val input =
+                buildJsonObject {
+                    put("userId", userId)
+                    put("perPage", COMPANY_PAGE_SIZE)
+                    cursor?.let { put("cursor", it) }
+                }
+            val page = query("company.getCompanies", CompanyPage.serializer(), input)
+            ids += page.items
+            cursor = page.nextCursor
+        } while (cursor != null)
+        return ids
+    }
+
+    override fun getCompany(companyId: String): WareraCompany =
+        query("company.getById", WareraCompany.serializer(), buildJsonObject { put("companyId", companyId) })
+
     private fun <T> query(
         procedure: String,
         serializer: KSerializer<T>,
+        input: JsonObject? = null,
     ): T {
         val call =
             RateLimiter.decorateCallable(rateLimiter) {
                 restClient
                     .get()
-                    .uri("/{procedure}", procedure)
-                    .retrieve()
+                    .uri { builder ->
+                        builder.path("/{procedure}")
+                        // tRPC takes the input of a query as JSON in the query string.
+                        if (input != null) builder.queryParam("input", "{input}")
+                        builder.build(mapOf("procedure" to procedure, "input" to input?.toString().orEmpty()))
+                    }.retrieve()
                     .body(String::class.java)
                     ?: throw WareraApiException("Empty response from $procedure")
             }
@@ -60,8 +94,22 @@ class RestWareraClient(
         val data: T,
     )
 
+    @Serializable
+    private data class SearchResult(
+        val userIds: List<String>,
+    )
+
+    @Serializable
+    private data class CompanyPage(
+        val items: List<String>,
+        val nextCursor: String? = null,
+    )
+
     companion object {
         const val DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
+
+        /** Largest page size the API accepts. */
+        private const val COMPANY_PAGE_SIZE = 100
 
         private val json = Json { ignoreUnknownKeys = true }
 

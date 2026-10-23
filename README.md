@@ -23,6 +23,11 @@ Nur das Backend greift auf Datenbank und WarEra-API zu, nur der Bot auf Discord.
 Der Command `/ping` geht einmal durch alle Teile: Der Bot ruft `POST /api/ping` auf, das Backend speichert den
 Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das der Bot verarbeitet und bestätigt.
 
+Mit `/verify <WarEra-Name>` verknüpft ein Nutzer seinen Discord-Account mit seinem WarEra-Account. Er bekommt
+einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer seiner WarEra-Firmen und klickt auf
+„Prüfen“. Das Backend sucht den Code über die öffentliche API, speichert die Verknüpfung und publiziert ein
+`AccountLinkedEvent`.
+
 ## Starten
 
 Voraussetzungen: JDK 21, Node.js 24, Docker.
