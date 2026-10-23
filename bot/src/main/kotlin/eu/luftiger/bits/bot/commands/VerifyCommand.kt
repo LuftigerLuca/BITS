@@ -104,7 +104,9 @@ class VerifyCommand(
                     }.orEmpty()
             return hint +
                 "Dein Code für **${escape(response.wareraUsername)}**: `${response.code}`\n\n" +
-                "1. Benenne in WarEra eine deiner Firmen so um, dass ihr Name den Code enthält, z. B. „Waffen ${response.code}“.\n" +
+                // WarEra allows at most 20 characters per company name, so appending the code rarely fits.
+                "1. Benenne in WarEra eine deiner Firmen vorübergehend in `${response.code}` um. Firmennamen haben höchstens " +
+                "20 Zeichen, weiterer Text neben dem Code ist aber erlaubt.\n" +
                 "2. Klicke danach auf „Prüfen“.\n\n" +
                 "Der Code ist gültig bis <t:$expiresAt:t> (<t:$expiresAt:R>). Nach der Verknüpfung kannst du ihn wieder aus dem " +
                 "Firmennamen entfernen."
