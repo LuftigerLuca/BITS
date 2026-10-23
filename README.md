@@ -35,6 +35,11 @@ docker compose up --build
 - Backend: http://localhost:8080, Health unter `/actuator/health`
 - Frontend: http://localhost:5173
 
+## Deployment
+
+Staging (mit eigenem Test-Bot auf einem Test-Server) und später Produktion werden über den Workflow **CD** auf
+GitHub deployt. Einrichtung und Betrieb beschreibt [deploy/README.md](deploy/README.md).
+
 ## Entwickeln
 
 ```sh
