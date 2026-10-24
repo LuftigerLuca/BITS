@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build
 
 # Runs nginx as an unprivileged user, which cannot bind ports below 1024, hence 8080.
-FROM nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e
 # The entrypoint fills in the template at startup. It writes to /tmp, the only writable place in the deployment,
 # where the container's file system is read-only; nginx.conf includes the result from there. The default for
 # REAL_IP_FROM trusts no proxy.
