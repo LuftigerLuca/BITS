@@ -125,6 +125,8 @@ backend/src/main/kotlin/eu/luftiger/bits/backend/
   `@NamedInterface("api")`. A module that others need to call exposes an interface (e.g. `EventPublisher`)
   that a class in its `internal/` implements.
 - **`domain/`** holds the module's data model. It is private to the module and never returned by a controller.
+  DTOs do not use its types either, not even enums: the API gets its own (e.g. `RuleType` for `ConditionType`),
+  so a change to the data model cannot change the API by accident. `DtoBoundaryTest` checks this.
 - **`internal/`** holds everything else. Controllers map between REST DTOs and the domain; services hold the
   logic and transactions; repositories are Spring Data interfaces.
 - REST DTOs that the bot uses live in the Gradle module `shared` (package `eu.luftiger.bits.shared`), not in

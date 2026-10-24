@@ -21,7 +21,7 @@ class MeController(
         return MeResponse(
             name = user.name,
             avatarUrl = user.avatarUrl,
-            role = user.role,
+            role = WebRole.of(user.role),
             wareraUsername = user.discordUserId?.let(accountLinks::findByDiscordUserId)?.wareraUsername,
         )
     }
@@ -31,7 +31,23 @@ class MeController(
 data class MeResponse(
     val name: String,
     val avatarUrl: String?,
-    val role: Role,
+    val role: WebRole,
     /** WarEra account the Discord account is linked to; always `null` for the admin account. */
     val wareraUsername: String?,
 )
+
+/** The API's names for [Role]; the dashboard spells them out in `frontend/src/lib/api.ts`. */
+@Serializable
+enum class WebRole {
+    USER,
+    ADMIN,
+    ;
+
+    companion object {
+        fun of(role: Role) =
+            when (role) {
+                Role.USER -> USER
+                Role.ADMIN -> ADMIN
+            }
+    }
+}
