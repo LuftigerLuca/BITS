@@ -25,4 +25,5 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.testcontainers)
+    testImplementation(libs.mockk)
 }

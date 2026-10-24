@@ -59,15 +59,21 @@ class RoleRuleService(
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
         val rule =
-            when (request.type) {
+            when (request.type.condition) {
                 ConditionType.CITIZENSHIP ->
-                    RoleRule(role.id, request.type, countryId = countryId(request), targetName = countryName(request), createdAt = now())
+                    RoleRule(
+                        role.id,
+                        request.type.condition,
+                        countryId = countryId(request),
+                        targetName = countryName(request),
+                        createdAt = now(),
+                    )
                 ConditionType.GOVERNMENT_OFFICE ->
                     RoleRule(
                         role.id,
-                        request.type,
+                        request.type.condition,
                         countryId = countryId(request),
-                        office = request.office ?: throw badRequest("Office missing"),
+                        office = request.office?.office ?: throw badRequest("Office missing"),
                         targetName = countryName(request),
                         createdAt = now(),
                     )
@@ -83,11 +89,11 @@ class RoleRuleService(
                             // An ID in a format WarEra does not accept.
                             throw badRequest("Unknown military unit $muId")
                         }
-                    RoleRule(role.id, request.type, muId = mu.id, targetName = mu.name, createdAt = now())
+                    RoleRule(role.id, request.type.condition, muId = mu.id, targetName = mu.name, createdAt = now())
                 }
                 ConditionType.LEVEL, ConditionType.MILITARY_RANK -> {
                     val threshold = request.threshold?.takeIf { it >= 1 } ?: throw badRequest("Threshold must be at least 1")
-                    RoleRule(role.id, request.type, threshold = threshold, createdAt = now())
+                    RoleRule(role.id, request.type.condition, threshold = threshold, createdAt = now())
                 }
             }
         val saved =

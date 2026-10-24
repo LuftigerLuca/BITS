@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.ping.internal
 
+import eu.luftiger.bits.backend.shared.BotInput
 import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import org.springframework.web.bind.annotation.PostMapping
@@ -15,5 +16,8 @@ class PingController(
     @PostMapping
     fun ping(
         @RequestBody request: PingRequest,
-    ): PingResponse = pingService.ping(request.discordUserId)
+    ): PingResponse {
+        BotInput.discordUserId(request.discordUserId)
+        return pingService.ping(request.discordUserId)
+    }
 }

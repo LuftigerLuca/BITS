@@ -106,12 +106,57 @@ enum class RuleStatus {
 @Serializable
 data class CreateRuleRequest(
     val roleId: String,
-    val type: ConditionType,
+    val type: RuleType,
     val countryId: String? = null,
-    val office: GovernmentOffice? = null,
+    val office: Office? = null,
     val muId: String? = null,
     val threshold: Int? = null,
 )
+
+/**
+ * Part of the dashboard API, so the names stay as they are; [ConditionType] may change with the database. The
+ * dashboard spells them out in `frontend/src/lib/api.ts`.
+ */
+@Serializable
+enum class RuleType {
+    CITIZENSHIP,
+    GOVERNMENT_OFFICE,
+    MILITARY_UNIT,
+    LEVEL,
+    MILITARY_RANK,
+}
+
+val RuleType.condition: ConditionType
+    get() =
+        when (this) {
+            RuleType.CITIZENSHIP -> ConditionType.CITIZENSHIP
+            RuleType.GOVERNMENT_OFFICE -> ConditionType.GOVERNMENT_OFFICE
+            RuleType.MILITARY_UNIT -> ConditionType.MILITARY_UNIT
+            RuleType.LEVEL -> ConditionType.LEVEL
+            RuleType.MILITARY_RANK -> ConditionType.MILITARY_RANK
+        }
+
+/** Like [RuleType], the API's names for [GovernmentOffice]. */
+@Serializable
+enum class Office {
+    PRESIDENT,
+    VICE_PRESIDENT,
+    MINISTER_OF_ECONOMY,
+    MINISTER_OF_DEFENSE,
+    MINISTER_OF_FOREIGN_AFFAIRS,
+    CONGRESS,
+}
+
+val Office.office: GovernmentOffice
+    get() =
+        when (this) {
+            Office.PRESIDENT -> GovernmentOffice.PRESIDENT
+            Office.VICE_PRESIDENT -> GovernmentOffice.VICE_PRESIDENT
+            Office.MINISTER_OF_ECONOMY -> GovernmentOffice.MINISTER_OF_ECONOMY
+            Office.MINISTER_OF_DEFENSE -> GovernmentOffice.MINISTER_OF_DEFENSE
+            Office.MINISTER_OF_FOREIGN_AFFAIRS -> GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS
+            Office.CONGRESS -> GovernmentOffice.CONGRESS
+        }
 
 @Serializable
 data class OptionResponse(
