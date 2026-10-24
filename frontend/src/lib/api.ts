@@ -138,4 +138,53 @@ export async function searchMilitaryUnits(query: string): Promise<Option[]> {
   return (await request(`${ROLE_SYNC}/military-units?${new URLSearchParams({ query })}`)).json()
 }
 
+const AUDIT_LOG = '/web/admin/audit-log'
+
+export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED'
+
+/** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
+export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
+
+export interface AuditActor {
+  /** What to filter by; `discord:<id>` or `admin:<username>`. */
+  subject: string
+  name: string
+  avatarUrl: string | null
+  kind: ActorKind
+}
+
+export interface AuditEntry {
+  id: number
+  /** Epoch milliseconds. */
+  occurredAt: number
+  actor: AuditActor
+  action: AuditAction
+  description: string
+}
+
+export interface AuditLogPage {
+  entries: AuditEntry[]
+  /** Pass as `before` for the next page; `null` on the last one. */
+  nextBefore: number | null
+}
+
+export interface AuditLogFilter {
+  actor: string | null
+  action: AuditAction | null
+}
+
+/** Newest first, a page at a time; the backend applies the filter. */
+export async function getAuditLog(filter: AuditLogFilter, before: number | null): Promise<AuditLogPage> {
+  const params = new URLSearchParams()
+  if (filter.actor) params.set('actor', filter.actor)
+  if (filter.action) params.set('action', filter.action)
+  if (before !== null) params.set('before', String(before))
+  return (await request(`${AUDIT_LOG}?${params}`)).json()
+}
+
+/** Everybody who appears in the audit log, former admins too. */
+export async function getAuditActors(): Promise<AuditActor[]> {
+  return (await request(`${AUDIT_LOG}/actors`)).json()
+}
+
 export const DISCORD_LOGIN_URL = '/auth/oauth2/authorization/discord'

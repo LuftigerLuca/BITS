@@ -1,5 +1,8 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
+import eu.luftiger.bits.backend.audit.api.AuditAction
+import eu.luftiger.bits.backend.audit.api.AuditActor
+import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.warera.WareraBadRequestException
@@ -9,12 +12,16 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
  * Manages the rules; every change syncs all members, with the WarEra data of the last sync. The change is the admin's
  * decision, so the bot takes the role from as many members as it takes, see [eu.luftiger.bits.shared.RoleSyncEvent].
+ *
+ * A change and its entry in the [AuditLog] are committed together. The sync starts only after the commit, since it
+ * reads the rules on a thread of its own.
  */
 @Service
 class RoleRuleService(
@@ -22,6 +29,8 @@ class RoleRuleService(
     private val roleRepository: DiscordRoleRepository,
     private val wareraClient: WareraClient,
     private val syncTrigger: RoleSyncTrigger,
+    private val auditLog: AuditLog,
+    private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
 ) {
     /** Roles the bot can give, highest first; the others cannot be picked for a rule. */
@@ -55,7 +64,10 @@ class RoleRuleService(
      * @throws ResponseStatusException 400 if the role cannot be given or the condition is incomplete or unknown, 409 if
      * the role has a rule with the same condition already
      */
-    fun create(request: CreateRuleRequest): RuleResponse {
+    fun create(
+        request: CreateRuleRequest,
+        actor: AuditActor,
+    ): RuleResponse {
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
         val rule =
@@ -97,20 +109,39 @@ class RoleRuleService(
                 }
             }
         val saved =
-            try {
-                ruleRepository.saveAndFlush(rule)
-            } catch (_: DataIntegrityViolationException) {
-                // The unique index on role and condition; the CHECK constraints cannot fail after the checks above.
-                throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
-            }
+            requireNotNull(
+                transactionTemplate.execute {
+                    val created =
+                        try {
+                            ruleRepository.saveAndFlush(rule)
+                        } catch (_: DataIntegrityViolationException) {
+                            // The unique index on role and condition; the CHECK constraints cannot fail after the
+                            // checks above.
+                            throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
+                        }
+                    auditLog.record(actor, AuditAction.ROLE_RULE_CREATED, describe(role.id, role.name, created))
+                    created
+                },
+            )
         syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
         return RuleResponse(requireNotNull(saved.id), role.id, role.name, role.color, saved.label, RuleStatus.ACTIVE)
     }
 
     /** @return the deleted rule, for the log */
-    fun delete(id: Long): RoleRule {
-        val rule = ruleRepository.findByIdOrNull(id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        ruleRepository.delete(rule)
+    fun delete(
+        id: Long,
+        actor: AuditActor,
+    ): RoleRule {
+        val rule =
+            requireNotNull(
+                transactionTemplate.execute {
+                    val found = ruleRepository.findByIdOrNull(id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                    ruleRepository.delete(found)
+                    val roleName = roleRepository.findByIdOrNull(found.roleId)?.name
+                    auditLog.record(actor, AuditAction.ROLE_RULE_DELETED, describe(found.roleId, roleName, found))
+                    found
+                },
+            )
         syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(rule.roleId))
         return rule
     }
@@ -134,6 +165,17 @@ class RoleRuleService(
     private fun countryName(request: CreateRuleRequest): String {
         val countryId = countryId(request)
         return wareraClient.getAllCountries().firstOrNull { it.id == countryId }?.name ?: throw badRequest("Unknown country $countryId")
+    }
+
+    /** A snapshot for the audit log, readable after the rule and the role are gone; e.g. "Rolle @Bürger: Level ab 10". */
+    private fun describe(
+        roleId: String,
+        roleName: String?,
+        rule: RoleRule,
+    ): String {
+        // The rules of a role deleted in Discord stay, so its name may be unknown by the time a rule is deleted.
+        val role = roleName?.let { "@$it" } ?: "$roleId (in Discord gelöscht)"
+        return "Rolle $role: ${rule.label}"
     }
 
     private fun now() = clock.instant()

@@ -1,5 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
+import eu.luftiger.bits.backend.audit.api.AuditActor
+import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.GovernmentOffice
 import eu.luftiger.bits.warera.WareraApiException
@@ -41,7 +43,7 @@ class RoleRuleController(
         @RequestBody request: CreateRuleRequest,
         @AuthenticationPrincipal session: Jwt,
     ): RuleResponse {
-        val rule = ruleService.create(request)
+        val rule = ruleService.create(request, actor(session))
         log.info("Rule {} ({}) for role {} created by {}", rule.id, rule.label, rule.roleId, session.subject)
         return rule
     }
@@ -52,7 +54,7 @@ class RoleRuleController(
         @PathVariable id: Long,
         @AuthenticationPrincipal session: Jwt,
     ) {
-        val rule = ruleService.delete(id)
+        val rule = ruleService.delete(id, actor(session))
         log.info("Rule {} ({}) for role {} deleted by {}", id, rule.label, rule.roleId, session.subject)
     }
 
@@ -63,6 +65,8 @@ class RoleRuleController(
     fun militaryUnits(
         @RequestParam query: String,
     ): List<OptionResponse> = ruleService.searchMilitaryUnits(query)
+
+    private fun actor(session: Jwt) = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
 
     @ExceptionHandler(WareraApiException::class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)

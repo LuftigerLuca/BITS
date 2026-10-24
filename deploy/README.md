@@ -137,6 +137,7 @@ docker compose exec -T postgres psql -U bits -d bits -v id='<discord id>' <<'SQL
 SELECT * FROM account_link WHERE discord_user_id = :'id';
 SELECT * FROM account_verification WHERE discord_user_id = :'id';
 SELECT * FROM ping_log WHERE discord_user_id = :'id';
+SELECT * FROM audit_entry WHERE actor_subject = 'discord:' || :'id';
 SQL
 ```
 
