@@ -32,3 +32,14 @@ class WareraNotFoundException(
     message: String,
     cause: Throwable? = null,
 ) : WareraApiException(message, cause)
+
+/** WarEra rejected the input of a call, e.g. an ID in the wrong format. Not an outage. */
+class WareraBadRequestException(
+    message: String,
+    cause: Throwable? = null,
+) : WareraApiException(message, cause)
+
+/** The answer of WarEra did not match what BITS expects; the unofficial API changes without notice. */
+class WareraSchemaException(
+    message: String,
+) : WareraApiException(message)

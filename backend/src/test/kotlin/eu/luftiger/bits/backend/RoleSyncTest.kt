@@ -13,12 +13,14 @@ import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
+import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraCompany
 import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraNotFoundException
+import eu.luftiger.bits.warera.WareraSchemaException
 import eu.luftiger.bits.warera.WareraUser
 import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
@@ -140,6 +142,7 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"xx"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-minister","type":"GOVERNMENT_OFFICE","countryId":"de"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-veteran","type":"MILITARY_UNIT","muId":"m9"}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","type":"MILITARY_UNIT","muId":"not an id"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":0}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-gone","type":"LEVEL","threshold":5}""").andExpect { status { isBadRequest() } }
     }
@@ -363,7 +366,8 @@ class RoleSyncTest {
 
         override fun getUser(userId: String) =
             available {
-                if (userId in failingUsers) throw WareraApiException("down")
+                // WarEra changed its answer in a way BITS cannot read.
+                if (userId in failingUsers) throw WareraSchemaException("unexpected response")
                 users.getValue(userId)
             }
 
@@ -381,6 +385,7 @@ class RoleSyncTest {
 
         override fun getMilitaryUnit(muId: String) =
             available {
+                if (" " in muId) throw WareraBadRequestException("invalid id")
                 if (muId != "m1") throw WareraNotFoundException("no such MU")
                 WareraMilitaryUnit("m1", "Deutsche Marine")
             }

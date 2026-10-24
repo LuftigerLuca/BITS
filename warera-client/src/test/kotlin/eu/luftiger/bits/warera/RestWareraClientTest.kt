@@ -1,5 +1,7 @@
 package eu.luftiger.bits.warera
 
+import io.github.resilience4j.core.functions.Either
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.ExpectedCount.times
@@ -7,12 +9,15 @@ import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
+import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import java.time.Duration
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class RestWareraClientTest {
     private lateinit var server: MockRestServiceServer
@@ -188,5 +193,83 @@ class RestWareraClientTest {
 
         assertFailsWith<WareraApiException> { client.getAllCountries() }
         server.verify()
+    }
+
+    @Test
+    fun `answers that do not fit the schema are reported as API errors`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(withSuccess("<html>Bad Gateway</html>", MediaType.TEXT_HTML))
+        server
+            .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
+            .andRespond(withSuccess("""{"result":{"data":{"_id":"u1"}}}""", MediaType.APPLICATION_JSON))
+
+        assertFailsWith<WareraSchemaException> { client.getAllCountries() }
+        val missingField = assertFailsWith<WareraSchemaException> { client.getUser("u1") }
+        assertTrue("user.getUserLite" in missingField.message.orEmpty(), missingField.message)
+        server.verify()
+    }
+
+    @Test
+    fun `countries do not need a code`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(withSuccess("""{"result":{"data":[{"_id":"c1","name":"Germany"}]}}""", MediaType.APPLICATION_JSON))
+
+        assertEquals(listOf(WareraCountry(id = "c1", name = "Germany")), client.getAllCountries())
+    }
+
+    @Test
+    fun `rejected input is its own error and not retried`() {
+        server
+            .expect(times(1), requestTo("https://warera.test/trpc/mu.getById?input=%7B%22muId%22%3A%22bad%22%7D"))
+            .andRespond(withStatus(HttpStatus.BAD_REQUEST))
+
+        assertFailsWith<WareraBadRequestException> { client.getMilitaryUnit("bad") }
+        server.verify()
+    }
+
+    @Test
+    fun `waits as long as a 429 asks for, up to a limit, and backs off exponentially otherwise`() {
+        val interval = RestWareraClient.defaultRetry(Duration.ofSeconds(2)).retryConfig.getIntervalBiFunction<Any>()
+
+        fun tooManyRequests(retryAfter: String?) =
+            Either.left<Throwable, Any>(
+                HttpClientErrorException.create(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "Too Many Requests",
+                    HttpHeaders().apply { retryAfter?.let { set(HttpHeaders.RETRY_AFTER, it) } },
+                    ByteArray(0),
+                    null,
+                ),
+            )
+
+        assertEquals(5_000, interval.apply(1, tooManyRequests("5")))
+        assertEquals(10_000, interval.apply(1, tooManyRequests("120")))
+        assertEquals(2_000, interval.apply(1, tooManyRequests(null)))
+        assertEquals(4_000, interval.apply(2, tooManyRequests(null)))
+        assertEquals(4_000, interval.apply(2, Either.left<Throwable, Any>(ResourceAccessException("timeout"))))
+    }
+
+    @Test
+    fun `no sliding minute gets more calls than WarEra allows`() {
+        // A minute shrunk to 600 ms: periods of 20 ms instead of two seconds.
+        val period = Duration.ofMillis(20)
+        val minute = period.toNanos() * 30
+        val limiter = RestWareraClient.defaultRateLimiter(period = period)
+        val permits = mutableListOf<Long>()
+        val end = System.nanoTime() + minute * 3
+        while (System.nanoTime() < end) {
+            if (limiter.acquirePermission()) permits += System.nanoTime()
+        }
+
+        var maxInMinute = 0
+        var start = 0
+        permits.forEachIndexed { i, at ->
+            while (permits[start] <= at - minute) start++
+            maxInMinute = maxOf(maxInMinute, i - start + 1)
+        }
+        assertTrue(maxInMinute <= RestWareraClient.WARERA_LIMIT_PER_MINUTE, "$maxInMinute calls in one sliding minute")
+        assertTrue(maxInMinute >= 80, "only $maxInMinute calls in one sliding minute, the limiter is too strict")
     }
 }
