@@ -207,6 +207,7 @@ class RoleSyncTest {
                 discordUserIds = null,
                 members = mapOf("1" to MemberRoles(listOf(RoleGrant("r-citizen", "BITS: Staatsbürgerschaft Germany")))),
                 occurredAt = clock.millis(),
+                confirmedRoleIds = listOf("r-citizen"),
             ),
             awaitEvents(1).single(),
         )
@@ -223,7 +224,10 @@ class RoleSyncTest {
         assertEquals(setOf("r-citizen", "r-veteran"), grantedRoles(awaitEvents(2).last(), "1"))
 
         syncTrigger.hourly()
-        assertEquals(setOf("r-citizen"), grantedRoles(awaitEvents(3).last(), "1"))
+        val hourly = awaitEvents(3).last() as RoleSyncEvent
+        assertEquals(setOf("r-citizen"), grantedRoles(hourly, "1"))
+        // Nobody changed a rule, so the bot limits how many members lose a role.
+        assertEquals(emptyList(), hourly.confirmedRoleIds)
     }
 
     @Test

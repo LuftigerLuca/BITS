@@ -12,7 +12,10 @@ import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
-/** Manages the rules; every change syncs all members, with the WarEra data of the last sync. */
+/**
+ * Manages the rules; every change syncs all members, with the WarEra data of the last sync. The change is the admin's
+ * decision, so the bot takes the role from as many members as it takes, see [eu.luftiger.bits.shared.RoleSyncEvent].
+ */
 @Service
 class RoleRuleService(
     private val ruleRepository: RoleRuleRepository,
@@ -94,7 +97,7 @@ class RoleRuleService(
                 // The unique index on role and condition; the CHECK constraints cannot fail after the checks above.
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
             }
-        syncTrigger.syncAllWithCachedData()
+        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
         return RuleResponse(requireNotNull(saved.id), role.id, role.name, role.color, saved.label, RuleStatus.ACTIVE)
     }
 
@@ -102,7 +105,7 @@ class RoleRuleService(
     fun delete(id: Long): RoleRule {
         val rule = ruleRepository.findByIdOrNull(id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         ruleRepository.delete(rule)
-        syncTrigger.syncAllWithCachedData()
+        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(rule.roleId))
         return rule
     }
 

@@ -36,11 +36,19 @@ class RoleSyncTrigger(
 
     private val lock = Any()
     private var syncAllPending = false
+    private val pendingConfirmedRoleIds = HashSet<String>()
     private val pendingMembers = LinkedHashSet<String>()
     private var draining = false
 
-    /** Syncs all members with the WarEra data loaded last. */
-    fun syncAllWithCachedData() = request { syncAllPending = true }
+    /**
+     * Syncs all members with the WarEra data loaded last. [confirmedRoleIds] are roles whose rules an admin just
+     * changed, see [eu.luftiger.bits.shared.RoleSyncEvent.confirmedRoleIds].
+     */
+    fun syncAllWithCachedData(confirmedRoleIds: Collection<String> = emptyList()) =
+        request {
+            syncAllPending = true
+            pendingConfirmedRoleIds += confirmedRoleIds
+        }
 
     /** The previous Discord account of a relinked WarEra account loses its roles. */
     @ApplicationModuleListener
@@ -84,20 +92,21 @@ class RoleSyncTrigger(
     /** Runs what is pending until nothing is left; requests that come in meanwhile are picked up by the next round. */
     private fun drain() {
         while (true) {
-            val (syncAll, members) =
+            val (syncAll, confirmedRoleIds, members) =
                 synchronized(lock) {
                     if (!syncAllPending && pendingMembers.isEmpty()) {
                         draining = false
                         return
                     }
-                    Pair(syncAllPending, pendingMembers.toList()).also {
+                    Triple(syncAllPending, pendingConfirmedRoleIds.toList(), pendingMembers.toList()).also {
                         syncAllPending = false
+                        pendingConfirmedRoleIds.clear()
                         pendingMembers.clear()
                     }
                 }
             // Members first: a single lookup each, while the sync of everybody may have to load users it has not seen.
             if (members.isNotEmpty()) attempt { syncService.syncMembers(members) }
-            if (syncAll) attempt { syncService.syncAll() }
+            if (syncAll) attempt { syncService.syncAll(confirmedRoleIds) }
         }
     }
 

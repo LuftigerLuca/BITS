@@ -54,9 +54,13 @@ class RoleSyncService(
         log.info("WarEra data of {} linked users refreshed", links.size)
     }
 
-    /** Syncs all members of the guild with the WarEra data loaded last; users not loaded yet are loaded now. */
+    /**
+     * Syncs all members of the guild with the WarEra data loaded last; users not loaded yet are loaded now.
+     * [confirmedRoleIds] are roles whose rules an admin changed, see [RoleSyncEvent.confirmedRoleIds].
+     */
     @Synchronized
-    fun syncAll() = sync(accountLinks.findAll(), discordUserIds = null, refresh = false)
+    fun syncAll(confirmedRoleIds: List<String> = emptyList()) =
+        sync(accountLinks.findAll(), discordUserIds = null, refresh = false, confirmedRoleIds = confirmedRoleIds)
 
     /** Syncs the given members only, with fresh WarEra data; members without a link lose all managed roles. */
     @Synchronized
@@ -69,6 +73,7 @@ class RoleSyncService(
         links: List<LinkedAccount>,
         discordUserIds: List<String>?,
         refresh: Boolean,
+        confirmedRoleIds: List<String> = emptyList(),
     ) {
         val rules = activeRules()
         if (rules.isEmpty()) return
@@ -87,6 +92,7 @@ class RoleSyncService(
                 discordUserIds = discordUserIds,
                 members = members,
                 occurredAt = clock.millis(),
+                confirmedRoleIds = confirmedRoleIds,
             ),
         )
         log.info("Role sync published for {} members, {} linked", discordUserIds?.size ?: "all", links.size)

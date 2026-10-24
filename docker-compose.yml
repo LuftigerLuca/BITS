@@ -65,6 +65,8 @@ services:
       BACKEND_URL: http://backend:8080
       BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN:?BITS_SERVICE_TOKEN must be set}
       REDIS_URL: redis://redis:6379
+      ROLE_SYNC_MIN_REMOVALS: ${ROLE_SYNC_MIN_REMOVALS:-10}
+      ROLE_SYNC_MAX_REMOVAL_SHARE: ${ROLE_SYNC_MAX_REMOVAL_SHARE:-0.25}
     restart: unless-stopped
     depends_on:
       redis:
