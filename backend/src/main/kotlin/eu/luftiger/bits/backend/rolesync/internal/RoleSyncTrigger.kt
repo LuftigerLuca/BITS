@@ -3,9 +3,9 @@ package eu.luftiger.bits.backend.rolesync.internal
 import eu.luftiger.bits.backend.account.api.AccountLinked
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
+import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import org.springframework.transaction.event.TransactionalEventListener
 import java.time.Duration
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -24,7 +24,7 @@ class RoleSyncTrigger(
     fun syncAllWithCachedData() = submit { syncService.syncAll(refresh = false) }
 
     /** The previous Discord account of a relinked WarEra account loses its roles. */
-    @TransactionalEventListener
+    @ApplicationModuleListener
     fun onAccountLinked(event: AccountLinked) =
         submit { syncService.syncMembers(listOfNotNull(event.discordUserId, event.previousDiscordUserId)) }
 

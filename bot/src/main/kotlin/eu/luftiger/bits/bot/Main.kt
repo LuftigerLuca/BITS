@@ -59,7 +59,7 @@ fun main() {
 
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
     guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data).queue()
-    roleReporter.report(guild)
+    roleReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()
     val roleSync = RoleSyncHandler(jda, config.guildId)

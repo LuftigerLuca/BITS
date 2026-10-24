@@ -62,6 +62,14 @@ The body explains what changed and why, not how.
   module, since the bot does not use them.
 - The bot calls the backend only through the REST API under `/api/**`, with the service token as a bearer token.
   The backend reaches the bot only through events in the Redis stream `bits:events`.
+- Publish events for the bot with `EventPublisher`, inside the transaction that makes the change they report.
+  They are stored in Spring Modulith's event publication registry with it and written to Redis only after the
+  commit, again and again until that works. So an event never reports a change that was rolled back, and an
+  outage of Redis neither fails the change nor loses the event. Write to Redis directly only for state that is
+  not an event, such as the login lockout.
+- Modules react to each other's application events with `@ApplicationModuleListener`, which runs after the
+  commit, on its own thread and through the same registry. Use a plain `@EventListener` only for work that must
+  happen in the publisher's transaction.
 - REST DTOs and events live in `shared` and are serialized with kotlinx.serialization. New events are subtypes
   of `BitsEvent` with a unique `@SerialName`.
 - Change the database schema only through new Flyway migrations in `backend/src/main/resources/db/migration`,

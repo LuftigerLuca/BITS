@@ -80,8 +80,8 @@ class RoleSyncTest {
 
     @BeforeTest
     fun reset() {
-        syncTrigger.awaitIdle()
-        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role")
+        awaitBackgroundWork()
+        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication")
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
@@ -335,8 +335,15 @@ class RoleSyncTest {
 
     /** Syncs run in the background, one after the other; waits for them and expects exactly [count] role syncs. */
     private fun awaitEvents(count: Int): List<BitsEvent> {
-        syncTrigger.awaitIdle()
+        awaitBackgroundWork()
         return roleSyncEvents().also { assertEquals(count, it.size, "expected $count role syncs, got $it") }
+    }
+
+    /** A link starts a sync through the registry, and the sync publishes its result through it again. */
+    private fun awaitBackgroundWork() {
+        jdbc.awaitOutbox()
+        syncTrigger.awaitIdle()
+        jdbc.awaitOutbox()
     }
 
     private fun roleSyncEvents() = streamEvents().filterIsInstance<RoleSyncEvent>()

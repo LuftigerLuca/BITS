@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend
 
 import com.jayway.jsonpath.JsonPath
 import eu.luftiger.bits.shared.AccountLinkedEvent
+import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
@@ -22,6 +23,7 @@ import org.springframework.data.redis.connection.stream.StreamOffset
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.modulith.events.IncompleteEventPublications
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
@@ -51,9 +53,13 @@ class AccountVerificationTest {
     @Autowired
     lateinit var clock: MutableClock
 
+    @Autowired
+    lateinit var incompletePublications: IncompleteEventPublications
+
     @BeforeTest
     fun reset() {
-        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role")
+        jdbc.awaitOutbox()
+        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication")
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
@@ -158,6 +164,30 @@ class AccountVerificationTest {
         assertEquals(CheckVerificationResponse.Linked("Luftiger"), check("1", code))
     }
 
+    @Test
+    fun `accounts are linked while Redis cannot take events, which follow once it can`() {
+        val code = startedCode("1", "Luftiger")
+        warera.rename("c1", code)
+        // A key of another type makes every XADD on the stream fail.
+        redisTemplate.opsForValue().set(EventStream.KEY, "blocked")
+
+        post("/api/verifications/check", """{"discordUserId":"1","code":"$code"}""").andExpect { jsonPath("$.type") { value("checking") } }
+        repeat(100) {
+            if (count("account_link") == 1 && count("event_publication") == 2) return@repeat
+            Thread.sleep(50)
+        }
+        assertEquals(1, count("account_link"))
+        assertEquals(2, count("event_publication"))
+
+        redisTemplate.delete(EventStream.KEY)
+        incompletePublications.resubmitIncompletePublications { true }
+
+        assertEquals(
+            setOf(AccountLinkedEvent::class, VerificationCheckedEvent::class),
+            events().mapTo(HashSet()) { it::class },
+        )
+    }
+
     private fun link(
         discordUserId: String,
         username: String,
@@ -216,12 +246,14 @@ class AccountVerificationTest {
 
     private fun count(table: String) = jdbc.queryForObject("SELECT COUNT(*) FROM $table", Int::class.java)
 
-    private fun events() =
-        redisTemplate
+    private fun events(): List<BitsEvent> {
+        jdbc.awaitOutbox()
+        return redisTemplate
             .opsForStream<String, String>()
             .read(StreamOffset.fromStart(EventStream.KEY))
             .orEmpty()
             .map { decodeEvent(it.value[EventStream.PAYLOAD_FIELD]!!) }
+    }
 
     /** Two WarEra users, each with one company: Luftiger (w1, c1) and Other (w2, c2). */
     class FakeWarera : WareraClient {

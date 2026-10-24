@@ -1,5 +1,10 @@
 # Loaded on top of the main application.yml in every backend test.
 spring:
+  datasource:
+    hikari:
+      # The shared containers are gone by the time the JVM closes the cached contexts, and the event publication
+      # registry still wants the database then. Without this (in ms) each context would wait 30 s for it.
+      connection-timeout: 2000
   http:
     clients:
       # Short, so that the timeout test does not wait for long.
