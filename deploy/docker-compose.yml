@@ -1,0 +1,130 @@
+# Deployed stack. The CD workflow copies this file and a generated .env into the deployment directory on
+# the target host, then runs `docker compose up -d`. The project name comes from COMPOSE_PROJECT_NAME in
+# that .env, so several environments can share a host.
+#
+# Only the frontend is published, and only on the loopback interface unless PUBLIC_BIND says otherwise.
+# The backend API is for the bot alone and is reachable inside the compose network only; the bot needs no
+# inbound connection, it dials out to Discord.
+
+# What every container gets: it cannot gain privileges it did not start with, and it starts with no Linux
+# capabilities at all. A service that needs some back names them itself.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+# Memory limits keep one service that gets out of hand from taking the host down with it. The defaults
+# fit a small host; each can be raised through the variable named.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    <<: *hardening
+    # The entrypoint starts as root to take ownership of a fresh data directory and then hands over to
+    # the postgres user. These are what that step needs.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    mem_limit: ${POSTGRES_MEMORY:-512m}
+    environment:
+      POSTGRES_DB: bits
+      POSTGRES_USER: bits
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bits -d bits"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    <<: *hardening
+    # Like Postgres, the entrypoint fixes the ownership of the data directory before dropping root.
+    cap_add: [CHOWN, SETGID, SETUID]
+    mem_limit: ${REDIS_MEMORY:-256m}
+    # Append-only, so events the bot has not acknowledged yet survive a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
+    restart: unless-stopped
+    <<: *hardening
+    # Writes nowhere but to a scratch directory for the JVM.
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      - /tmp
+    # The JVM sizes its heap to 25 % of this by default.
+    mem_limit: ${BACKEND_MEMORY:-768m}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/bits
+      DB_USER: bits
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN:?BITS_SERVICE_TOKEN is required}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      # Flyway migrates on startup, which can take a while.
+      start_period: 60s
+      retries: 6
+
+  bot:
+    image: ${BOT_IMAGE:?BOT_IMAGE is required}
+    restart: unless-stopped
+    <<: *hardening
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: ${BOT_MEMORY:-512m}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:?DISCORD_TOKEN is required}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:?DISCORD_GUILD_ID is required}
+      BACKEND_URL: http://backend:8080
+      BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN}
+      REDIS_URL: redis://redis:6379
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
+    restart: unless-stopped
+    <<: *hardening
+    # The image runs nginx as an unprivileged user on port 8080 (see frontend/Dockerfile).
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: ${FRONTEND_MEMORY:-64m}
+    # A proxy on another host needs an address it can reach: name the interface that faces it in
+    # PUBLIC_BIND rather than 0.0.0.0, and let the firewall decide who may talk to it.
+    ports:
+      - "${PUBLIC_BIND:-127.0.0.1}:${PUBLIC_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,151 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: environment
+        required: true
+
+permissions:
+  contents: read
+
+# Two deployments to the same environment must not interleave; different environments may run side by
+# side.
+concurrency:
+  group: cd-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  # Everything happens on a runner installed on the target host: it builds the images and starts them.
+  # The host accepts no inbound connections, and a runner only dials out over HTTPS, so nothing has to be
+  # exposed for a deployment to reach it. No registry is involved either.
+  #
+  # The runner label must match the environment name, which is what routes a run to the right host.
+  deploy:
+    # Only what was reviewed into main is deployed. The "Deployment branches" rule of the environment
+    # enforces the same, see deploy/README.md.
+    if: github.ref == 'refs/heads/main'
+    runs-on:
+      - self-hosted
+      - ${{ inputs.environment }}
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      PUBLIC_PORT: ${{ vars.PUBLIC_PORT || '8080' }}
+      PUBLIC_BIND: ${{ vars.PUBLIC_BIND || '127.0.0.1' }}
+      # Per environment, so a deployment to one never removes the images another one runs.
+      IMAGE_PREFIX: bits-${{ inputs.environment }}
+      COMPOSE_PROJECT_NAME: bits-${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Tagged with the commit, so what is running can always be traced back to a revision, and a failed
+      # deployment leaves the previous images untouched.
+      - name: Build the images
+        run: |
+          docker build -t "$IMAGE_PREFIX-backend:$GITHUB_SHA" -f backend/Dockerfile .
+          docker build -t "$IMAGE_PREFIX-bot:$GITHUB_SHA" -f bot/Dockerfile .
+          docker build -t "$IMAGE_PREFIX-frontend:$GITHUB_SHA" frontend
+
+      - name: Install the stack
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          BITS_SERVICE_TOKEN: ${{ secrets.BITS_SERVICE_TOKEN }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
+        run: |
+          for name in DEPLOY_PATH POSTGRES_PASSWORD BITS_SERVICE_TOKEN DISCORD_TOKEN DISCORD_GUILD_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set for this environment, see deploy/README.md"
+              exit 1
+            fi
+          done
+          mkdir -p "$DEPLOY_PATH"
+          cp deploy/docker-compose.yml "$DEPLOY_PATH/"
+          # The .env holds every deployment secret, so it is written unreadable to anyone else and never
+          # leaves this host.
+          umask 077
+          {
+            echo "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME"
+            echo "BACKEND_IMAGE=$IMAGE_PREFIX-backend:$GITHUB_SHA"
+            echo "BOT_IMAGE=$IMAGE_PREFIX-bot:$GITHUB_SHA"
+            echo "FRONTEND_IMAGE=$IMAGE_PREFIX-frontend:$GITHUB_SHA"
+            echo "PUBLIC_PORT=$PUBLIC_PORT"
+            echo "PUBLIC_BIND=$PUBLIC_BIND"
+            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
+            echo "BITS_SERVICE_TOKEN=$BITS_SERVICE_TOKEN"
+            echo "DISCORD_TOKEN=$DISCORD_TOKEN"
+            echo "DISCORD_GUILD_ID=$DISCORD_GUILD_ID"
+          } > "$DEPLOY_PATH/.env"
+
+      # Flyway migrates on backend startup, so this is also the migration step. --wait returns once every
+      # service with a healthcheck is healthy and fails if one is not.
+      - name: Start
+        run: |
+          cd "$DEPLOY_PATH"
+          docker compose up -d --remove-orphans --wait --wait-timeout 300
+
+      - name: Smoke test
+        run: |
+          cd "$DEPLOY_PATH"
+
+          # A request without the service token must be rejected. A 401 proves the token filter is in
+          # place, rather than the port merely being open.
+          code=$(docker compose exec -T backend curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8080/api/ping || echo 000)
+          if [ "$code" != "401" ]; then
+            echo "the backend answered $code instead of 401 to a request without token"
+            docker compose logs --tail=60 backend
+            exit 1
+          fi
+
+          # The bot has no port to probe. It is up once JDA has connected to Discord; with a wrong token, or
+          # when it is not a member of the guild, it exits and is restarted.
+          bot=$(docker compose ps -aq bot)
+          for i in $(seq 1 30); do
+            if [ "$(docker inspect -f '{{.RestartCount}}' "$bot")" != "0" ]; then
+              echo "the bot crashed, check DISCORD_TOKEN and DISCORD_GUILD_ID"
+              docker compose logs --tail=60 bot
+              exit 1
+            fi
+            if docker compose logs bot 2>&1 | grep -q 'Finished Loading!'; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "the bot did not connect to Discord"
+              docker compose logs --tail=60 bot
+              exit 1
+            fi
+            sleep 4
+          done
+          # Registering the commands follows right after connecting and fails if the bot is not in the guild.
+          sleep 10
+          if [ "$(docker inspect -f '{{.RestartCount}}' "$bot")" != "0" ]; then
+            echo "the bot stopped after connecting, check DISCORD_GUILD_ID"
+            docker compose logs --tail=60 bot
+            exit 1
+          fi
+
+          curl -fsS -o /dev/null "http://$PUBLIC_BIND:$PUBLIC_PORT/" || {
+            echo "the frontend does not answer on $PUBLIC_BIND:$PUBLIC_PORT"
+            exit 1
+          }
+
+          echo "backend, bot and frontend are up"
+
+      # Only images of this environment, so an unrelated image on the host is never touched. The ones just
+      # deployed are kept, and one older set stays as a fallback.
+      - name: Drop superseded images
+        run: |
+          for service in backend bot frontend; do
+            docker images "$IMAGE_PREFIX-$service" --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' \
+              | sort -r | tail -n +3 | cut -f2 \
+              | xargs -r -n1 docker rmi || true
+          done
+          docker image prune -f
+
+      - name: Report what is running
+        if: always()
+        run: cd "$DEPLOY_PATH" && docker compose ps

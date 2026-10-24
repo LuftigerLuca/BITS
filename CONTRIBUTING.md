@@ -19,6 +19,9 @@ GitHub Actions runs on every pull request and on `main`; all three jobs are requ
 - **Frontend:** `npm ci`, `npm run lint` and `npm run build`
 - **Conventions:** PR title and branch name follow the rules below
 
+The manual workflow **CD** deploys `main` to a GitHub environment such as `staging`; see
+[deploy/README.md](deploy/README.md).
+
 Dependabot opens weekly update PRs for Gradle, npm, GitHub Actions and Docker images. The rules for `main` are
 kept in `.github/rulesets/main.json`; change them there and apply them to the repository.
 
