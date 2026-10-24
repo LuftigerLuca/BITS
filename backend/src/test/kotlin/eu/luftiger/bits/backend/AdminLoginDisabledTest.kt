@@ -11,7 +11,7 @@ import org.springframework.test.web.servlet.post
 import kotlin.test.Test
 
 /** Without `BITS_ADMIN_USERNAME` and `BITS_ADMIN_PASSWORD_HASH`, only the Discord login is available. */
-@SpringBootTest(properties = ["bits.service-token=test-token"])
+@SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig::class)
 class AdminLoginDisabledTest {

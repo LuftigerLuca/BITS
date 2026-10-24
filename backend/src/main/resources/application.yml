@@ -45,8 +45,20 @@ bits:
 server:
   # The dashboard reaches the backend through nginx; the client IP for the login lockout comes from X-Forwarded-For.
   forward-headers-strategy: native
+  servlet:
+    session:
+      # Only the Discord login uses the HTTP session, from the redirect to Discord until the way back. Lax, since that
+      # way back is a navigation from discord.com. Browsers accept Secure cookies on http://localhost too.
+      timeout: 10m
+      cookie:
+        secure: true
+        same-site: lax
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health
   endpoint:
     health:
       probes:

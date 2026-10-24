@@ -9,7 +9,7 @@ data class BitsProperties(
     val warera: Warera,
 ) {
     init {
-        require(serviceToken.isNotBlank()) { "bits.service-token must not be blank" }
+        Secrets.requireStrong(serviceToken, "BITS_SERVICE_TOKEN (bits.service-token)")
     }
 
     data class Warera(

@@ -35,7 +35,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-@SpringBootTest(properties = ["bits.service-token=test-token"])
+@SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig::class, BitsBackendApplicationTest.FakeWarera::class)
 class BitsBackendApplicationTest {
@@ -86,7 +86,7 @@ class BitsBackendApplicationTest {
     fun `ping is stored and published as event`() {
         mockMvc
             .post("/api/ping") {
-                header("Authorization", "Bearer test-token")
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"discordUserId":"42"}"""
             }.andExpect {

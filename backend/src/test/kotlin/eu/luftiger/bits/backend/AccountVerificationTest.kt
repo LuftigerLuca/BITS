@@ -34,7 +34,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
-@SpringBootTest(properties = ["bits.service-token=test-token"])
+@SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig::class, AccountVerificationTest.Fakes::class)
 class AccountVerificationTest {
@@ -239,7 +239,7 @@ class AccountVerificationTest {
         path: String,
         body: String,
     ) = mockMvc.post(path) {
-        header("Authorization", "Bearer test-token")
+        header("Authorization", "Bearer test-service-token-at-least-32-chars")
         contentType = MediaType.APPLICATION_JSON
         content = body
     }

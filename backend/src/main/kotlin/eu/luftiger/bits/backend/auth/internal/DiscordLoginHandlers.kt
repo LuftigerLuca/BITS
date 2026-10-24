@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.auth.internal
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.AuthenticationException
@@ -36,18 +37,18 @@ class DiscordLoginSuccessHandler(
 class DiscordLoginFailureHandler(
     private val properties: AuthProperties,
 ) : AuthenticationFailureHandler {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     override fun onAuthenticationFailure(
         request: HttpServletRequest,
         response: HttpServletResponse,
         exception: AuthenticationException,
     ) {
         request.getSession(false)?.invalidate()
-        val error =
-            (exception as? OAuth2AuthenticationException)
-                ?.error
-                ?.errorCode
-                ?.takeIf { it in FORWARDED_ERRORS }
-                ?: GENERIC_ERROR
+        val errorCode = (exception as? OAuth2AuthenticationException)?.error?.errorCode
+        val error = errorCode?.takeIf { it in FORWARDED_ERRORS } ?: GENERIC_ERROR
+        // The forwarded errors were logged where they occurred; the rest come from Spring Security, e.g. a stale state.
+        if (error == GENERIC_ERROR) log.warn("Discord login failed: {} ({})", errorCode, exception.message)
         response.sendRedirect("${properties.publicUrl}/login?error=$error")
     }
 

@@ -69,5 +69,9 @@ docker compose ps
 docker compose logs -f bot backend
 ```
 
+To end every dashboard session at once, e.g. after a leaked cookie or when someone lost the admin rights, set a
+new `BITS_JWT_SECRET` in the environment and deploy again. A single session ends with its logout, ADMIN sessions
+on their own after one hour.
+
 To roll back, set the image tags in `.env` to the previous commit (`docker images 'bits-staging-*'`) and run
 `docker compose up -d`. A migration that already ran is not undone by that; there are no automatic backups yet.

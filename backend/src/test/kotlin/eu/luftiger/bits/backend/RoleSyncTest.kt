@@ -48,7 +48,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
-@SpringBootTest(properties = ["bits.service-token=test-token"])
+@SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig::class, RoleSyncTest.Fakes::class)
 class RoleSyncTest {
@@ -262,7 +262,7 @@ class RoleSyncTest {
     private fun reportRoles(vararg roles: String) {
         mockMvc
             .put("/api/discord-roles") {
-                header("Authorization", "Bearer test-token")
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"roles":[${roles.joinToString(",")}]}"""
             }.andExpect { status { isNoContent() } }
@@ -302,7 +302,7 @@ class RoleSyncTest {
         val started =
             mockMvc
                 .post("/api/verifications") {
-                    header("Authorization", "Bearer test-token")
+                    header("Authorization", "Bearer test-service-token-at-least-32-chars")
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"discordUserId":"$discordUserId","wareraUsername":"$username"}"""
                 }.andReturn()
@@ -311,7 +311,7 @@ class RoleSyncTest {
         warera.companyName = code
         mockMvc
             .post("/api/verifications/check") {
-                header("Authorization", "Bearer test-token")
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"discordUserId":"$discordUserId","code":"$code"}"""
             }.andExpect { jsonPath("$.type") { value("checking") } }

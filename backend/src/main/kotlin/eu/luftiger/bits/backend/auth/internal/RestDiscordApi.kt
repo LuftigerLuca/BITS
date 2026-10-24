@@ -11,8 +11,14 @@ class RestDiscordApi(
 ) : DiscordApi {
     override fun getCurrentUser(accessToken: String): DiscordUser = get("/users/@me", accessToken, DiscordUser.serializer())
 
-    override fun getCurrentUserGuilds(accessToken: String): List<DiscordGuild> =
-        get("/users/@me/guilds", accessToken, ListSerializer(DiscordGuild.serializer()))
+    override fun getCurrentUserGuilds(
+        accessToken: String,
+        after: String?,
+        limit: Int,
+    ): List<DiscordGuild> {
+        val query = "?limit=$limit" + after?.let { "&after=$it" }.orEmpty()
+        return get("/users/@me/guilds$query", accessToken, ListSerializer(DiscordGuild.serializer()))
+    }
 
     private fun <T> get(
         path: String,

@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.auth.internal
 
+import eu.luftiger.bits.backend.shared.Secrets
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("bits.auth")
@@ -13,8 +14,7 @@ data class AuthProperties(
 ) {
     init {
         require(publicUrl.isNotBlank()) { "bits.auth.public-url must not be blank" }
-        // HS256 needs a key of at least 256 bits.
-        require(jwtSecret.toByteArray().size >= 32) { "bits.auth.jwt-secret must be at least 32 bytes long" }
+        Secrets.requireStrong(jwtSecret, "BITS_JWT_SECRET (bits.auth.jwt-secret)")
     }
 
     /** OAuth2 client of the Discord application; only members of [guildId] may log in. */
@@ -39,11 +39,24 @@ data class AuthProperties(
             get() = username.isNotBlank() && passwordHash.isNotBlank()
 
         init {
-            require(!enabled || BCRYPT_HASH.matches(passwordHash)) { "bits.auth.admin.password-hash must be a BCrypt hash" }
+            if (enabled) {
+                val cost =
+                    BCRYPT_HASH
+                        .matchEntire(passwordHash)
+                        ?.groupValues
+                        ?.get(1)
+                        ?.toInt()
+                requireNotNull(cost) { "BITS_ADMIN_PASSWORD_HASH (bits.auth.admin.password-hash) must be a BCrypt hash" }
+                require(cost >= MIN_BCRYPT_COST) {
+                    "BITS_ADMIN_PASSWORD_HASH (bits.auth.admin.password-hash) needs a BCrypt cost of at least $MIN_BCRYPT_COST, it has $cost"
+                }
+            }
         }
 
-        private companion object {
-            val BCRYPT_HASH = Regex("""^\$2[aby]?\$\d{2}\$[./A-Za-z0-9]{53}$""")
+        companion object {
+            /** Below it, a stolen hash is cracked too quickly. */
+            const val MIN_BCRYPT_COST = 10
+            private val BCRYPT_HASH = Regex("""^\$2[aby]?\$(\d{2})\$[./A-Za-z0-9]{53}$""")
         }
     }
 }

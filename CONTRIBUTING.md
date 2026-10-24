@@ -60,6 +60,12 @@ The body explains what changed and why, not how.
   `/web/admin/**` the role `ADMIN`). These are separate Spring Security filter chains from the bot's `/api/**`,
   and only they are forwarded by nginx and the Vite dev proxy. DTOs of these endpoints stay in the backend
   module, since the bot does not use them.
+- The prefix of a controller's path decides its protection: `/api/` the service token, `/web/` the session,
+  `/web/admin/` the role `ADMIN` (admin controllers also carry `@PreAuthorize("hasRole('ADMIN')")`), `/auth/`
+  none. Everything else is denied. `EndpointPathTest` fails for other prefixes and for new paths under `/auth/`,
+  which have to be added to its list on purpose.
+- Requests to `/auth/**` and `/web/**` that change state must come from the dashboard's origin
+  (`BITS_PUBLIC_URL`); `SameOriginFilter` rejects others.
 - The bot calls the backend only through the REST API under `/api/**`, with the service token as a bearer token.
   The backend reaches the bot only through events in the Redis stream `bits:events`.
 - Publish events for the bot with `EventPublisher`, inside the transaction that makes the change they report.
@@ -133,8 +139,9 @@ Modules without anything to expose have no `api/`, and modules without their own
   not what.
 - Get the current time from the injected `Clock`, never from `Instant.now()`, so tests can control it.
 - **Logging:** Logs may name single IDs that are needed to follow up on a problem: a Discord user, role or
-  guild ID, a stream entry ID, an event type. They never contain payloads, member lists, the pairing of a
-  Discord account with a WarEra account, verification codes, tokens or passwords. Log an event by its type,
+  guild ID, a stream entry ID, an event type, the subject of a dashboard session, and the client IP of a login.
+  They never contain payloads, member lists, the pairing of a Discord account with a WarEra account, verification
+  codes, tokens, passwords or the username of a failed login. Log an event by its type,
   stream ID and `occurredAt`.
 
 ## Tests

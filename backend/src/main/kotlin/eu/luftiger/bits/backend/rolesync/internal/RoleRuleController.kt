@@ -6,6 +6,9 @@ import eu.luftiger.bits.warera.WareraApiException
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 
 /** Rules of the role sync in the dashboard. Only for admins, see the security config of `/web/admin/`. */
 @RestController
+@PreAuthorize("hasRole('ADMIN')")
 @RequestMapping("/web/admin/role-sync")
 class RoleRuleController(
     private val ruleService: RoleRuleService,
@@ -35,13 +39,22 @@ class RoleRuleController(
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @RequestBody request: CreateRuleRequest,
-    ): RuleResponse = ruleService.create(request)
+        @AuthenticationPrincipal session: Jwt,
+    ): RuleResponse {
+        val rule = ruleService.create(request)
+        log.info("Rule {} ({}) for role {} created by {}", rule.id, request.type, rule.roleId, session.subject)
+        return rule
+    }
 
     @DeleteMapping("/rules/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(
         @PathVariable id: Long,
-    ) = ruleService.delete(id)
+        @AuthenticationPrincipal session: Jwt,
+    ) {
+        ruleService.delete(id)
+        log.info("Rule {} deleted by {}", id, session.subject)
+    }
 
     @GetMapping("/countries")
     fun countries(): List<OptionResponse> = ruleService.countries()
