@@ -22,7 +22,7 @@ const DISCORD_ERRORS: Record<string, string> = {
 }
 
 export function LoginPage() {
-  const { user } = useAuth()
+  const { user, sessionExpired } = useAuth()
   const [searchParams] = useSearchParams()
   const [adminLoginEnabled, setAdminLoginEnabled] = useState(false)
 
@@ -49,6 +49,11 @@ export function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {sessionExpired && !discordError && (
+            <Alert>
+              <AlertDescription>Deine Sitzung ist abgelaufen, bitte melde dich erneut an.</AlertDescription>
+            </Alert>
+          )}
           {discordError && (
             <Alert variant="destructive">
               <AlertDescription>{discordError}</AlertDescription>
@@ -130,7 +135,8 @@ function AdminLoginForm() {
 function adminLoginError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'Benutzername oder Passwort falsch.'
-    if (error.status === 429) return 'Zu viele Fehlversuche. Bitte versuche es in 15 Minuten erneut.'
+    // The lockout ends a fixed time after the first attempt, or later if the whole login is locked; the page cannot tell.
+    if (error.status === 429) return 'Zu viele Anmeldeversuche. Die Admin-Anmeldung ist vorübergehend gesperrt, versuche es später erneut.'
   }
   return 'Die Anmeldung ist fehlgeschlagen. Bitte versuche es später erneut.'
 }

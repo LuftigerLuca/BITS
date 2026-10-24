@@ -104,7 +104,7 @@ class VerifyCommand(
                         hook.sendMessage("Das dauert gerade länger als erwartet. Versuche es gleich noch einmal.").queue()
                     else -> {
                         log.error("Verification call to backend failed", e)
-                        hook.sendMessage("Das Backend ist gerade nicht erreichbar.").queue()
+                        hook.sendMessage(BITS_UNAVAILABLE_MESSAGE).queue()
                     }
                 }
             }
@@ -154,8 +154,8 @@ class VerifyCommand(
         internal fun checkMessage(response: CheckVerificationResponse): String =
             when (response) {
                 is CheckVerificationResponse.Linked ->
-                    "Fertig! Dein Discord-Account ist jetzt mit **${escape(response.wareraUsername)}** verknüpft. Du kannst den Code " +
-                        "wieder aus dem Firmennamen entfernen."
+                    "Fertig! Dein Discord-Account ist jetzt mit **${escape(response.wareraUsername)}** verknüpft. Deine Rollen " +
+                        "bekommst du in den nächsten Minuten automatisch. Du kannst den Code wieder aus dem Firmennamen entfernen."
                 // Answered by the event, never shown.
                 CheckVerificationResponse.Checking -> "Ich prüfe deinen Code …"
                 CheckVerificationResponse.WareraUnavailable -> WARERA_UNAVAILABLE_MESSAGE

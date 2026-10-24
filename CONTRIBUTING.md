@@ -16,7 +16,7 @@ changes are made and how they get into `main`.
 GitHub Actions runs on every pull request and on `main`; all three jobs are required for merging:
 
 - **Gradle:** `./gradlew build` without the frontend, i.e. ktlint and all tests incl. Testcontainers
-- **Frontend:** `npm ci`, `npm run lint` and `npm run build`
+- **Frontend:** `npm ci`, `npm run lint`, `npm test` and `npm run build`
 - **Conventions:** PR title and branch name follow the rules below
 
 The workflow **Images** builds the backend, bot and frontend images and scans them with Trivy; it fails on a
@@ -141,8 +141,12 @@ Modules without anything to expose have no `api/`, and modules without their own
 
 - **Kotlin:** ktlint (`ktlint_official`), no wildcard imports. `./gradlew ktlintFormat` formats the code,
   `./gradlew build` checks it.
-- **Frontend:** TypeScript, React and shadcn/ui, linted with oxlint (`npm run lint`). shadcn components live in
-  `frontend/src/components/ui`.
+- **Frontend:** TypeScript, React and shadcn/ui, linted with oxlint (`npm run lint`). Under `frontend/src`:
+  `pages/` holds only what a route renders, `features/<feature>/` the components, queries and texts of one feature
+  (e.g. `features/role-sync/`), `components/` what several features share, and `components/ui` the shadcn
+  components. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
+  mutation invalidates what it changes instead of reloading by hand. While data loads or after it failed, show
+  `LoadingState` or `ErrorState` from `components/QueryState.tsx`, never the empty state.
 - `.editorconfig` defines indentation and line endings.
 - **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (Discord messages,
   dashboard) is in German.
@@ -162,6 +166,8 @@ Modules without anything to expose have no `api/`, and modules without their own
 - Backend tests run against real PostgreSQL and Redis with Testcontainers, and so do the bot's tests of the
   event consumer, so they need Docker.
 - Tests never call external services (WarEra, Discord). Replace them with fakes.
+- Frontend tests use Vitest and Testing Library in jsdom (`npm test`), next to the code they test. They stub `fetch`
+  with `src/test/fetch.ts` instead of talking to a backend, and render whole pages with `src/test/renderApp.tsx`.
 
 ## Configuration and secrets
 

@@ -1,10 +1,11 @@
 import { Navigate, Outlet } from 'react-router'
+import { UnavailablePage } from '@/pages/UnavailablePage'
 import { useAuth } from './context'
 
 /** Renders the nested routes only with a valid session, otherwise sends the user to the login page. */
 export function RequireAuth() {
-  const { user } = useAuth()
-  if (user === undefined) return null
+  const { user, unavailable } = useAuth()
+  if (user === undefined) return unavailable ? <UnavailablePage /> : null
   if (user === null) return <Navigate to="/login" replace />
   return <Outlet />
 }

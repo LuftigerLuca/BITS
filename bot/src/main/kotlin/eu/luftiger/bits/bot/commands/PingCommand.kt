@@ -27,7 +27,7 @@ class PingCommand(
                     "Pong! Pings bisher: ${response.pingCount}, WarEra: $countries"
                 } catch (e: Exception) {
                     log.error("Ping to backend failed", e)
-                    "Das Backend ist gerade nicht erreichbar."
+                    BITS_UNAVAILABLE_MESSAGE
                 }
             event.hook.sendMessage(message).queue()
         }
@@ -36,6 +36,6 @@ class PingCommand(
     companion object {
         const val NAME = "ping"
 
-        val data: SlashCommandData = Commands.slash(NAME, "Prüft die Verbindung zum Backend")
+        val data: SlashCommandData = Commands.slash(NAME, "Prüft, ob BITS erreichbar ist")
     }
 }

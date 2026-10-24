@@ -5,5 +5,5 @@
 ## Checks
 
 - [ ] `./gradlew build` passes
-- [ ] Frontend: `npm run lint && npm run build` passes (if changed)
+- [ ] Frontend: `npm run lint && npm test && npm run build` passes (if changed)
 - [ ] New environment variables are in `.env.example`
