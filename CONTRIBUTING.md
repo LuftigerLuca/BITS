@@ -53,7 +53,13 @@ The body explains what changed and why, not how.
 
 ## Architecture rules
 
-- Only the **backend** talks to PostgreSQL and the WarEra API. Only the **bot** talks to Discord.
+- Only the **backend** talks to PostgreSQL and the WarEra API. Only the **bot** talks to Discord with the bot
+  token and the gateway. The backend calls Discord solely for the OAuth2 login of the dashboard, with the access
+  token of the user who logs in, and does not keep that token.
+- The dashboard talks to the backend under `/auth/**` (login, logout) and `/web/**` (needs the session cookie,
+  `/web/admin/**` the role `ADMIN`). These are separate Spring Security filter chains from the bot's `/api/**`,
+  and only they are forwarded by nginx and the Vite dev proxy. DTOs of these endpoints stay in the backend
+  module, since the bot does not use them.
 - The bot calls the backend only through the REST API under `/api/**`, with the service token as a bearer token.
   The backend reaches the bot only through events in the Redis stream `bits:events`.
 - REST DTOs and events live in `shared` and are serialized with kotlinx.serialization. New events are subtypes
