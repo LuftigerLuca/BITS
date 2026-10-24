@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/context'
+import { DiscordIcon } from '@/components/DiscordIcon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -59,7 +60,12 @@ export function LoginPage() {
               <AlertDescription>{discordError}</AlertDescription>
             </Alert>
           )}
-          <Button className="w-full" onClick={() => window.location.assign(DISCORD_LOGIN_URL)}>
+          <Button
+            variant="discord"
+            className="w-full"
+            onClick={() => window.location.assign(DISCORD_LOGIN_URL)}
+          >
+            <DiscordIcon data-icon="inline-start" />
             Mit Discord anmelden
           </Button>
         </CardContent>

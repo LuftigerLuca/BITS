@@ -45,6 +45,15 @@ describe('login page', () => {
     expect(screen.queryByLabelText('Benutzername')).not.toBeInTheDocument()
   })
 
+  it('labels the Discord button by its text, not by the logo', async () => {
+    stubFetch({ 'GET /web/me': () => status(401), 'GET /auth/options': () => json({ adminLogin: false }) })
+
+    renderApp('/login')
+
+    const button = await screen.findByRole('button', { name: 'Mit Discord anmelden' })
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('reports wrong credentials', async () => {
     stubLogin(401)
     renderApp('/login')
