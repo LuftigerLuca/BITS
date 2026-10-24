@@ -69,6 +69,18 @@ The body explains what changed and why, not how.
   (`ddl-auto: validate`).
 - Access WarEra through `warera-client`, not directly from backend code.
 
+### Compatibility of DTOs and events
+
+Backend and bot are deployed together, but for a moment they run different versions of `shared`: the backend
+starts before the bot, and a rollback may hit only one of them. Every change to a DTO or event must therefore
+work with the previous version on the other side:
+
+- Add new fields only with a default value. Unknown fields are ignored (`BitsJson`), so older readers are fine.
+- Do not rename or remove a field in one step. Stop using it first, remove it in a later release.
+- Publish a new event type only once the bot that handles it is deployed. The bot leaves an event it cannot
+  read pending and retries it; after a few deliveries it moves it to the dead letter stream
+  `bits:events:dead`, where it can be inspected or added back to `bits:events` by hand.
+
 ## Backend architecture
 
 The backend is a modular monolith built with [Spring Modulith](https://spring.io/projects/spring-modulith).
@@ -112,12 +124,17 @@ Modules without anything to expose have no `api/`, and modules without their own
 - Add KDoc to classes and public functions whose purpose is not clear from their name. Comments explain why,
   not what.
 - Get the current time from the injected `Clock`, never from `Instant.now()`, so tests can control it.
+- **Logging:** Logs may name single IDs that are needed to follow up on a problem: a Discord user, role or
+  guild ID, a stream entry ID, an event type. They never contain payloads, member lists, the pairing of a
+  Discord account with a WarEra account, verification codes, tokens or passwords. Log an event by its type,
+  stream ID and `occurredAt`.
 
 ## Tests
 
 - New logic comes with tests in the style of the existing ones (`kotlin.test`, Ktor `MockEngine`, fakes via
   `@TestConfiguration`).
-- Backend tests run against real PostgreSQL and Redis with Testcontainers, so they need Docker.
+- Backend tests run against real PostgreSQL and Redis with Testcontainers, and so do the bot's tests of the
+  event consumer, so they need Docker.
 - Tests never call external services (WarEra, Discord). Replace them with fakes.
 
 ## Configuration and secrets
