@@ -84,6 +84,29 @@ services:
       timeout: 5s
       retries: 12
 
+  # Dumps the database once a day into BACKUP_PATH on the host, see backup.sh. It runs as the runner's user, so the
+  # dumps belong to the same user as the rest of the deployment, and the host's backup can pick them up.
+  backup:
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+    restart: unless-stopped
+    <<: *hardening
+    user: "${BACKUP_UID:?BACKUP_UID is required}:${BACKUP_GID:?BACKUP_GID is required}"
+    read_only: true
+    mem_limit: ${BACKUP_MEMORY:-128m}
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: bits
+      PGDATABASE: bits
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ${BACKUP_PATH:?BACKUP_PATH is required}:/backups
+
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
     restart: unless-stopped

@@ -34,6 +34,7 @@ a test server, so testing never touches the real WarEra Discord.
    | `BITS_PUBLIC_URL`          | variable | Origin the dashboard is reached under, e.g. `https://bits.example.org`                              |
    | `DISCORD_CLIENT_ID`        | variable | OAuth2 client ID from step 1                                                                        |
    | `BITS_ADMIN_USERNAME`      | variable | Name of the admin account (optional, disabled without it)                                           |
+   | `BACKUP_PATH`              | variable | Directory for the database dumps on the host (optional, default `<DEPLOY_PATH>/backups`)            |
    | `DISCORD_TOKEN`            | secret   | Bot token from step 1                                                                               |
    | `DISCORD_CLIENT_SECRET`    | secret   | OAuth2 client secret from step 1                                                                    |
    | `BITS_SERVICE_TOKEN`       | secret   | Random secret, e.g. `openssl rand -hex 32`                                                          |
@@ -67,14 +68,15 @@ images are named after the environment (`bits-staging-…`), so they do not get 
 Under **Actions → CD → Run workflow**, pick the environment and run it from `main`. The workflow:
 
 1. builds the images, tagged with the commit,
-2. writes `docker-compose.yml` and `.env` (readable only by the runner's user) into `DEPLOY_PATH`,
-3. starts the stack and waits until Postgres, Redis, backend and dashboard are healthy (Flyway migrates on
+2. dumps the database of the running stack, if there is one, see [Backups](#backups),
+3. writes `docker-compose.yml` and `.env` (readable only by the runner's user) into `DEPLOY_PATH`,
+4. starts the stack and waits until Postgres, Redis, backend and dashboard are healthy (Flyway migrates on
    backend startup),
-4. checks that the backend rejects requests without the service token, that the bot connects to Discord and
+5. checks that the backend rejects requests without the service token, that the bot connects to Discord and
    stays up, and that the dashboard answers and forwards `/web` to the backend; that no variant of an `/api` path
    reaches the bot's API through nginx, that a client cannot choose its address with `X-Forwarded-For`, that the
    security headers are set, and that the frontend container reaches neither Redis nor Postgres,
-5. removes older images of the environment, keeping the previous set as a fallback.
+6. removes older images of the environment, keeping the previous set as a fallback.
 
 The bot registers its slash commands on the server at every start, so new commands show up right after a
 deployment.
@@ -92,4 +94,34 @@ new `BITS_JWT_SECRET` in the environment and deploy again. A single session ends
 on their own after one hour.
 
 To roll back, set the image tags in `.env` to the previous commit (`docker images 'bits-staging-*'`) and run
-`docker compose up -d`. A migration that already ran is not undone by that; there are no automatic backups yet.
+`docker compose up -d`. A migration that already ran is not undone by that; restore the dump taken before the
+deployment for it, see below.
+
+## Backups
+
+Postgres holds everything that is hard to get back: the linked accounts and the role rules. Redis only holds
+events and lockouts that expire anyway and needs no backup. The dumps (`pg_dump -Fc`) land in `BACKUP_PATH`,
+readable only by the runner's user:
+
+- `daily/`: the `backup` service of the stack dumps once a day and keeps the newest 7,
+- `weekly/`: the first dump of each week, the newest 4,
+- `pre-deploy/`: the CD workflow dumps before every deployment, since Flyway migrates on startup; the newest 10. If
+  that dump fails, nothing is deployed.
+
+These dumps are on the same host as the database, so they do not survive the loss of the host. **Include
+`BACKUP_PATH` in the host's own backup** (restic, borg, a snapshot of the disk, …), which takes them elsewhere.
+
+To restore a dump, stop everything that writes, replace the database and start again:
+
+```sh
+cd /srv/bits-staging          # DEPLOY_PATH
+docker compose stop backend bot backup
+docker compose exec -T postgres dropdb -U bits bits
+docker compose exec -T postgres createdb -U bits bits
+docker compose exec -T postgres pg_restore -U bits -d bits --no-owner < backups/pre-deploy/bits-….dump
+docker compose up -d
+```
+
+After a dump from before a migration, also roll back the images (see above), or the backend migrates the restored
+database again on startup. Dumps can also be inspected without touching the stack, e.g. with
+`pg_restore --list bits-….dump`.
