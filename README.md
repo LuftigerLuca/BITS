@@ -47,8 +47,10 @@ Im Dashboard melden sich Mitglieder des Discord-Servers mit Discord an (OAuth2, 
 Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, bekommt die Rolle `ADMIN` und sieht
 den Verwaltungsbereich, alle anderen `USER`. Zusätzlich gibt es optional einen Admin-Account mit Benutzername
 und Passwort aus der Umgebung (`BITS_ADMIN_USERNAME`, `BITS_ADMIN_PASSWORD_HASH`), der ohne Discord
-funktioniert; nach 5 Fehlversuchen ist er pro IP für 15 Minuten gesperrt. Die Sitzung ist ein JWT im Cookie,
-gilt 8 Stunden und wird nicht verlängert. Rollen werden nur beim Login geprüft.
+funktioniert. Pro IP werden in 15 Minuten höchstens 5 Anmeldeversuche geprüft, über alle IPs höchstens 50; danach
+ist er bis zum Ende des Zeitfensters gesperrt. Der Hash braucht BCrypt-Kosten von mindestens 10. Die Sitzung ist
+ein JWT im Cookie, gilt 8 Stunden, für `ADMIN` 1 Stunde, und wird nicht verlängert. Rollen werden nur beim Login
+geprüft. Der Logout sperrt die Sitzung auch für Kopien des Cookies.
 
 ## Starten
 

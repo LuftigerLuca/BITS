@@ -10,7 +10,30 @@ import kotlinx.serialization.Serializable
 interface DiscordApi {
     fun getCurrentUser(accessToken: String): DiscordUser
 
-    fun getCurrentUserGuilds(accessToken: String): List<DiscordGuild>
+    /** The guilds of the user, one page of up to [limit] after the guild ID [after], sorted by ID. */
+    fun getCurrentUserGuilds(
+        accessToken: String,
+        after: String? = null,
+        limit: Int = MAX_GUILDS_PER_PAGE,
+    ): List<DiscordGuild>
+
+    /** Pages through the guilds of the user until [guildId] turns up, since Discord returns at most 200 at a time. */
+    fun findCurrentUserGuild(
+        accessToken: String,
+        guildId: String,
+    ): DiscordGuild? {
+        var after: String? = null
+        while (true) {
+            val page = getCurrentUserGuilds(accessToken, after)
+            page.firstOrNull { it.id == guildId }?.let { return it }
+            if (page.size < MAX_GUILDS_PER_PAGE) return null
+            after = page.last().id
+        }
+    }
+
+    companion object {
+        const val MAX_GUILDS_PER_PAGE = 200
+    }
 }
 
 @Serializable

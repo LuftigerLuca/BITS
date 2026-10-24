@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.web.bind.annotation.CookieValue
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -21,6 +23,8 @@ class AuthController(
     private val adminLoginService: AdminLoginService,
     private val sessionTokens: SessionTokens,
     private val properties: AuthProperties,
+    private val jwtDecoder: JwtDecoder,
+    private val revokedSessions: RevokedSessions,
 ) {
     @GetMapping("/options")
     fun options() = AuthOptionsResponse(adminLogin = properties.admin.enabled)
@@ -41,12 +45,20 @@ class AuthController(
             AdminLoginResult.Disabled -> ResponseEntity.notFound().build()
         }
 
+    /** Revokes the session, if the request carries a valid one, so that a copy of the cookie stops working too. */
     @PostMapping("/logout")
-    fun logout(): ResponseEntity<Unit> =
-        ResponseEntity
+    fun logout(
+        @CookieValue(SessionTokens.COOKIE_NAME, required = false) token: String?,
+    ): ResponseEntity<Unit> {
+        token
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { runCatching { jwtDecoder.decode(it) }.getOrNull() }
+            ?.let(revokedSessions::revoke)
+        return ResponseEntity
             .noContent()
             .header(HttpHeaders.SET_COOKIE, sessionTokens.clearedCookie().toString())
             .build()
+    }
 }
 
 @Serializable

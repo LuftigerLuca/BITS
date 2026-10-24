@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.auth.internal
 
 import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
+import org.slf4j.LoggerFactory
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest
@@ -23,23 +24,31 @@ class DiscordLoginService(
     private val discordApi: DiscordApi,
     private val properties: AuthProperties,
 ) : OAuth2UserService<OAuth2UserRequest, OAuth2User> {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     override fun loadUser(userRequest: OAuth2UserRequest): OAuth2User {
         val accessToken = userRequest.accessToken.tokenValue
         try {
-            val guild =
-                discordApi.getCurrentUserGuilds(accessToken).firstOrNull { it.id == properties.discord.guildId }
-                    ?: throw OAuth2AuthenticationException(OAuth2Error(NOT_MEMBER_ERROR))
             val user = discordApi.getCurrentUser(accessToken)
+            val guild = discordApi.findCurrentUserGuild(accessToken, properties.discord.guildId)
+            if (guild == null) {
+                log.info("Discord login of {} rejected: not a member of the guild", user.id)
+                throw OAuth2AuthenticationException(OAuth2Error(NOT_MEMBER_ERROR))
+            }
             val isAdmin = guild.owner || BigInteger(guild.permissions).testBit(ADMINISTRATOR_BIT)
+            val role = if (isAdmin) Role.ADMIN else Role.USER
+            log.info("Discord login of {} as {}", user.id, role)
             return DiscordPrincipal(
                 SessionUser.discord(
                     discordUserId = user.id,
                     name = user.globalName ?: user.username,
                     avatarUrl = avatarUrl(user),
-                    role = if (isAdmin) Role.ADMIN else Role.USER,
+                    role = role,
                 ),
             )
         } catch (e: RestClientException) {
+            // The message names the URL and status, never the access token, which only travels in a header.
+            log.warn("Discord login failed: Discord not reachable ({})", e.message)
             throw OAuth2AuthenticationException(OAuth2Error(DISCORD_UNAVAILABLE_ERROR), e)
         }
     }

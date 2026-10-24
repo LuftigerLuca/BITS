@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
 import org.springframework.http.converter.FormHttpMessageConverter
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -23,9 +24,12 @@ import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorH
 import org.springframework.security.oauth2.client.registration.ClientRegistration
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator
 import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -38,6 +42,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
+import org.springframework.security.web.csrf.CsrfFilter
 import org.springframework.security.web.savedrequest.NullRequestCache
 import org.springframework.web.client.RestClient
 import java.time.Clock
@@ -53,9 +58,16 @@ import javax.crypto.spec.SecretKeySpec
  * - `/web/` requires the session cookie issued by [SessionTokens], and `/web/admin/` the role ADMIN.
  *
  * CSRF tokens are not needed: the session cookie is `SameSite=Strict`, so the browser never sends it with requests
- * started by another site.
+ * started by another site. Other origins of the same site, such as a neighbouring subdomain, are kept out by
+ * [SameOriginFilter] for every request that changes state. The admin controllers also check the role themselves
+ * with `@PreAuthorize`, in case a path is mapped wrongly.
+ *
+ * The HTTP session of the Discord login has a `Secure` cookie with `SameSite=Lax` (Discord's redirect back is a
+ * cross-site navigation) and lives for minutes only, see `server.servlet.session` in `application.yml`. PKCE is used
+ * on top of the state, although Spring Security turns it on only for public clients by default.
  */
 @Configuration(proxyBeanMethods = false)
+@EnableMethodSecurity
 class AuthSecurityConfig {
     @Bean
     @Order(2)
@@ -66,10 +78,12 @@ class AuthSecurityConfig {
         discordLoginService: DiscordLoginService,
         successHandler: DiscordLoginSuccessHandler,
         failureHandler: DiscordLoginFailureHandler,
+        properties: AuthProperties,
     ): SecurityFilterChain {
         http {
             securityMatcher("/auth/**")
             csrf { disable() }
+            addFilterBefore<CsrfFilter>(SameOriginFilter(properties.publicUrl))
             requestCache { requestCache = NullRequestCache() }
             exceptionHandling { authenticationEntryPoint = HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED) }
             authorizeHttpRequests { authorize(anyRequest, permitAll) }
@@ -78,7 +92,12 @@ class AuthSecurityConfig {
                 // Discord's access token is not kept after the login.
                 authorizedClientRepository = DiscardingAuthorizedClientRepository
                 loginPage = "/login"
-                authorizationEndpoint { baseUri = "/auth/oauth2/authorization" }
+                authorizationEndpoint {
+                    authorizationRequestResolver =
+                        DefaultOAuth2AuthorizationRequestResolver(clientRegistrations, "/auth/oauth2/authorization").apply {
+                            setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce())
+                        }
+                }
                 redirectionEndpoint { baseUri = "/auth/oauth2/callback/*" }
                 tokenEndpoint { accessTokenResponseClient = tokenResponseClient }
                 userInfoEndpoint { userService = discordLoginService }
@@ -94,10 +113,12 @@ class AuthSecurityConfig {
     fun webSecurityFilterChain(
         http: HttpSecurity,
         jwtDecoder: JwtDecoder,
+        properties: AuthProperties,
     ): SecurityFilterChain {
         http {
             securityMatcher("/web/**")
             csrf { disable() }
+            addFilterBefore<CsrfFilter>(SameOriginFilter(properties.publicUrl))
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             requestCache { requestCache = NullRequestCache() }
             authorizeHttpRequests {
@@ -155,17 +176,25 @@ class AuthSecurityConfig {
     @Bean
     fun jwtEncoder(properties: AuthProperties): JwtEncoder = NimbusJwtEncoder(ImmutableSecret<SecurityContext>(signingKey(properties)))
 
-    /** Checks the signature and, against the injected [Clock], the expiry. Backend and token share a clock, so no skew. */
+    /**
+     * Checks the signature, the expiry against the injected [Clock] (backend and token share a clock, so no skew) and
+     * the denylist of logged-out sessions.
+     */
     @Bean
     fun jwtDecoder(
         properties: AuthProperties,
         clock: Clock,
+        revokedSessions: RevokedSessions,
     ): JwtDecoder =
         NimbusJwtDecoder
             .withSecretKey(signingKey(properties))
             .macAlgorithm(MacAlgorithm.HS256)
             .build()
-            .apply { setJwtValidator(JwtTimestampValidator(Duration.ZERO).apply { setClock(clock) }) }
+            .apply {
+                setJwtValidator(
+                    DelegatingOAuth2TokenValidator(JwtTimestampValidator(Duration.ZERO).apply { setClock(clock) }, revokedSessions),
+                )
+            }
 
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
