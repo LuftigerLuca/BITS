@@ -107,9 +107,9 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label>Rolle</Label>
+          <Label htmlFor="rule-role">Rolle</Label>
           <Select items={roleItems} value={roleId} onValueChange={setRoleId}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="rule-role" className="w-full">
               <SelectValue placeholder="Rolle wählen" />
             </SelectTrigger>
             <SelectContent>
@@ -125,13 +125,13 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Bedingung</Label>
+          <Label htmlFor="rule-type">Bedingung</Label>
           <Select
             items={typeItems}
             value={type}
             onValueChange={(value) => value && setType(value as ConditionType)}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="rule-type" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -145,9 +145,9 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
         </div>
         {needsCountry && (
           <div className="flex flex-col gap-1.5">
-            <Label>Land</Label>
+            <Label htmlFor="rule-country">Land</Label>
             <Select items={countryItems} value={countryId} onValueChange={setCountryId} disabled={countries.isPending}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="rule-country" className="w-full">
                 <SelectValue placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'} />
               </SelectTrigger>
               <SelectContent>
@@ -162,13 +162,13 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
         )}
         {type === 'GOVERNMENT_OFFICE' && (
           <div className="flex flex-col gap-1.5">
-            <Label>Amt</Label>
+            <Label htmlFor="rule-office">Amt</Label>
             <Select
               items={officeItems}
               value={office}
               onValueChange={(value) => value && setOffice(value as GovernmentOffice)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="rule-office" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -203,9 +203,9 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Military Unit</Label>
+              <Label htmlFor="rule-mu">Military Unit</Label>
               <Select items={muItems} value={muId} onValueChange={setMuId} disabled={muItems.length === 0}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="rule-mu" className="w-full">
                   <SelectValue placeholder={muItems.length === 0 ? 'Erst suchen' : 'MU wählen'} />
                 </SelectTrigger>
                 <SelectContent>

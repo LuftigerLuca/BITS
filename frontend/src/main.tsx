@@ -9,6 +9,9 @@ import { HomePage } from './pages/HomePage.tsx'
 import { Layout } from './pages/Layout.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { createQueryClient } from './lib/queryClient.ts'
+import { followSystemTheme } from './lib/theme.ts'
+
+followSystemTheme()
 
 const queryClient = createQueryClient()
 
