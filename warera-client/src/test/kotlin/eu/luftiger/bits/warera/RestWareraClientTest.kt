@@ -166,6 +166,21 @@ class RestWareraClientTest {
     }
 
     @Test
+    fun `company comes with its owner`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/company.getById?input=%7B%22companyId%22%3A%22c1%22%7D"))
+            .andRespond(
+                withSuccess(
+                    """{"result":{"data":{"_id":"c1","user":"u1","name":"BITS-ABC123","workerCount":2}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        assertEquals(WareraCompany(id = "c1", name = "BITS-ABC123", ownerId = "u1"), client.getCompany("c1"))
+        server.verify()
+    }
+
+    @Test
     fun `retries when rate limited`() {
         server
             .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))

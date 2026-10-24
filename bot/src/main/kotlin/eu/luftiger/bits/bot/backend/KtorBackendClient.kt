@@ -9,6 +9,8 @@ import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UnlinkAccountRequest
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.HttpClientEngine
@@ -66,6 +68,9 @@ class KtorBackendClient(
         discordUserId: String,
         code: String,
     ): CheckVerificationResponse = post("api/verifications/check", CheckVerificationRequest(discordUserId, code))
+
+    override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse =
+        post("api/verifications/unlink", UnlinkAccountRequest(discordUserId))
 
     override suspend fun reportRoles(roles: List<DiscordRoleDto>) {
         http.put("api/discord-roles") {

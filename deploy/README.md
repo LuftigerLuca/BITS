@@ -125,3 +125,21 @@ docker compose up -d
 After a dump from before a migration, also roll back the images (see above), or the backend migrates the restored
 database again on startup. Dumps can also be inspected without touching the stack, e.g. with
 `pg_restore --list bits-….dump`.
+
+## Data protection requests
+
+What BITS stores and for how long is listed under "Datenschutz" in the [README](../README.md#datenschutz). Members
+delete their link themselves with `/unverify`. To tell someone what is stored about them, look up their Discord ID:
+
+```sh
+cd /srv/bits-staging          # DEPLOY_PATH
+docker compose exec -T postgres psql -U bits -d bits -v id='<discord id>' <<'SQL'
+SELECT * FROM account_link WHERE discord_user_id = :'id';
+SELECT * FROM account_verification WHERE discord_user_id = :'id';
+SELECT * FROM ping_log WHERE discord_user_id = :'id';
+SQL
+```
+
+To delete it for them, run the same with `DELETE FROM` instead of `SELECT * FROM`. The hourly sync then takes the
+managed roles away. The dumps in `BACKUP_PATH` still hold the data until they rotate out, at most four weeks; the
+copies the host's own backup took follow its retention.

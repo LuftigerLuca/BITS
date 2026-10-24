@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.backend
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -45,6 +46,20 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "wrong", MockEngine { respond("", HttpStatusCode.Unauthorized) })
 
             assertFails { client.ping("42") }
+        }
+
+    @Test
+    fun `unlink posts the user and reads the former link`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals("http://backend:8080/api/verifications/unlink", request.url.toString())
+                    assertEquals("""{"discordUserId":"42"}""", request.body.toByteArray().decodeToString())
+                    respond("""{"wareraUsername":"Luftiger"}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(UnlinkAccountResponse(wareraUsername = "Luftiger"), client.unlinkAccount("42"))
         }
 
     @Test

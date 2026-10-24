@@ -9,7 +9,7 @@ data class PingRequest(
 
 @Serializable
 data class PingResponse(
-    /** Number of pings the backend has stored so far, including this one. */
+    /** Number of pings the backend has stored, including this one; pings are kept for 30 days. */
     val pingCount: Long,
     /** Number of countries reported by the WarEra API, or null if it could not be reached. */
     val wareraCountryCount: Int?,

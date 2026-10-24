@@ -244,6 +244,25 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `unlinking syncs the member, who then gets none of the managed roles`() {
+        link("1", "w1")
+        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        assertEquals(setOf("r-citizen"), grantedRoles(awaitEvents(1).single(), "1"))
+
+        mockMvc
+            .post("/api/verifications/unlink") {
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"discordUserId":"1"}"""
+            }.andExpect { jsonPath("$.wareraUsername") { value("Luftiger") } }
+
+        val event = awaitEvents(2).last() as RoleSyncEvent
+        assertEquals(listOf("1"), event.discordUserIds)
+        assertEquals(listOf("r-citizen"), event.managedRoleIds)
+        assertEquals(emptySet(), event.members.keys)
+    }
+
+    @Test
     fun `rule changes while a sync runs are merged into one`() {
         // A user no sync has seen yet, so the first one has to look them up and can be held there.
         warera.users["w3"] = WareraUser("w3", "Third", country = "de", leveling = WareraUser.Leveling(1))
@@ -490,7 +509,8 @@ class RoleSyncTest {
 
         override fun getCompanyIds(userId: String) = available { listOf("c-$userId") }
 
-        override fun getCompany(companyId: String) = available { WareraCompany(companyId, companyName) }
+        override fun getCompany(companyId: String) =
+            available { WareraCompany(companyId, companyName, ownerId = companyId.removePrefix("c-")) }
 
         override fun getGovernment(countryId: String) =
             available {

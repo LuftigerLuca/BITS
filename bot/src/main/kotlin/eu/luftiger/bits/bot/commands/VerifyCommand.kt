@@ -148,8 +148,21 @@ class VerifyCommand(
                 "20 Zeichen, weiterer Text neben dem Code ist aber erlaubt.\n" +
                 "2. Klicke danach auf „Prüfen“.\n\n" +
                 "Der Code ist gültig bis <t:$expiresAt:t> (<t:$expiresAt:R>). Nach der Verknüpfung kannst du ihn wieder aus dem " +
-                "Firmennamen entfernen."
+                "Firmennamen entfernen.\n\n" +
+                PRIVACY_NOTICE + "\n\n" +
+                SOCIAL_ENGINEERING_WARNING
         }
+
+        /** What the data protection section of the README says, in short. */
+        internal const val PRIVACY_NOTICE =
+            "BITS speichert deine Discord-ID zusammen mit deinem WarEra-Account, um dir passende Rollen zu geben. Mit " +
+                "`/${UnverifyCommand.NAME}` löschst du die Verknüpfung jederzeit."
+
+        /** The code proves who renamed the company, not who asked for it; see VerificationService in the backend. */
+        internal const val SOCIAL_ENGINEERING_WARNING =
+            "⚠️ Trage nur Codes ein, die du selbst mit `/verify` bekommen hast. Bittet dich jemand, einen Code in einen " +
+                "Firmennamen zu schreiben, etwa für ein Gewinnspiel, will er deinen WarEra-Account mit seinem Discord-Account " +
+                "verknüpfen und deine Rollen bekommen."
 
         internal fun checkMessage(response: CheckVerificationResponse): String =
             when (response) {

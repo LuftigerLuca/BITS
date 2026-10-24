@@ -1,11 +1,13 @@
 package eu.luftiger.bits.backend
 
 import com.jayway.jsonpath.JsonPath
+import eu.luftiger.bits.backend.account.internal.VerificationCleanup
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
@@ -29,6 +31,11 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -55,6 +62,9 @@ class AccountVerificationTest {
 
     @Autowired
     lateinit var incompletePublications: IncompleteEventPublications
+
+    @Autowired
+    lateinit var cleanup: VerificationCleanup
 
     @BeforeTest
     fun reset() {
@@ -92,7 +102,13 @@ class AccountVerificationTest {
 
         assertEquals("w1", jdbc.queryForObject("SELECT warera_user_id FROM account_link WHERE discord_user_id = '1'", String::class.java))
         assertEquals(
-            AccountLinkedEvent(discordUserId = "1", wareraUserId = "w1", previousDiscordUserId = null, occurredAt = clock.millis()),
+            AccountLinkedEvent(
+                discordUserId = "1",
+                wareraUserId = "w1",
+                previousDiscordUserId = null,
+                occurredAt = clock.millis(),
+                wareraUsername = "Luftiger",
+            ),
             events().filterIsInstance<AccountLinkedEvent>().single(),
         )
     }
@@ -116,12 +132,69 @@ class AccountVerificationTest {
     }
 
     @Test
+    fun `two checks at the same time run once`() {
+        val code = startedCode("1", "Luftiger")
+        warera.rename("c1", code)
+        warera.companyLookups.set(0)
+
+        val responses = inParallel(2) { checkRequest("1", code) }
+
+        assertEquals(setOf(CheckVerificationResponse.Checking, CheckVerificationResponse.TooEarly(10)), responses.toSet())
+        assertEquals(CheckVerificationResponse.Linked("Luftiger"), awaitResult(code))
+        assertEquals(1, warera.companyLookups.get())
+        assertEquals(1, events().filterIsInstance<AccountLinkedEvent>().size)
+    }
+
+    @Test
+    fun `two accounts linking the same WarEra account at the same time both succeed, the later one wins`() {
+        val first = startedCode("1", "Luftiger")
+        val second = startedCode("2", "Luftiger")
+        warera.rename("c1", "$first $second")
+        // Both checks find their code before either links, so neither sees the other's link.
+        warera.holdCompanies(2)
+
+        val results = inParallel(2) { i -> check(if (i == 0) "1" else "2", if (i == 0) first else second) }
+
+        assertEquals(List(2) { CheckVerificationResponse.Linked("Luftiger") }, results)
+        val linked = events().filterIsInstance<AccountLinkedEvent>()
+        val winner = jdbc.queryForObject("SELECT discord_user_id FROM account_link WHERE warera_user_id = 'w1'", String::class.java)
+        assertEquals(1, count("account_link"))
+        assertEquals(winner, linked.last().discordUserId)
+        assertEquals(setOf("1", "2") - winner, setOfNotNull(linked.last().previousDiscordUserId))
+    }
+
+    @Test
+    fun `code in the name of a company the user does not own does not count`() {
+        val code = startedCode("1", "Luftiger")
+        // WarEra lists a company of somebody else among the user's companies.
+        warera.companies.getValue("w1") += WareraCompany("c3", code, ownerId = "w2")
+
+        assertEquals(CheckVerificationResponse.CodeMissing, check("1", code))
+        assertEquals(0, count("account_link"))
+    }
+
+    @Test
     fun `code expires after 15 minutes`() {
         val code = startedCode("1", "Luftiger")
         warera.rename("c1", code)
 
         clock.advance(Duration.ofMinutes(15))
         assertEquals(CheckVerificationResponse.Expired, check("1", code))
+        assertEquals(0, count("account_verification"))
+    }
+
+    @Test
+    fun `expired verifications are deleted an hour after they expired`() {
+        startedCode("1", "Luftiger")
+        clock.advance(Duration.ofMinutes(10))
+        startedCode("2", "Other")
+
+        clock.advance(Duration.ofMinutes(66))
+        cleanup.deleteExpired()
+        assertEquals(listOf("2"), jdbc.queryForList("SELECT discord_user_id FROM account_verification", String::class.java))
+
+        clock.advance(Duration.ofMinutes(10))
+        cleanup.deleteExpired()
         assertEquals(0, count("account_verification"))
     }
 
@@ -149,6 +222,29 @@ class AccountVerificationTest {
             jdbc.query("SELECT discord_user_id, warera_user_id FROM account_link") { rs, _ -> rs.getString(1) to rs.getString(2) },
         )
         assertEquals(listOf(null, "1", null), events().filterIsInstance<AccountLinkedEvent>().map { it.previousDiscordUserId })
+    }
+
+    @Test
+    fun `unlinking deletes the link and the open code of the user`() {
+        link("1", "Luftiger")
+        startedCode("1", "Other")
+        link("2", "Other")
+
+        unlink("1").andExpect { jsonPath("$.wareraUsername") { value("Luftiger") } }
+
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM account_link WHERE discord_user_id = '1'", Int::class.java))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM account_verification WHERE discord_user_id = '1'", Int::class.java))
+        assertEquals(1, count("account_link"))
+    }
+
+    @Test
+    fun `unlinking an account that is not linked says so`() {
+        val body =
+            unlink("1")
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response.contentAsString
+        assertEquals(UnlinkAccountResponse(wareraUsername = null), BitsJson.decodeFromString<UnlinkAccountResponse>(body))
     }
 
     @Test
@@ -214,23 +310,56 @@ class AccountVerificationTest {
         username: String,
     ): ResultActionsDsl = post("/api/verifications", """{"discordUserId":"$discordUserId","wareraUsername":"$username"}""")
 
+    private fun unlink(discordUserId: String) = post("/api/verifications/unlink", """{"discordUserId":"$discordUserId"}""")
+
     /** The answer to the request, or the result of the background check that follows as event. */
     private fun check(
         discordUserId: String,
         code: String,
     ): CheckVerificationResponse {
         val before = checkedEvents(code).size
-        val body =
-            post("/api/verifications/check", """{"discordUserId":"$discordUserId","code":"$code"}""")
-                .andReturn()
-                .response.contentAsString
-        val response = BitsJson.decodeFromString<CheckVerificationResponse>(body)
+        val response = checkRequest(discordUserId, code)
         if (response != CheckVerificationResponse.Checking) return response
         repeat(100) {
             checkedEvents(code).getOrNull(before)?.let { return it.result }
             Thread.sleep(50)
         }
         fail("no result for the check of $code")
+    }
+
+    private fun checkRequest(
+        discordUserId: String,
+        code: String,
+    ): CheckVerificationResponse {
+        val body =
+            post("/api/verifications/check", """{"discordUserId":"$discordUserId","code":"$code"}""")
+                .andReturn()
+                .response.contentAsString
+        return BitsJson.decodeFromString<CheckVerificationResponse>(body)
+    }
+
+    /** Runs [block] on [threads] threads that start at the same moment. */
+    private fun <T> inParallel(
+        threads: Int,
+        block: (Int) -> T,
+    ): List<T> {
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(threads)
+        try {
+            val futures = (0 until threads).map { i -> executor.submit<T> { start.await().let { block(i) } } }
+            start.countDown()
+            return futures.map { it.get(10, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun awaitResult(code: String): CheckVerificationResponse {
+        repeat(100) {
+            checkedEvents(code).singleOrNull()?.let { return it.result }
+            Thread.sleep(50)
+        }
+        fail("no single result for the check of $code: ${checkedEvents(code)}")
     }
 
     private fun checkedEvents(code: String) = events().filterIsInstance<VerificationCheckedEvent>().filter { it.code == code }
@@ -258,14 +387,23 @@ class AccountVerificationTest {
     /** Two WarEra users, each with one company: Luftiger (w1, c1) and Other (w2, c2). */
     class FakeWarera : WareraClient {
         private val users = listOf(WareraUser("w1", "Luftiger"), WareraUser("w2", "Other"))
-        val companies = mutableMapOf<String, MutableList<WareraCompany>>()
+        val companies = ConcurrentHashMap<String, MutableList<WareraCompany>>()
+        val companyLookups = AtomicInteger()
+        private var companyGate: CountDownLatch? = null
         var down = false
 
         fun reset() {
             companies.clear()
-            companies["w1"] = mutableListOf(WareraCompany("c1", "Waffen GmbH"))
-            companies["w2"] = mutableListOf(WareraCompany("c2", "Brot AG"))
+            companies["w1"] = mutableListOf(WareraCompany("c1", "Waffen GmbH", "w1"))
+            companies["w2"] = mutableListOf(WareraCompany("c2", "Brot AG", "w2"))
+            companyLookups.set(0)
+            companyGate = null
             down = false
+        }
+
+        /** The next [lookups] lookups of company lists wait for each other. */
+        fun holdCompanies(lookups: Int) {
+            companyGate = CountDownLatch(lookups)
         }
 
         fun rename(
@@ -283,7 +421,15 @@ class AccountVerificationTest {
 
         override fun getUser(userId: String) = available { users.first { it.id == userId } }
 
-        override fun getCompanyIds(userId: String) = available { companies[userId].orEmpty().map { it.id } }
+        override fun getCompanyIds(userId: String) =
+            available {
+                companyLookups.incrementAndGet()
+                companyGate?.let {
+                    it.countDown()
+                    it.await(10, TimeUnit.SECONDS)
+                }
+                companies[userId].orEmpty().map { it.id }
+            }
 
         override fun getCompany(companyId: String) = available { companies.values.flatten().first { it.id == companyId } }
 

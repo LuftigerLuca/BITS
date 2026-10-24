@@ -27,6 +27,8 @@ data class AccountLinkedEvent(
     /** Discord account the WarEra account was linked to before, if it was another one. */
     val previousDiscordUserId: String?,
     override val occurredAt: Long,
+    /** WarEra username at the time of linking, for the message to the previous Discord account. */
+    val wareraUsername: String? = null,
 ) : BitsEvent
 
 /** Result of a verification check that answered [CheckVerificationResponse.Checking]. */

@@ -5,6 +5,7 @@ import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -66,5 +67,7 @@ class RoleReporterTest {
             discordUserId: String,
             code: String,
         ): CheckVerificationResponse = TODO()
+
+        override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse = TODO()
     }
 }

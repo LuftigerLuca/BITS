@@ -34,6 +34,9 @@ bits:
     base-url: ${WARERA_BASE_URL:https://api2.warera.io/trpc}
   role-sync:
     cron: "0 0 * * * *"
+  # Deletes data BITS no longer needs, see "Datenschutz" in the README.
+  cleanup:
+    cron: "0 30 * * * *"
   auth:
     public-url: ${BITS_PUBLIC_URL:http://localhost:5173}
     jwt-secret: ${BITS_JWT_SECRET:}

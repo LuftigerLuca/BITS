@@ -29,7 +29,8 @@ Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das der Bot verarb
 Mit `/verify <WarEra-Name>` verknüpft ein Nutzer seinen Discord-Account mit seinem WarEra-Account. Er bekommt
 einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer seiner WarEra-Firmen und klickt auf
 „Prüfen“. Das Backend sucht den Code über die öffentliche API, speichert die Verknüpfung und publiziert ein
-`AccountLinkedEvent`.
+`AccountLinkedEvent`. Der Code zählt nur in Firmen, die dem Nutzer gehören. Mit `/unverify` löst er die Verknüpfung
+wieder.
 
 Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an ein WarEra-Merkmal koppeln:
 Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit, Level oder Militärrang ab
@@ -51,6 +52,27 @@ funktioniert. Pro IP werden in 15 Minuten höchstens 5 Anmeldeversuche geprüft,
 ist er bis zum Ende des Zeitfensters gesperrt. Der Hash braucht BCrypt-Kosten von mindestens 10. Die Sitzung ist
 ein JWT im Cookie, gilt 8 Stunden, für `ADMIN` 1 Stunde, und wird nicht verlängert. Rollen werden nur beim Login
 geprüft. Der Logout sperrt die Sitzung auch für Kopien des Cookies.
+
+## Datenschutz
+
+BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
+
+| Daten                                            | Wo                         | Wozu                              | Wie lange                                                                   |
+|--------------------------------------------------|----------------------------|-----------------------------------|-----------------------------------------------------------------------------|
+| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten vergeben | bis `/unverify` oder bis eine neue Verknüpfung sie ersetzt                  |
+| Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung              | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
+| Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                           | 30 Tage                                                                     |
+| Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot             | 7 Tage                                                                      |
+| Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                       | im Deployment höchstens 5 × 10 MB pro Dienst                                |
+| alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                 | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
+
+WarEra-Daten der Nutzer hält das Backend nur im Speicher. Ein Hinweis in `/verify` sagt, was gespeichert wird.
+Mit `/unverify` löscht ein Nutzer seine Verknüpfung und einen offenen Code; die Rollen, die BITS verwaltet, verliert
+er beim folgenden Abgleich. Abgelaufene Codes und alte Pings löscht ein Job jede Stunde. Wie Admins Auskunft geben
+oder für jemanden löschen, steht in [deploy/README.md](deploy/README.md#data-protection-requests).
+
+Verifiziert sich ein anderer Discord-Account für einen schon verknüpften WarEra-Account, ersetzt die neue
+Verknüpfung die alte. Der vorherige Account bekommt dann eine Direktnachricht vom Bot, falls er welche annimmt.
 
 ## Starten
 

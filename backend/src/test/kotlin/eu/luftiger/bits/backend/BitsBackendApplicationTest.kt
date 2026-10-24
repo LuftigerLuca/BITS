@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend
 
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.ping.internal.PingLogCleanup
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.decodeEvent
@@ -56,6 +57,9 @@ class BitsBackendApplicationTest {
 
     @Autowired
     lateinit var transactionTemplate: TransactionTemplate
+
+    @Autowired
+    lateinit var pingLogCleanup: PingLogCleanup
 
     /** The containers are shared with the other test classes. */
     @BeforeTest
@@ -148,6 +152,16 @@ class BitsBackendApplicationTest {
             val elapsed = Duration.ofNanos(System.nanoTime() - started)
             assertTrue(elapsed < Duration.ofSeconds(5), "took $elapsed")
         }
+    }
+
+    @Test
+    fun `pings are deleted after 30 days`() {
+        jdbc.update("INSERT INTO ping_log (discord_user_id, created_at) VALUES ('old', now() - interval '31 days')")
+        jdbc.update("INSERT INTO ping_log (discord_user_id, created_at) VALUES ('recent', now() - interval '29 days')")
+
+        pingLogCleanup.deleteOld()
+
+        assertEquals(listOf("recent"), jdbc.queryForList("SELECT discord_user_id FROM ping_log", String::class.java))
     }
 
     private fun streamEvents() =
