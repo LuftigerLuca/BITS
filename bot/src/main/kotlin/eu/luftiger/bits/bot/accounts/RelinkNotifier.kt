@@ -28,11 +28,11 @@ class RelinkNotifier(
         synchronized(handled) { if (handled.put(key, Unit) != null) return }
         try {
             directMessages.send(previous, message(event))
-            log.info("Told user {} that their WarEra account {} was linked to another Discord account", previous, event.wareraUserId)
+            log.info("Told user {} that their WarEra account was linked to another Discord account", previous)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn("Cannot tell user {} that their WarEra account {} was relinked: {}", previous, event.wareraUserId, e.message)
+            log.warn("Cannot tell user {} that their WarEra account was relinked: {}", previous, e.message)
         }
     }
 

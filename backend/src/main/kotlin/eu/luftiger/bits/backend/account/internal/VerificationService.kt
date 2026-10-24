@@ -191,7 +191,7 @@ class VerificationService(
             link?.let(linkRepository::delete)
             verificationRepository.findByIdOrNull(discordUserId)?.let(verificationRepository::delete)
             if (link != null) {
-                log.info("User {} unlinked WarEra account {}", discordUserId, link.wareraUserId)
+                log.info("User {} unlinked their WarEra account", discordUserId)
                 applicationEvents.publishEvent(AccountUnlinked(discordUserId))
             }
             UnlinkAccountResponse(link?.wareraUsername)
