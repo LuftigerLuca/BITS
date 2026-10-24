@@ -14,7 +14,7 @@ export const OFFICES: Record<GovernmentOffice, string> = {
   MINISTER_OF_ECONOMY: 'Wirtschaftsminister',
   MINISTER_OF_DEFENSE: 'Verteidigungsminister',
   MINISTER_OF_FOREIGN_AFFAIRS: 'Außenminister',
-  CONGRESS: 'Kongress',
+  CONGRESS: 'Kongressmitglied',
 }
 
 export const STATUS: Record<RuleStatus, { label: string; variant: 'secondary' | 'destructive' | 'outline' }> = {
