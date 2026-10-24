@@ -2,6 +2,7 @@ package eu.luftiger.bits.warera
 
 import io.github.resilience4j.ratelimiter.RateLimiter
 import io.github.resilience4j.ratelimiter.RateLimiterConfig
+import io.github.resilience4j.ratelimiter.RequestNotPermitted
 import io.github.resilience4j.retry.Retry
 import io.github.resilience4j.retry.RetryConfig
 import kotlinx.serialization.KSerializer
@@ -31,8 +32,7 @@ class RestWareraClient(
 ) : WareraClient {
     override fun getAllCountries(): List<WareraCountry> = query("country.getAllCountries", ListSerializer(WareraCountry.serializer()))
 
-    override fun searchUserIds(text: String): List<String> =
-        query("search.searchAnything", SearchResult.serializer(), buildJsonObject { put("searchText", text) }).userIds
+    override fun searchUserIds(text: String): List<String> = search(text).userIds
 
     override fun getUser(userId: String): WareraUser =
         query("user.getUserLite", WareraUser.serializer(), buildJsonObject { put("userId", userId) })
@@ -57,6 +57,17 @@ class RestWareraClient(
     override fun getCompany(companyId: String): WareraCompany =
         query("company.getById", WareraCompany.serializer(), buildJsonObject { put("companyId", companyId) })
 
+    override fun getGovernment(countryId: String): WareraGovernment =
+        query("government.getByCountryId", WareraGovernment.serializer(), buildJsonObject { put("countryId", countryId) })
+
+    override fun searchMilitaryUnitIds(text: String): List<String> = search(text).muIds
+
+    override fun getMilitaryUnit(muId: String): WareraMilitaryUnit =
+        query("mu.getById", WareraMilitaryUnit.serializer(), buildJsonObject { put("muId", muId) })
+
+    private fun search(text: String): SearchResult =
+        query("search.searchAnything", SearchResult.serializer(), buildJsonObject { put("searchText", text) })
+
     private fun <T> query(
         procedure: String,
         serializer: KSerializer<T>,
@@ -78,8 +89,12 @@ class RestWareraClient(
         val body =
             try {
                 Retry.decorateCallable(retry, call).call()
+            } catch (e: HttpClientErrorException.NotFound) {
+                throw WareraNotFoundException("WarEra API call $procedure found nothing", e)
             } catch (e: RestClientException) {
                 throw WareraApiException("WarEra API call $procedure failed", e)
+            } catch (e: RequestNotPermitted) {
+                throw WareraApiException("WarEra API call $procedure was throttled for too long", e)
             }
         return json.decodeFromString(TrpcResponse.serializer(serializer), body).result.data
     }
@@ -96,7 +111,8 @@ class RestWareraClient(
 
     @Serializable
     private data class SearchResult(
-        val userIds: List<String>,
+        val userIds: List<String> = emptyList(),
+        val muIds: List<String> = emptyList(),
     )
 
     @Serializable

@@ -29,6 +29,36 @@ data class AccountLinkedEvent(
     override val occurredAt: Long,
 ) : BitsEvent
 
+/**
+ * Target state of the roles BITS manages. The bot gives each member the roles in [members] and takes away every other
+ * role of [managedRoleIds], except for those listed in [MemberRoles.keepRoleIds].
+ */
+@Serializable
+@SerialName("role_sync")
+data class RoleSyncEvent(
+    /** Roles that have at least one rule; nobody keeps them without a matching rule. */
+    val managedRoleIds: List<String>,
+    /** Members to sync, or `null` for all members of the guild. */
+    val discordUserIds: List<String>?,
+    /** Target roles by Discord user ID. Members without an entry get none of the managed roles. */
+    val members: Map<String, MemberRoles>,
+    override val occurredAt: Long,
+) : BitsEvent
+
+@Serializable
+data class MemberRoles(
+    val grants: List<RoleGrant>,
+    /** Managed roles that stay as they are, because the WarEra data needed to decide on them could not be loaded. */
+    val keepRoleIds: List<String> = emptyList(),
+)
+
+@Serializable
+data class RoleGrant(
+    val roleId: String,
+    /** Shown in Discord's audit log. */
+    val reason: String,
+)
+
 fun BitsEvent.encode(): String = BitsJson.encodeToString(BitsEvent.serializer(), this)
 
 fun decodeEvent(payload: String): BitsEvent = BitsJson.decodeFromString(BitsEvent.serializer(), payload)

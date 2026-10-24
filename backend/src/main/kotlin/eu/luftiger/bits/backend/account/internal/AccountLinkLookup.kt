@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.account.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinks
+import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.account.api.dto.LinkedWareraAccount
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Component
@@ -11,4 +12,6 @@ class AccountLinkLookup(
 ) : AccountLinks {
     override fun findByDiscordUserId(discordUserId: String): LinkedWareraAccount? =
         linkRepository.findByIdOrNull(discordUserId)?.let { LinkedWareraAccount(it.wareraUserId, it.wareraUsername) }
+
+    override fun findAll(): List<LinkedAccount> = linkRepository.findAll().map { LinkedAccount(it.discordUserId, it.wareraUserId) }
 }

@@ -18,4 +18,17 @@ class BitsEventTest {
 
         assertTrue(payload.contains("\"type\":\"ping\""), payload)
     }
+
+    @Test
+    fun `role sync survives a round trip, including a sync of all members`() {
+        val event =
+            RoleSyncEvent(
+                managedRoleIds = listOf("r1", "r2"),
+                discordUserIds = null,
+                members = mapOf("1" to MemberRoles(grants = listOf(RoleGrant("r1", "BITS: Level ab 10")), keepRoleIds = listOf("r2"))),
+                occurredAt = 5,
+            )
+
+        assertEquals(event, decodeEvent(event.encode()))
+    }
 }
