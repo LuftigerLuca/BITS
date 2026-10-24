@@ -141,8 +141,12 @@ Modules without anything to expose have no `api/`, and modules without their own
 
 - **Kotlin:** ktlint (`ktlint_official`), no wildcard imports. `./gradlew ktlintFormat` formats the code,
   `./gradlew build` checks it.
-- **Frontend:** TypeScript, React and shadcn/ui, linted with oxlint (`npm run lint`). shadcn components live in
-  `frontend/src/components/ui`.
+- **Frontend:** TypeScript, React and shadcn/ui, linted with oxlint (`npm run lint`). Under `frontend/src`:
+  `pages/` holds only what a route renders, `features/<feature>/` the components, queries and texts of one feature
+  (e.g. `features/role-sync/`), `components/` what several features share, and `components/ui` the shadcn
+  components. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
+  mutation invalidates what it changes instead of reloading by hand. While data loads or after it failed, show
+  `LoadingState` or `ErrorState` from `components/QueryState.tsx`, never the empty state.
 - `.editorconfig` defines indentation and line endings.
 - **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (Discord messages,
   dashboard) is in German.

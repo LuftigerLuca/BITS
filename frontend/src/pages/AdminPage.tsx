@@ -1,4 +1,4 @@
-import { RoleRulesCard } from './RoleRulesCard'
+import { RoleRulesCard } from '@/features/role-sync/RoleRulesCard'
 
 export function AdminPage() {
   return (
