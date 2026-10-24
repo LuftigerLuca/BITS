@@ -87,3 +87,15 @@ sealed interface CheckVerificationResponse {
         val retryAfterSeconds: Long,
     ) : CheckVerificationResponse
 }
+
+@Serializable
+data class UnlinkAccountRequest(
+    val discordUserId: String,
+)
+
+/** Answer to `/unverify`; the link and any open code of the user are gone either way. */
+@Serializable
+data class UnlinkAccountResponse(
+    /** WarEra username the Discord account was linked to, or `null` if it was not linked. */
+    val wareraUsername: String?,
+)

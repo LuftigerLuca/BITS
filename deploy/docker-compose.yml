@@ -19,6 +19,14 @@ x-hardening: &hardening
   cap_drop:
     - ALL
 
+# Logs contain Discord and WarEra IDs, so they are rotated rather than kept for good: at most 5 files of 10 MB per
+# container. `docker compose logs` reads them as usual.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "5"
+
 # Memory limits keep one service that gets out of hand from taking the host down with it. The defaults
 # fit a small host; each can be raised through the variable named.
 
@@ -27,6 +35,7 @@ services:
     image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     restart: unless-stopped
     <<: *hardening
+    logging: *logging
     # The entrypoint starts as root to take ownership of a fresh data directory and then hands over to
     # the postgres user. These are what that step needs.
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
@@ -48,6 +57,7 @@ services:
     image: redis:8-alpine@sha256:0bf6577d7774e592b29d093e3ac9390eb91e13d72c21e506afce736de5e0eeb0
     restart: unless-stopped
     <<: *hardening
+    logging: *logging
     # Like Postgres, the entrypoint fixes the ownership of the data directory before dropping root.
     cap_add: [CHOWN, SETGID, SETUID]
     mem_limit: ${REDIS_MEMORY:-256m}
@@ -90,6 +100,7 @@ services:
     image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     restart: unless-stopped
     <<: *hardening
+    logging: *logging
     user: "${BACKUP_UID:?BACKUP_UID is required}:${BACKUP_GID:?BACKUP_GID is required}"
     read_only: true
     mem_limit: ${BACKUP_MEMORY:-128m}
@@ -111,6 +122,7 @@ services:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
     restart: unless-stopped
     <<: *hardening
+    logging: *logging
     # Writes nowhere but to a scratch directory for the JVM.
     user: "65534:65534"
     read_only: true
@@ -151,6 +163,7 @@ services:
     image: ${BOT_IMAGE:?BOT_IMAGE is required}
     restart: unless-stopped
     <<: *hardening
+    logging: *logging
     user: "65534:65534"
     read_only: true
     tmpfs:
@@ -175,6 +188,7 @@ services:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
     restart: unless-stopped
     <<: *hardening
+    logging: *logging
     # The image runs nginx as an unprivileged user on port 8080 (see frontend/Dockerfile).
     read_only: true
     tmpfs:

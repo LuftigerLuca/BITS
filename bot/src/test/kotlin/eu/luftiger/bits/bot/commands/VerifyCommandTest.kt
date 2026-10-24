@@ -32,6 +32,12 @@ class VerifyCommandTest {
     }
 
     @Test
+    fun `started message says what BITS stores and how to delete it`() {
+        assertContains(VerifyCommand.startedMessage(started), VerifyCommand.PRIVACY_NOTICE)
+        assertContains(VerifyCommand.PRIVACY_NOTICE, "`/unverify`")
+    }
+
+    @Test
     fun `started message warns about an existing link`() {
         val message = VerifyCommand.startedMessage(started.copy(linkedWareraUsername = "Old"))
 

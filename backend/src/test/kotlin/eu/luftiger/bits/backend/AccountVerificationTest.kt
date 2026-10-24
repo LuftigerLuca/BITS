@@ -7,6 +7,7 @@ import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
@@ -218,6 +219,29 @@ class AccountVerificationTest {
     }
 
     @Test
+    fun `unlinking deletes the link and the open code of the user`() {
+        link("1", "Luftiger")
+        startedCode("1", "Other")
+        link("2", "Other")
+
+        unlink("1").andExpect { jsonPath("$.wareraUsername") { value("Luftiger") } }
+
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM account_link WHERE discord_user_id = '1'", Int::class.java))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM account_verification WHERE discord_user_id = '1'", Int::class.java))
+        assertEquals(1, count("account_link"))
+    }
+
+    @Test
+    fun `unlinking an account that is not linked says so`() {
+        val body =
+            unlink("1")
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response.contentAsString
+        assertEquals(UnlinkAccountResponse(wareraUsername = null), BitsJson.decodeFromString<UnlinkAccountResponse>(body))
+    }
+
+    @Test
     fun `unreachable WarEra keeps the code valid`() {
         val code = startedCode("1", "Luftiger")
         warera.rename("c1", code)
@@ -279,6 +303,8 @@ class AccountVerificationTest {
         discordUserId: String,
         username: String,
     ): ResultActionsDsl = post("/api/verifications", """{"discordUserId":"$discordUserId","wareraUsername":"$username"}""")
+
+    private fun unlink(discordUserId: String) = post("/api/verifications/unlink", """{"discordUserId":"$discordUserId"}""")
 
     /** The answer to the request, or the result of the background check that follows as event. */
     private fun check(

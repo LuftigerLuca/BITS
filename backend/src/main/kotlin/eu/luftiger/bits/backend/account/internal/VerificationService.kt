@@ -1,12 +1,14 @@
 package eu.luftiger.bits.backend.account.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinked
+import eu.luftiger.bits.backend.account.api.AccountUnlinked
 import eu.luftiger.bits.backend.account.domain.AccountLink
 import eu.luftiger.bits.backend.account.domain.AccountVerification
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
@@ -177,6 +179,22 @@ class VerificationService(
             )
             true
         } == true
+
+    /**
+     * Deletes the link and any open code of the user, everything BITS keeps about a Discord account. The role sync
+     * then takes the managed roles away, since an account without link meets no rule.
+     */
+    fun unlink(discordUserId: String): UnlinkAccountResponse =
+        transactionTemplate.execute {
+            val link = linkRepository.findByIdOrNull(discordUserId)
+            link?.let(linkRepository::delete)
+            verificationRepository.findByIdOrNull(discordUserId)?.let(verificationRepository::delete)
+            if (link != null) {
+                log.info("User {} unlinked WarEra account {}", discordUserId, link.wareraUserId)
+                applicationEvents.publishEvent(AccountUnlinked(discordUserId))
+            }
+            UnlinkAccountResponse(link?.wareraUsername)
+        }!!
 
     /** WarEra has no lookup by name, so the search candidates are compared with the exact username. */
     private fun findUser(username: String): WareraUser? {

@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot
 
 import eu.luftiger.bits.bot.backend.KtorBackendClient
 import eu.luftiger.bits.bot.commands.PingCommand
+import eu.luftiger.bits.bot.commands.UnverifyCommand
 import eu.luftiger.bits.bot.commands.VerifyCommand
 import eu.luftiger.bits.bot.events.EventHandler
 import eu.luftiger.bits.bot.events.LoggingEventHandler
@@ -53,12 +54,12 @@ fun main() {
             .enableIntents(GatewayIntent.GUILD_MEMBERS)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .setChunkingFilter(ChunkingFilter.ALL)
-            .addEventListeners(PingCommand(backend, scope), verifyCommand, roleReporter)
+            .addEventListeners(PingCommand(backend, scope), verifyCommand, UnverifyCommand(backend, scope), roleReporter)
             .build()
             .awaitReady()
 
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
-    guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data).queue()
+    guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data, UnverifyCommand.data).queue()
     roleReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()

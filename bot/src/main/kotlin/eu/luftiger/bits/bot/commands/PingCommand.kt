@@ -24,7 +24,7 @@ class PingCommand(
                 try {
                     val response = backend.ping(event.user.id)
                     val countries = response.wareraCountryCount?.let { "$it Länder" } ?: "nicht erreichbar"
-                    "Pong! Pings bisher: ${response.pingCount}, WarEra: $countries"
+                    "Pong! Pings in den letzten 30 Tagen: ${response.pingCount}, WarEra: $countries"
                 } catch (e: Exception) {
                     log.error("Ping to backend failed", e)
                     BITS_UNAVAILABLE_MESSAGE

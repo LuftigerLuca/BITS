@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinked
+import eu.luftiger.bits.backend.account.api.AccountUnlinked
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.modulith.events.ApplicationModuleListener
@@ -12,8 +13,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Starts syncs in the background: right away for a member who links an account, for everybody after a rule change,
- * and every hour with fresh WarEra data.
+ * Starts syncs in the background: right away for a member who links or unlinks an account, for everybody after a
+ * rule change, and every hour with fresh WarEra data.
  *
  * Two lanes keep the quick syncs from waiting behind the hourly one. The hourly refresh loads every linked user, about
  * one per second, on a lane of its own and publishes nothing; once done, it asks for a sync of all members with the
@@ -54,6 +55,10 @@ class RoleSyncTrigger(
     @ApplicationModuleListener
     fun onAccountLinked(event: AccountLinked) =
         request { pendingMembers += listOfNotNull(event.discordUserId, event.previousDiscordUserId) }
+
+    /** An unlinked account meets no rule, so the member loses the managed roles. */
+    @ApplicationModuleListener
+    fun onAccountUnlinked(event: AccountUnlinked) = request { pendingMembers += event.discordUserId }
 
     @Scheduled(cron = "\${bits.role-sync.cron}")
     fun hourly() {

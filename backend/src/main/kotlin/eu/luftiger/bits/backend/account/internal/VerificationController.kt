@@ -4,6 +4,8 @@ import eu.luftiger.bits.shared.CheckVerificationRequest
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UnlinkAccountRequest
+import eu.luftiger.bits.shared.UnlinkAccountResponse
 import eu.luftiger.bits.warera.WareraApiException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -31,6 +33,11 @@ class VerificationController(
     fun check(
         @RequestBody request: CheckVerificationRequest,
     ): CheckVerificationResponse = verificationService.check(request.discordUserId, request.code)
+
+    @PostMapping("/unlink")
+    fun unlink(
+        @RequestBody request: UnlinkAccountRequest,
+    ): UnlinkAccountResponse = verificationService.unlink(request.discordUserId)
 
     @ExceptionHandler(WareraApiException::class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
