@@ -67,6 +67,9 @@ Für den Discord-Login braucht die Discord-Application unter **OAuth2 → Redire
 - Backend: http://localhost:8080, Health unter `/actuator/health`
 - Frontend: http://localhost:5173
 
+Alle Ports sind nur auf `127.0.0.1` gebunden, da Redis lokal ohne Passwort läuft und Docker die Firewall des
+Rechners umgeht. Wer von einem anderen Gerät zugreifen will, ändert die Bindung in `docker-compose.yml` bewusst.
+
 ## Deployment
 
 Staging (mit eigenem Test-Bot auf einem Test-Server) und später Produktion werden über den Workflow **CD** auf

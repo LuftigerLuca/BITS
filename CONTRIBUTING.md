@@ -68,6 +68,12 @@ The body explains what changed and why, not how.
   (`BITS_PUBLIC_URL`); `SameOriginFilter` rejects others.
 - The bot calls the backend only through the REST API under `/api/**`, with the service token as a bearer token.
   The backend reaches the bot only through events in the Redis stream `bits:events`.
+- **The bot is trusted.** The backend believes every `discordUserId` and every other claim that comes with the
+  service token, so the token stands for full power over all users. It therefore never leaves the compose network:
+  nginx does not forward `/api`, and the CD smoke test checks that. A new `/api` endpoint must not do anything the
+  bot should not be able to do on behalf of any member; an action only some members may take (e.g. an admin
+  action from Discord) has its permission checked by the bot, since only the bot sees who acted. In turn, the bot
+  believes every event in `bits:events`, which is why only the backend's Redis user may write to it.
 - Publish events for the bot with `EventPublisher`, inside the transaction that makes the change they report.
   They are stored in Spring Modulith's event publication registry with it and written to Redis only after the
   commit, again and again until that works. So an event never reports a change that was rolled back, and an

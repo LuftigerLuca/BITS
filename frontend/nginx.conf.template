@@ -1,0 +1,51 @@
+# Filled in by the image's entrypoint at startup (envsubst), see frontend/Dockerfile. Only the variable
+# REAL_IP_FROM is replaced; nginx's own variables stay as they are.
+server {
+    listen 8080;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    # Docker's DNS. Resolving the backend per request, rather than once at startup, lets nginx start before
+    # the backend is up.
+    resolver 127.0.0.11 valid=30s;
+
+    # The client address. Only the TLS proxy in front, at REAL_IP_FROM, may name it, as the last entry of its
+    # X-Forwarded-For; entries further left come from the client and are ignored. From any other peer the peer
+    # itself is the client. The backend locks the admin login by this address.
+    set_real_ip_from ${REAL_IP_FROM};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive off;
+
+    # Only the endpoints of the dashboard reach the backend; the bot's /api stays inside the compose network.
+    location ~ ^/(auth|web)/ {
+        set $backend http://backend:8080;
+        proxy_pass $backend;
+        # Replaces whatever the client sent, so the backend sees one address it can trust.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Host $http_host;
+        # Spring Security sends these too; ours replace them, so no header shows up twice.
+        proxy_hide_header X-Frame-Options;
+        proxy_hide_header X-Content-Type-Options;
+        include /etc/nginx/security-headers.conf;
+    }
+
+    # Built by Vite with a hash in every name, so a file never changes once deployed.
+    location /assets/ {
+        try_files $uri =404;
+        # Not `always`: a 404 must not be cached for a year.
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        include /etc/nginx/security-headers.conf;
+    }
+
+    # Revalidated on every load, so an open tab picks up the asset names of a new deployment.
+    location = /index.html {
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/security-headers.conf;
+    }
+
+    location / {
+        # Single-page app: unknown paths are handled by the client-side router.
+        try_files $uri /index.html;
+        include /etc/nginx/security-headers.conf;
+    }
+}

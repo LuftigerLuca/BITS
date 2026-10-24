@@ -30,6 +30,7 @@ a test server, so testing never touches the real WarEra Discord.
    | `DISCORD_GUILD_ID`         | variable | ID of the server the bot serves                                                                     |
    | `PUBLIC_PORT`              | variable | Port of the dashboard on the host (optional, default `8080`)                                        |
    | `PUBLIC_BIND`              | variable | Interface the dashboard is bound to (optional, default `127.0.0.1`)                                 |
+   | `REAL_IP_FROM`             | variable | Address (or CIDR) of the TLS proxy in front, the only one trusted to name the client, see below     |
    | `BITS_PUBLIC_URL`          | variable | Origin the dashboard is reached under, e.g. `https://bits.example.org`                              |
    | `DISCORD_CLIENT_ID`        | variable | OAuth2 client ID from step 1                                                                        |
    | `BITS_ADMIN_USERNAME`      | variable | Name of the admin account (optional, disabled without it)                                           |
@@ -43,6 +44,21 @@ a test server, so testing never touches the real WarEra Discord.
 The dashboard sets its session cookie with `Secure`, so it has to be served over HTTPS (a TLS proxy in front of
 `PUBLIC_BIND:PUBLIC_PORT`); only `localhost` works without. Changing `BITS_JWT_SECRET` logs everybody out.
 
+The TLS proxy has to:
+
+- **append the client address to `X-Forwarded-For`** (nginx: `$proxy_add_x_forwarded_for`, the default of Nginx
+  Proxy Manager) or replace the header with it. The dashboard's nginx takes the last entry, and only from
+  `REAL_IP_FROM`; from any other peer the peer itself counts as the client. The admin login locks out by this
+  address, so without `REAL_IP_FROM` every login seems to come from the proxy, and five failures lock out everybody.
+- **send HSTS** (`Strict-Transport-Security`), since only it knows that HTTPS is in place. The dashboard's nginx
+  sets the other security headers.
+
+The Redis passwords are not part of the environment: on the first deployment, the workflow generates one per
+service into `DEPLOY_PATH/redis-passwords.env`, readable only by the runner's user, and keeps them. To change them,
+delete the file and deploy again. Redis has a user per service with only the commands it needs, see the comment in
+the [stack](docker-compose.yml); the frontend container is on a network of its own and reaches neither Redis nor
+Postgres.
+
 Environments on the same host need different values for `DEPLOY_PATH` and `PUBLIC_PORT`. Containers, volumes and
 images are named after the environment (`bits-staging-…`), so they do not get in each other's way.
 
@@ -55,7 +71,9 @@ Under **Actions → CD → Run workflow**, pick the environment and run it from 
 3. starts the stack and waits until Postgres, Redis, backend and dashboard are healthy (Flyway migrates on
    backend startup),
 4. checks that the backend rejects requests without the service token, that the bot connects to Discord and
-   stays up, and that the dashboard answers and forwards `/web` to the backend,
+   stays up, and that the dashboard answers and forwards `/web` to the backend; that no variant of an `/api` path
+   reaches the bot's API through nginx, that a client cannot choose its address with `X-Forwarded-For`, that the
+   security headers are set, and that the frontend container reaches neither Redis nor Postgres,
 5. removes older images of the environment, keeping the previous set as a fallback.
 
 The bot registers its slash commands on the server at every start, so new commands show up right after a
