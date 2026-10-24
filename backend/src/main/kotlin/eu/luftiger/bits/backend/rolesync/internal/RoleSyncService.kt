@@ -5,6 +5,9 @@ import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
+import eu.luftiger.bits.backend.systemlog.api.SystemLog
+import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
@@ -12,6 +15,7 @@ import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraUser
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 
@@ -22,6 +26,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Syncs that publish run one at a time: a sync of all members reads the links when it starts, so a sync of a single
  * member running in between could be overwritten with stale data. [refreshUsers] only loads data and may run alongside,
  * see [RoleSyncTrigger].
+ *
+ * Every sync is a run in the [SystemLog], written together with its event; members whose WarEra data is missing and
+ * governments that cannot be loaded are recorded there as problems of the run.
  */
 @Service
 class RoleSyncService(
@@ -30,6 +37,8 @@ class RoleSyncService(
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
+    private val systemLog: SystemLog,
+    private val transactionTemplate: TransactionTemplate,
     private val properties: RoleSyncProperties,
     private val clock: Clock,
 ) {
@@ -59,42 +68,55 @@ class RoleSyncService(
      * [confirmedRoleIds] are roles whose rules an admin changed, see [RoleSyncEvent.confirmedRoleIds].
      */
     @Synchronized
-    fun syncAll(confirmedRoleIds: List<String> = emptyList()) =
-        sync(accountLinks.findAll(), discordUserIds = null, refresh = false, confirmedRoleIds = confirmedRoleIds)
+    fun syncAll(
+        confirmedRoleIds: List<String> = emptyList(),
+        trigger: SyncTrigger = SyncTrigger.HOURLY,
+    ) = sync(accountLinks.findAll(), discordUserIds = null, refresh = false, trigger = trigger, confirmedRoleIds = confirmedRoleIds)
 
     /** Syncs the given members only, with fresh WarEra data; members without a link lose all managed roles. */
     @Synchronized
     fun syncMembers(discordUserIds: Collection<String>) {
         val links = discordUserIds.mapNotNull { id -> accountLinks.findByDiscordUserId(id)?.let { LinkedAccount(id, it.wareraUserId) } }
-        sync(links, discordUserIds = discordUserIds.distinct(), refresh = true)
+        sync(links, discordUserIds = discordUserIds.distinct(), refresh = true, trigger = SyncTrigger.ACCOUNT_CHANGE)
     }
 
     private fun sync(
         links: List<LinkedAccount>,
         discordUserIds: List<String>?,
         refresh: Boolean,
+        trigger: SyncTrigger,
         confirmedRoleIds: List<String> = emptyList(),
     ) {
         val rules = activeRules()
-        if (rules.isEmpty()) return
+        if (rules.isEmpty()) {
+            systemLog.recordSyncWithoutRules(trigger)
+            return
+        }
         val evaluator = RuleEvaluator(rules, governments(rules))
         var lookups = 0
+        val unavailable = mutableListOf<String>()
         val members =
             links
                 .mapNotNull { link ->
                     val cached = users[link.wareraUserId]?.takeUnless { refresh }
                     val user = if (cached != null) cached.user else loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
+                    if (user == null) unavailable += link.discordUserId
                     evaluator.evaluate(user)?.let { link.discordUserId to it }
                 }.toMap()
-        eventPublisher.publish(
-            RoleSyncEvent(
-                managedRoleIds = rules.map { it.roleId }.distinct(),
-                discordUserIds = discordUserIds,
-                members = members,
-                occurredAt = clock.millis(),
-                confirmedRoleIds = confirmedRoleIds,
-            ),
-        )
+        if (unavailable.isNotEmpty()) systemLog.recordProblem(SystemProblem.WareraUsersUnavailable(unavailable))
+        transactionTemplate.executeWithoutResult {
+            val syncId = systemLog.recordSyncRun(trigger, links.size)
+            eventPublisher.publish(
+                RoleSyncEvent(
+                    managedRoleIds = rules.map { it.roleId }.distinct(),
+                    discordUserIds = discordUserIds,
+                    members = members,
+                    occurredAt = clock.millis(),
+                    confirmedRoleIds = confirmedRoleIds,
+                    syncId = syncId,
+                ),
+            )
+        }
         log.info("Role sync published for {} members, {} linked", discordUserIds?.size ?: "all", links.size)
     }
 
@@ -107,14 +129,15 @@ class RoleSyncService(
     /** One call per country that office rules refer to. A country whose government cannot be loaded is left out. */
     private fun governments(rules: List<RoleRule>): Map<String, WareraGovernment> =
         rules
-            .filter { it.type == ConditionType.GOVERNMENT_OFFICE }
-            .mapNotNull { it.countryId }
-            .distinct()
-            .mapNotNull { countryId ->
+            .filter { it.type == ConditionType.GOVERNMENT_OFFICE && it.countryId != null }
+            .distinctBy { it.countryId }
+            .mapNotNull { rule ->
+                val countryId = requireNotNull(rule.countryId)
                 try {
                     countryId to wareraClient.getGovernment(countryId)
                 } catch (e: WareraApiException) {
                     log.warn("Government of country {} could not be loaded, its office rules are skipped", countryId, e)
+                    systemLog.recordProblem(SystemProblem.GovernmentUnavailable(countryId, rule.targetName))
                     null
                 }
             }.toMap()

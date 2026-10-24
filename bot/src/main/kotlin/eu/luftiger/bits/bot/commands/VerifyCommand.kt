@@ -73,7 +73,7 @@ class VerifyCommand(
         // Before the call, since the result may arrive before the answer does.
         pendingChecks.add(code, event.hook)
         respond(event.hook, onFailure = { pendingChecks.complete(code) }) {
-            val response = backend.checkVerification(event.user.id, code)
+            val response = backend.checkVerification(event.user.id, code, event.member?.effectiveName ?: event.user.effectiveName)
             if (response != CheckVerificationResponse.Checking) {
                 pendingChecks.complete(code)
                 event.hook.sendMessage(checkMessage(response)).queue()

@@ -15,3 +15,9 @@ deviation from it is a bug.
 Failures of single calls are handled where they happen: a WarEra call is retried with backoff before it counts as
 down, a role change that Discord refuses is skipped, and an event the bot cannot handle is retried and then moved to
 `bits:events:dead`.
+
+Admins see most of this in the system log of the dashboard: members and governments whose WarEra data is missing,
+role changes Discord refused, events moved to `bits:events:dead`, and events that wait more than 10 minutes for Redis.
+A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or
+Redis outage looks like there. Without Postgres or the backend, nothing is recorded; the bot keeps its reports for
+about an hour.

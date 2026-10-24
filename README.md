@@ -63,6 +63,7 @@ BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung              | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                           | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard            | unbegrenzt                                                                  |
+| Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard           | 30 Tage                                                                     |
 | Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot             | 7 Tage                                                                      |
 | Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                       | im Deployment höchstens 5 × 10 MB pro Dienst                                |
 | alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                 | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |

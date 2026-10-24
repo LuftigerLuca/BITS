@@ -11,6 +11,7 @@ import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
+import eu.luftiger.bits.bot.systemlog.SystemLogReporter
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
@@ -66,7 +67,8 @@ fun main() {
     roleReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()
-    val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit)
+    val systemLog = SystemLogReporter(backend, scope)
+    val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit, systemLog::reportRoleSync)
     val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
     val events =
         EventHandler { event ->
@@ -78,7 +80,7 @@ fun main() {
                 else -> Unit
             }
         }
-    val consumer = RedisStreamEventConsumer(redis, events)
+    val consumer = RedisStreamEventConsumer(redis, events, onDeadLetter = systemLog::reportUndeliveredEvent)
     // The consumer only ends when it is stopped. Anything else would leave a bot that answers commands but never
     // handles events again, so the process ends and Docker starts it anew.
     scope.launch(

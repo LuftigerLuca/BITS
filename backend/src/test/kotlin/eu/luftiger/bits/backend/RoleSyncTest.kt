@@ -209,7 +209,8 @@ class RoleSyncTest {
                 occurredAt = clock.millis(),
                 confirmedRoleIds = listOf("r-citizen"),
             ),
-            awaitEvents(1).single(),
+            // The ID of the run in the system log, see SystemLogTest.
+            (awaitEvents(1).single() as RoleSyncEvent).copy(syncId = null),
         )
     }
 
