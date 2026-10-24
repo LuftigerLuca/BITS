@@ -1,10 +1,22 @@
+import { useState } from 'react'
 import { Trash2Icon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import type { RoleRule } from '@/lib/api'
 import { NewRuleForm } from './NewRuleForm'
 import { STATUS, errorMessage } from './labels'
 import { RoleName } from './RoleName'
@@ -15,6 +27,7 @@ export function RoleRulesCard() {
   const roles = useRoles()
   const rules = useRoleRules()
   const deleteRule = useDeleteRoleRule()
+  const [ruleToDelete, setRuleToDelete] = useState<RoleRule | null>(null)
 
   return (
     <Card>
@@ -65,8 +78,9 @@ export function RoleRulesCard() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label="Regel löschen"
-                      onClick={() => deleteRule.mutate(rule.id)}
+                      aria-label={`Regel „${rule.label}“ löschen`}
+                      disabled={deleteRule.isPending && deleteRule.variables === rule.id}
+                      onClick={() => setRuleToDelete(rule)}
                     >
                       <Trash2Icon />
                     </Button>
@@ -76,6 +90,15 @@ export function RoleRulesCard() {
             </TableBody>
           </Table>
         )}
+        <DeleteRuleDialog
+          rule={ruleToDelete}
+          lastOfRole={ruleToDelete !== null && rules.data?.filter((r) => r.roleId === ruleToDelete.roleId).length === 1}
+          onConfirm={(rule) => {
+            setRuleToDelete(null)
+            deleteRule.mutate(rule.id)
+          }}
+          onCancel={() => setRuleToDelete(null)}
+        />
         {roles.isPending ? (
           <LoadingState label="Rollen werden geladen …" />
         ) : roles.isError ? (
@@ -85,5 +108,48 @@ export function RoleRulesCard() {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * Deleting a rule syncs everybody right away, so a slip in the table would take the role from members at once. The
+ * last rule of a role ends its management instead, which takes the role from nobody.
+ */
+function DeleteRuleDialog({
+  rule,
+  lastOfRole,
+  onConfirm,
+  onCancel,
+}: {
+  rule: RoleRule | null
+  lastOfRole: boolean
+  onConfirm: (rule: RoleRule) => void
+  onCancel: () => void
+}) {
+  const role = rule?.roleName ?? 'gelöschte Rolle'
+  return (
+    <AlertDialog open={rule !== null} onOpenChange={(open) => !open && onCancel()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Regel löschen?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {rule && (
+              <>
+                <strong>{role}</strong>: {rule.label}.{' '}
+                {lastOfRole
+                  ? 'Es ist die letzte Regel der Rolle. BITS verwaltet sie danach nicht mehr; wer sie hat, behält sie.'
+                  : 'Mitglieder, die nur diese Regel erfüllen, verlieren die Rolle sofort.'}
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => rule && onConfirm(rule)}>
+            Regel löschen
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
