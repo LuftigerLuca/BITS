@@ -44,6 +44,10 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -218,7 +222,7 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
         assertEquals(setOf("r-citizen", "r-veteran"), grantedRoles(awaitEvents(2).last(), "1"))
 
-        syncService.syncAll(refresh = true)
+        syncTrigger.hourly()
         assertEquals(setOf("r-citizen"), grantedRoles(awaitEvents(3).last(), "1"))
     }
 
@@ -233,6 +237,39 @@ class RoleSyncTest {
         val event = awaitEvents(2).last() as RoleSyncEvent
         assertEquals(listOf("2", "1"), event.discordUserIds)
         assertEquals(setOf("2"), event.members.keys)
+    }
+
+    @Test
+    fun `rule changes while a sync runs are merged into one`() {
+        // A user no sync has seen yet, so the first one has to look them up and can be held there.
+        warera.users["w3"] = WareraUser("w3", "Third", country = "de", leveling = WareraUser.Leveling(1))
+        link("3", "w3")
+        warera.hold("w3")
+
+        repeat(10) { createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":${it + 1}}""").andExpect { status { isCreated() } } }
+        warera.release()
+
+        assertEquals(2, awaitEvents(2).size)
+    }
+
+    @Test
+    fun `a new link is synced while the hourly refresh runs, and the next refresh is skipped`() {
+        link("1", "w1")
+        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        awaitEvents(1)
+        warera.lookups.clear()
+        warera.hold("w1")
+        syncTrigger.hourly()
+        syncTrigger.hourly()
+
+        verify("2", "Other")
+        val memberSync = (1..100).firstNotNullOfOrNull { roleSyncEvents().getOrNull(1) ?: null.also { Thread.sleep(50) } }
+        assertEquals(listOf("2"), (memberSync as RoleSyncEvent?)?.discordUserIds)
+
+        warera.release()
+        awaitEvents(3)
+        // The second refresh was skipped, and the sync after the first one used the data it loaded.
+        assertEquals(1, warera.lookups.count { it == "w1" })
     }
 
     @Test
@@ -254,7 +291,7 @@ class RoleSyncTest {
 
         warera.failingUsers += "w1"
         warera.governmentDown = true
-        syncService.syncAll(refresh = true)
+        syncTrigger.hourly()
 
         val event = awaitEvents(3).last() as RoleSyncEvent
         assertEquals(MemberRoles(grants = emptyList(), keepRoleIds = listOf("r-citizen", "r-minister")), event.members["1"])
@@ -273,7 +310,7 @@ class RoleSyncTest {
         val rules = mockMvc.get("/web/admin/role-sync/rules") { cookie(admin) }
         assertEquals(listOf("ACTIVE", "ORPHANED"), rules.read("$[*].status"))
         assertEquals(null, rules.read<String?>("$[1].roleName"))
-        syncService.syncAll(refresh = false)
+        syncService.syncAll()
         assertEquals(listOf("r-veteran"), (awaitEvents(3).last() as RoleSyncEvent).managedRoleIds)
     }
 
@@ -404,11 +441,27 @@ class RoleSyncTest {
     class FakeWarera : WareraClient {
         val users = mutableMapOf<String, WareraUser>()
         val failingUsers = mutableSetOf<String>()
+        val lookups = CopyOnWriteArrayList<String>()
+        private val heldUsers = ConcurrentHashMap.newKeySet<String>()
+        private var gate = CountDownLatch(0)
         var governmentDown = false
         var down = false
         var companyName = ""
 
+        /** Lookups of [wareraUserIds] wait until [release], so a sync can be caught while it runs. */
+        fun hold(vararg wareraUserIds: String) {
+            gate = CountDownLatch(1)
+            heldUsers += wareraUserIds
+        }
+
+        fun release() {
+            heldUsers.clear()
+            gate.countDown()
+        }
+
         fun reset() {
+            release()
+            lookups.clear()
             users.clear()
             users["w1"] = WareraUser("w1", "Luftiger", country = "de", mu = "m1", militaryRank = 40, leveling = WareraUser.Leveling(30))
             users["w2"] = WareraUser("w2", "Other", country = "fr", leveling = WareraUser.Leveling(3))
@@ -424,6 +477,8 @@ class RoleSyncTest {
 
         override fun getUser(userId: String) =
             available {
+                lookups += userId
+                if (userId in heldUsers) gate.await(10, TimeUnit.SECONDS)
                 // WarEra changed its answer in a way BITS cannot read.
                 if (userId in failingUsers) throw WareraSchemaException("unexpected response")
                 users.getValue(userId)

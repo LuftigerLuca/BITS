@@ -19,8 +19,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Works out the target roles of the members from the rules and the WarEra data of the linked accounts, and hands them
  * to the bot as a [RoleSyncEvent].
  *
- * Syncs run one at a time: a sync of all members reads the links when it starts, so a sync of a single member running
- * in between could be overwritten with stale data.
+ * Syncs that publish run one at a time: a sync of all members reads the links when it starts, so a sync of a single
+ * member running in between could be overwritten with stale data. [refreshUsers] only loads data and may run alongside,
+ * see [RoleSyncTrigger].
  */
 @Service
 class RoleSyncService(
@@ -35,18 +36,27 @@ class RoleSyncService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     /**
-     * Last WarEra data loaded per WarEra user ID. A rule change only changes how the data is judged, so it reuses this
+     * Result of the last lookup per WarEra user ID. A rule change only changes how the data is judged, so it reuses this
      * instead of loading every user again.
      */
-    private val users = ConcurrentHashMap<String, WareraUser>()
+    private val users = ConcurrentHashMap<String, Lookup>()
 
-    /** Syncs all members of the guild. With [refresh], the WarEra data of every linked user is loaded again. */
-    @Synchronized
-    fun syncAll(refresh: Boolean) {
+    /** `null` if the user could not be loaded; the member then keeps the roles as they are. */
+    private class Lookup(
+        val user: WareraUser?,
+    )
+
+    /** Loads the WarEra data of every linked user again, without syncing; [syncAll] uses it afterwards. */
+    fun refreshUsers() {
         val links = accountLinks.findAll()
-        if (refresh) users.keys.retainAll(links.mapTo(HashSet()) { it.wareraUserId })
-        sync(links, discordUserIds = null, refresh = refresh)
+        users.keys.retainAll(links.mapTo(HashSet()) { it.wareraUserId })
+        links.forEachIndexed { index, link -> loadUser(link.wareraUserId, pauseBefore = index > 0) }
+        log.info("WarEra data of {} linked users refreshed", links.size)
     }
+
+    /** Syncs all members of the guild with the WarEra data loaded last; users not loaded yet are loaded now. */
+    @Synchronized
+    fun syncAll() = sync(accountLinks.findAll(), discordUserIds = null, refresh = false)
 
     /** Syncs the given members only, with fresh WarEra data; members without a link lose all managed roles. */
     @Synchronized
@@ -68,7 +78,7 @@ class RoleSyncService(
             links
                 .mapNotNull { link ->
                     val cached = users[link.wareraUserId]?.takeUnless { refresh }
-                    val user = cached ?: loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
+                    val user = if (cached != null) cached.user else loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
                     evaluator.evaluate(user)?.let { link.discordUserId to it }
                 }.toMap()
         eventPublisher.publish(
@@ -108,11 +118,14 @@ class RoleSyncService(
         pauseBefore: Boolean,
     ): WareraUser? {
         if (pauseBefore && !properties.userLookupInterval.isZero) Thread.sleep(properties.userLookupInterval)
-        return try {
-            wareraClient.getUser(wareraUserId).also { users[wareraUserId] = it }
-        } catch (e: WareraApiException) {
-            log.warn("WarEra user {} could not be loaded, their roles stay as they are", wareraUserId, e)
-            null
-        }
+        val user =
+            try {
+                wareraClient.getUser(wareraUserId)
+            } catch (e: WareraApiException) {
+                log.warn("WarEra user {} could not be loaded, their roles stay as they are", wareraUserId, e)
+                null
+            }
+        users[wareraUserId] = Lookup(user)
+        return user
     }
 }
