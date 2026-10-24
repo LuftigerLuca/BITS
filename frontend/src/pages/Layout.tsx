@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -8,11 +9,17 @@ import { cn } from '@/lib/utils'
 export function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [logoutFailed, setLogoutFailed] = useState(false)
   if (!user) return null
 
   async function onLogout() {
-    await logout()
-    navigate('/login', { replace: true })
+    setLogoutFailed(false)
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } catch {
+      setLogoutFailed(true)
+    }
   }
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -39,6 +46,11 @@ export function Layout() {
               <AvatarFallback>{user.name.slice(0, 1).toUpperCase()}</AvatarFallback>
             </Avatar>
             <span className="text-sm">{user.name}</span>
+            {logoutFailed && (
+              <span role="alert" className="text-sm text-destructive">
+                Abmelden fehlgeschlagen, versuche es erneut.
+              </span>
+            )}
             <Button variant="ghost" size="sm" onClick={onLogout}>
               Abmelden
             </Button>
