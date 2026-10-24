@@ -50,7 +50,10 @@ class RestWareraClientTest {
         server
             .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
             .andRespond(
-                withSuccess("""{"result":{"data":{"_id":"u1","username":"Luftiger"}}}""", MediaType.APPLICATION_JSON),
+                withSuccess(
+                    """{"result":{"data":{"_id":"u1","username":"Luftiger","country":null,"militaryRank":0,"leveling":{"level":0}}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
             )
 
         assertEquals(WareraUser(id = "u1", username = "Luftiger"), client.getUser("u1"))
@@ -208,6 +211,28 @@ class RestWareraClientTest {
         val missingField = assertFailsWith<WareraSchemaException> { client.getUser("u1") }
         assertTrue("user.getUserLite" in missingField.message.orEmpty(), missingField.message)
         server.verify()
+    }
+
+    @Test
+    fun `a user without the fields the role sync judges is a schema error, except for the military unit`() {
+        val complete = """"_id":"u1","username":"Luftiger","country":"c1","militaryRank":12,"leveling":{"level":30}"""
+        listOf(
+            complete.replace(""","country":"c1"""", ""),
+            complete.replace(""","militaryRank":12""", ""),
+            complete.replace(""""leveling":{"level":30}""", """"leveling":{}"""),
+        ).forEach { data ->
+            server.reset()
+            server
+                .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
+                .andRespond(withSuccess("""{"result":{"data":{$data}}}""", MediaType.APPLICATION_JSON))
+            assertFailsWith<WareraSchemaException>(data) { client.getUser("u1") }
+        }
+
+        server.reset()
+        server
+            .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
+            .andRespond(withSuccess("""{"result":{"data":{$complete}}}""", MediaType.APPLICATION_JSON))
+        assertEquals(null, client.getUser("u1").mu)
     }
 
     @Test

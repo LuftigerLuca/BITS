@@ -5,13 +5,17 @@ import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraNotFoundException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
-/** Manages the rules; every change syncs all members, with the WarEra data of the last sync. */
+/**
+ * Manages the rules; every change syncs all members, with the WarEra data of the last sync. The change is the admin's
+ * decision, so the bot takes the role from as many members as it takes, see [eu.luftiger.bits.shared.RoleSyncEvent].
+ */
 @Service
 class RoleRuleService(
     private val ruleRepository: RoleRuleRepository,
@@ -47,7 +51,10 @@ class RoleRuleService(
             }
     }
 
-    /** @throws ResponseStatusException 400 if the role cannot be given or the condition is incomplete or unknown */
+    /**
+     * @throws ResponseStatusException 400 if the role cannot be given or the condition is incomplete or unknown, 409 if
+     * the role has a rule with the same condition already
+     */
     fun create(request: CreateRuleRequest): RuleResponse {
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
@@ -83,15 +90,23 @@ class RoleRuleService(
                     RoleRule(role.id, request.type, threshold = threshold, createdAt = now())
                 }
             }
-        val saved = ruleRepository.save(rule)
-        syncTrigger.syncAllWithCachedData()
+        val saved =
+            try {
+                ruleRepository.saveAndFlush(rule)
+            } catch (_: DataIntegrityViolationException) {
+                // The unique index on role and condition; the CHECK constraints cannot fail after the checks above.
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
+            }
+        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
         return RuleResponse(requireNotNull(saved.id), role.id, role.name, role.color, saved.label, RuleStatus.ACTIVE)
     }
 
-    fun delete(id: Long) {
+    /** @return the deleted rule, for the log */
+    fun delete(id: Long): RoleRule {
         val rule = ruleRepository.findByIdOrNull(id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         ruleRepository.delete(rule)
-        syncTrigger.syncAllWithCachedData()
+        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(rule.roleId))
+        return rule
     }
 
     fun countries(): List<OptionResponse> = wareraClient.getAllCountries().map { OptionResponse(it.id, it.name) }.sortedBy { it.name }

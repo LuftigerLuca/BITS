@@ -62,7 +62,7 @@ fun main() {
     roleReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()
-    val roleSync = RoleSyncHandler(jda, config.guildId)
+    val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit)
     val events =
         EventHandler { event ->
             logging.handle(event)

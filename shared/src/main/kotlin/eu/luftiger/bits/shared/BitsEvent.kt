@@ -54,6 +54,12 @@ data class RoleSyncEvent(
     /** Target roles by Discord user ID. Members without an entry get none of the managed roles. */
     val members: Map<String, MemberRoles>,
     override val occurredAt: Long,
+    /**
+     * Roles whose rules an admin changed since the last sync. When a sync of all members would take a role from a large
+     * share of its holders, the bot holds back, since that is more likely missing WarEra data than real change; for
+     * these roles, the change is what the admin asked for.
+     */
+    val confirmedRoleIds: List<String> = emptyList(),
 ) : BitsEvent
 
 @Serializable

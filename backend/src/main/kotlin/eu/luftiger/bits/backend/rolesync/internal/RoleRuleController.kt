@@ -42,7 +42,7 @@ class RoleRuleController(
         @AuthenticationPrincipal session: Jwt,
     ): RuleResponse {
         val rule = ruleService.create(request)
-        log.info("Rule {} ({}) for role {} created by {}", rule.id, request.type, rule.roleId, session.subject)
+        log.info("Rule {} ({}) for role {} created by {}", rule.id, rule.label, rule.roleId, session.subject)
         return rule
     }
 
@@ -52,8 +52,8 @@ class RoleRuleController(
         @PathVariable id: Long,
         @AuthenticationPrincipal session: Jwt,
     ) {
-        ruleService.delete(id)
-        log.info("Rule {} deleted by {}", id, session.subject)
+        val rule = ruleService.delete(id)
+        log.info("Rule {} ({}) for role {} deleted by {}", id, rule.label, rule.roleId, session.subject)
     }
 
     @GetMapping("/countries")
