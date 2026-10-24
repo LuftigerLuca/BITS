@@ -178,7 +178,8 @@ What these flows show:
 - **Frontend:** TypeScript, React and shadcn/ui, linted with oxlint (`npm run lint`). Under `frontend/src`:
   `pages/` holds only what a route renders, `features/<feature>/` the components, queries and texts of one feature
   (e.g. `features/role-sync/`), `components/` what several features share, and `components/ui` the shadcn
-  components. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
+  components. UI building blocks come from shadcn/ui. If one is missing, add it with the shadcn CLI instead of
+  building it yourself; custom markup is limited to layout. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
   mutation invalidates what it changes instead of reloading by hand. While data loads or after it failed, show
   `LoadingState` or `ErrorState` from `components/QueryState.tsx`, never the empty state.
 - `.editorconfig` defines indentation and line endings.

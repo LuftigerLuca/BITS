@@ -5,10 +5,10 @@ import { RouterProvider, createBrowserRouter } from 'react-router'
 import './index.css'
 import { AuthProvider } from './auth/AuthProvider.tsx'
 import { createQueryClient } from './lib/queryClient.ts'
-import { followSystemTheme } from './lib/theme.ts'
+import { followTheme } from './lib/theme.ts'
 import { routes } from './routes.tsx'
 
-followSystemTheme()
+followTheme()
 
 const queryClient = createQueryClient()
 const router = createBrowserRouter(routes)
