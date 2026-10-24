@@ -22,6 +22,10 @@ export const routes: RouteObject[] = [
                 // Only admins need the admin area, so its code is loaded on demand.
                 lazy: async () => ({ Component: (await import('./pages/AdminPage.tsx')).AdminPage }),
               },
+              {
+                path: 'admin/audit-log',
+                lazy: async () => ({ Component: (await import('./pages/AuditLogPage.tsx')).AuditLogPage }),
+              },
             ],
           },
         ],

@@ -165,6 +165,10 @@ What these flows show:
   `AccountUnlinked`), published inside the transaction and received with `@ApplicationModuleListener` after the
   commit. Events for the bot go through `EventPublisher` inside the same transaction, so they reach the bot only if
   it commits.
+- **Admin changes in the dashboard are recorded** with `AuditLog.record` from `audit.api`, inside the transaction
+  of the change, with the actor from `SessionPrincipal.of(session)` and a German description that stays readable
+  after the changed object is gone. New actions get a value in `AuditAction` and a label in
+  `features/audit-log/labels.ts`.
 - **Background jobs** use `@Scheduled` with a cron from the configuration (`-` in tests, which start them by hand)
   and the injected `Clock`. A job that must not run twice at once gets its own single thread.
 - **The bot** defers the reply, does the work in its coroutine scope and turns each failure into a German
