@@ -15,6 +15,11 @@ spring:
       # only one. WarEra answers within a second when it is well; 10 s leaves room for slow pages.
       connect-timeout: 5s
       read-timeout: 10s
+  modulith:
+    events:
+      # Handed-out events are removed from the registry; the stream is where they live on.
+      completion-mode: delete
+      republish-outstanding-events-on-restart: true
   data:
     redis:
       host: ${REDIS_HOST:localhost}

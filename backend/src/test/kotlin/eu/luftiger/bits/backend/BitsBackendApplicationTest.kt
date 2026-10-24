@@ -1,8 +1,10 @@
 package eu.luftiger.bits.backend
 
+import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.decodeEvent
+import eu.luftiger.bits.shared.encode
 import eu.luftiger.bits.warera.RestWareraClient
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
@@ -14,13 +16,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.connection.stream.StreamOffset
+import org.springframework.data.redis.connection.stream.StreamRecords
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.client.RestClient
 import java.net.ServerSocket
 import java.time.Duration
@@ -46,10 +51,17 @@ class BitsBackendApplicationTest {
     @Autowired
     lateinit var restClientBuilder: RestClient.Builder
 
+    @Autowired
+    lateinit var eventPublisher: EventPublisher
+
+    @Autowired
+    lateinit var transactionTemplate: TransactionTemplate
+
     /** The containers are shared with the other test classes. */
     @BeforeTest
     fun reset() {
-        jdbc.execute("TRUNCATE ping_log")
+        jdbc.awaitOutbox()
+        jdbc.execute("TRUNCATE ping_log, event_publication")
         redisTemplate.delete(EventStream.KEY)
     }
 
@@ -83,10 +95,42 @@ class BitsBackendApplicationTest {
                 jsonPath("$.wareraCountryCount") { value(1) }
             }
 
+        jdbc.awaitOutbox()
         val records =
             redisTemplate.opsForStream<String, String>().read(StreamOffset.fromStart(EventStream.KEY))!!
         val event = decodeEvent(records.single().value[EventStream.PAYLOAD_FIELD]!!)
         assertEquals("42", (event as PingEvent).discordUserId)
+    }
+
+    @Test
+    fun `events of a transaction that rolls back never reach the bot`() {
+        transactionTemplate.executeWithoutResult {
+            eventPublisher.publish(PingEvent(discordUserId = "42", occurredAt = 0))
+            it.setRollbackOnly()
+        }
+        eventPublisher.publish(PingEvent(discordUserId = "43", occurredAt = 0))
+
+        jdbc.awaitOutbox()
+        assertEquals(listOf("43"), streamEvents().map { (it as PingEvent).discordUserId })
+    }
+
+    @Test
+    fun `the stream keeps a week of events`() {
+        val now = System.currentTimeMillis()
+        val stream = redisTemplate.opsForStream<String, String>()
+        listOf(EventStream.RETENTION.toMillis() + 60_000, EventStream.RETENTION.toMillis() - 60_000).forEach { age ->
+            stream.add(
+                StreamRecords
+                    .string(mapOf(EventStream.PAYLOAD_FIELD to PingEvent("old", occurredAt = 0).encode()))
+                    .withStreamKey(EventStream.KEY)
+                    .withId(RecordId.of(now - age, 0)),
+            )
+        }
+
+        eventPublisher.publish(PingEvent(discordUserId = "new", occurredAt = 0))
+
+        jdbc.awaitOutbox()
+        assertEquals(2, stream.size(EventStream.KEY))
     }
 
     @Test
@@ -105,6 +149,13 @@ class BitsBackendApplicationTest {
             assertTrue(elapsed < Duration.ofSeconds(5), "took $elapsed")
         }
     }
+
+    private fun streamEvents() =
+        redisTemplate
+            .opsForStream<String, String>()
+            .read(StreamOffset.fromStart(EventStream.KEY))
+            .orEmpty()
+            .map { decodeEvent(it.value[EventStream.PAYLOAD_FIELD]!!) }
 
     @TestConfiguration(proxyBeanMethods = false)
     class FakeWarera {

@@ -13,6 +13,9 @@ dependencies {
 
     implementation(platform(libs.spring.modulith.bom))
     implementation("org.springframework.modulith:spring-modulith-starter-core")
+    implementation("org.springframework.modulith:spring-modulith-starter-jpa")
+    // Lets the event publication registry read Kotlin classes back when it hands an event out again.
+    implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-kotlinx-serialization-json")
