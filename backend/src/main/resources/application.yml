@@ -9,6 +9,12 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  http:
+    clients:
+      # For WarEra and Discord. Without them a hanging connection blocks its thread for good, and the role sync has
+      # only one. WarEra answers within a second when it is well; 10 s leaves room for slow pages.
+      connect-timeout: 5s
+      read-timeout: 10s
   data:
     redis:
       host: ${REDIS_HOST:localhost}
