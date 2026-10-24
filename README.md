@@ -71,6 +71,9 @@ Mit `/unverify` löscht ein Nutzer seine Verknüpfung und einen offenen Code; di
 er beim folgenden Abgleich. Abgelaufene Codes und alte Pings löscht ein Job jede Stunde. Wie Admins Auskunft geben
 oder für jemanden löschen, steht in [deploy/README.md](deploy/README.md#data-protection-requests).
 
+Verifiziert sich ein anderer Discord-Account für einen schon verknüpften WarEra-Account, ersetzt die neue
+Verknüpfung die alte. Der vorherige Account bekommt dann eine Direktnachricht vom Bot, falls er welche annimmt.
+
 ## Starten
 
 Voraussetzungen: JDK 21, Node.js 24, Docker.

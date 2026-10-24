@@ -102,7 +102,13 @@ class AccountVerificationTest {
 
         assertEquals("w1", jdbc.queryForObject("SELECT warera_user_id FROM account_link WHERE discord_user_id = '1'", String::class.java))
         assertEquals(
-            AccountLinkedEvent(discordUserId = "1", wareraUserId = "w1", previousDiscordUserId = null, occurredAt = clock.millis()),
+            AccountLinkedEvent(
+                discordUserId = "1",
+                wareraUserId = "w1",
+                previousDiscordUserId = null,
+                occurredAt = clock.millis(),
+                wareraUsername = "Luftiger",
+            ),
             events().filterIsInstance<AccountLinkedEvent>().single(),
         )
     }

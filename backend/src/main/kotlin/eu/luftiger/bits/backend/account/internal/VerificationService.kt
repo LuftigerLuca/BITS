@@ -175,6 +175,7 @@ class VerificationService(
                     wareraUserId = verification.wareraUserId,
                     previousDiscordUserId = previousDiscordUserId,
                     occurredAt = now.toEpochMilli(),
+                    wareraUsername = verification.wareraUsername,
                 ),
             )
             true

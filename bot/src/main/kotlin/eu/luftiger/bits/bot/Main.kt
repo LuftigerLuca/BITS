@@ -1,5 +1,7 @@
 package eu.luftiger.bits.bot
 
+import eu.luftiger.bits.bot.accounts.JdaDirectMessages
+import eu.luftiger.bits.bot.accounts.RelinkNotifier
 import eu.luftiger.bits.bot.backend.KtorBackendClient
 import eu.luftiger.bits.bot.commands.PingCommand
 import eu.luftiger.bits.bot.commands.UnverifyCommand
@@ -9,6 +11,7 @@ import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
+import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import io.lettuce.core.RedisClient
@@ -64,12 +67,14 @@ fun main() {
 
     val logging = LoggingEventHandler()
     val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit)
+    val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
     val events =
         EventHandler { event ->
             logging.handle(event)
             when (event) {
                 is RoleSyncEvent -> roleSync.handle(event)
                 is VerificationCheckedEvent -> verifyCommand.onChecked(event)
+                is AccountLinkedEvent -> relinkNotifier.handle(event)
                 else -> Unit
             }
         }
