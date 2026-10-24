@@ -25,4 +25,8 @@ interface AccountVerificationRepository : JpaRepository<AccountVerification, Str
         now: Instant,
         checkedBefore: Instant,
     ): Int
+
+    @Modifying
+    @Query("DELETE FROM AccountVerification v WHERE v.expiresAt < :before")
+    fun deleteExpiredBefore(before: Instant): Int
 }

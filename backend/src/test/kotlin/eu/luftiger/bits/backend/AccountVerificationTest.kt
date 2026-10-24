@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend
 
 import com.jayway.jsonpath.JsonPath
+import eu.luftiger.bits.backend.account.internal.VerificationCleanup
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BitsJson
@@ -60,6 +61,9 @@ class AccountVerificationTest {
 
     @Autowired
     lateinit var incompletePublications: IncompleteEventPublications
+
+    @Autowired
+    lateinit var cleanup: VerificationCleanup
 
     @BeforeTest
     fun reset() {
@@ -169,6 +173,21 @@ class AccountVerificationTest {
 
         clock.advance(Duration.ofMinutes(15))
         assertEquals(CheckVerificationResponse.Expired, check("1", code))
+        assertEquals(0, count("account_verification"))
+    }
+
+    @Test
+    fun `expired verifications are deleted an hour after they expired`() {
+        startedCode("1", "Luftiger")
+        clock.advance(Duration.ofMinutes(10))
+        startedCode("2", "Other")
+
+        clock.advance(Duration.ofMinutes(66))
+        cleanup.deleteExpired()
+        assertEquals(listOf("2"), jdbc.queryForList("SELECT discord_user_id FROM account_verification", String::class.java))
+
+        clock.advance(Duration.ofMinutes(10))
+        cleanup.deleteExpired()
         assertEquals(0, count("account_verification"))
     }
 
