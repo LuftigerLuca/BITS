@@ -1,5 +1,6 @@
 package eu.luftiger.bits.bot.events
 
+import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.PingEvent
 import org.slf4j.LoggerFactory
@@ -11,6 +12,7 @@ class LoggingEventHandler : EventHandler {
     override suspend fun handle(event: BitsEvent) {
         when (event) {
             is PingEvent -> log.info("Backend handled a ping of user {}", event.discordUserId)
+            is AccountLinkedEvent -> log.info("User {} linked WarEra account {}", event.discordUserId, event.wareraUserId)
         }
     }
 }

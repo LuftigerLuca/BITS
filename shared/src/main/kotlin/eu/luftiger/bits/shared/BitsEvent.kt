@@ -18,6 +18,17 @@ data class PingEvent(
     override val occurredAt: Long,
 ) : BitsEvent
 
+/** Published when a Discord account was linked to a WarEra account. */
+@Serializable
+@SerialName("account_linked")
+data class AccountLinkedEvent(
+    val discordUserId: String,
+    val wareraUserId: String,
+    /** Discord account the WarEra account was linked to before, if it was another one. */
+    val previousDiscordUserId: String?,
+    override val occurredAt: Long,
+) : BitsEvent
+
 fun BitsEvent.encode(): String = BitsJson.encodeToString(BitsEvent.serializer(), this)
 
 fun decodeEvent(payload: String): BitsEvent = BitsJson.decodeFromString(BitsEvent.serializer(), payload)

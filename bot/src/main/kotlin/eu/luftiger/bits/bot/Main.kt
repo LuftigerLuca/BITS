@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot
 
 import eu.luftiger.bits.bot.backend.KtorBackendClient
 import eu.luftiger.bits.bot.commands.PingCommand
+import eu.luftiger.bits.bot.commands.VerifyCommand
 import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import io.lettuce.core.RedisClient
@@ -21,12 +22,12 @@ fun main() {
     val jda =
         JDABuilder
             .createLight(config.discordToken)
-            .addEventListeners(PingCommand(backend, scope))
+            .addEventListeners(PingCommand(backend, scope), VerifyCommand(backend, scope))
             .build()
             .awaitReady()
 
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
-    guild.updateCommands().addCommands(PingCommand.data).queue()
+    guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data).queue()
 
     scope.launch { RedisStreamEventConsumer(redis, LoggingEventHandler()).run() }
 

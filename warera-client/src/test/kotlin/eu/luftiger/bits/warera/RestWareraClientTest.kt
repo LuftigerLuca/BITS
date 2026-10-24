@@ -41,6 +41,52 @@ class RestWareraClientTest {
     }
 
     @Test
+    fun `passes the input as JSON in the query string`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
+            .andRespond(
+                withSuccess("""{"result":{"data":{"_id":"u1","username":"Luftiger","country":"c1"}}}""", MediaType.APPLICATION_JSON),
+            )
+
+        assertEquals(WareraUser(id = "u1", username = "Luftiger"), client.getUser("u1"))
+        server.verify()
+    }
+
+    @Test
+    fun `search returns the user ids`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/search.searchAnything?input=%7B%22searchText%22%3A%22Luf%20tiger%22%7D"))
+            .andRespond(
+                withSuccess(
+                    """{"result":{"data":{"userIds":["u1","u2"],"countryIds":["c1"],"hasData":true}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        assertEquals(listOf("u1", "u2"), client.searchUserIds("Luf tiger"))
+        server.verify()
+    }
+
+    @Test
+    fun `company ids are collected across all pages`() {
+        server
+            .expect(
+                requestTo(
+                    "https://warera.test/trpc/company.getCompanies?input=%7B%22userId%22%3A%22u1%22%2C%22perPage%22%3A100%7D",
+                ),
+            ).andRespond(withSuccess("""{"result":{"data":{"items":["a","b"],"nextCursor":"next"}}}""", MediaType.APPLICATION_JSON))
+        server
+            .expect(
+                requestTo(
+                    "https://warera.test/trpc/company.getCompanies?input=%7B%22userId%22%3A%22u1%22%2C%22perPage%22%3A100%2C%22cursor%22%3A%22next%22%7D",
+                ),
+            ).andRespond(withSuccess("""{"result":{"data":{"items":["c"]}}}""", MediaType.APPLICATION_JSON))
+
+        assertEquals(listOf("a", "b", "c"), client.getCompanyIds("u1"))
+        server.verify()
+    }
+
+    @Test
     fun `retries when rate limited`() {
         server
             .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
