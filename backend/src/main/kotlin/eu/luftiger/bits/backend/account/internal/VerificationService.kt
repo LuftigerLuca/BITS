@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.account.internal
 
+import eu.luftiger.bits.backend.account.api.AccountLinked
 import eu.luftiger.bits.backend.account.domain.AccountLink
 import eu.luftiger.bits.backend.account.domain.AccountVerification
 import eu.luftiger.bits.backend.event.api.EventPublisher
@@ -8,6 +9,7 @@ import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -27,6 +29,7 @@ class VerificationService(
     private val verificationRepository: AccountVerificationRepository,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
+    private val applicationEvents: ApplicationEventPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
 ) {
@@ -109,11 +112,13 @@ class VerificationService(
                 ),
             )
             verificationRepository.deleteById(verification.discordUserId)
+            val previousDiscordUserId = previous?.discordUserId?.takeIf { it != verification.discordUserId }
+            applicationEvents.publishEvent(AccountLinked(verification.discordUserId, verification.wareraUserId, previousDiscordUserId))
             eventPublisher.publish(
                 AccountLinkedEvent(
                     discordUserId = verification.discordUserId,
                     wareraUserId = verification.wareraUserId,
-                    previousDiscordUserId = previous?.discordUserId?.takeIf { it != verification.discordUserId },
+                    previousDiscordUserId = previousDiscordUserId,
                     occurredAt = now.toEpochMilli(),
                 ),
             )

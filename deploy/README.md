@@ -11,8 +11,10 @@ a test server, so testing never touches the real WarEra Discord.
 ## Set up an environment
 
 1. **Discord application:** In the [Developer Portal](https://discord.com/developers/applications), create an
-   application (e.g. "BITS Staging") and copy the token under **Bot → Reset Token**. Invite the bot to the
-   test server via **OAuth2 → URL Generator** with the scopes `bot` and `applications.commands`. Copy the ID of
+   application (e.g. "BITS Staging") and copy the token under **Bot → Reset Token**. On the same page, turn on
+   **Server Members Intent**; the role sync needs all members, and the bot does not start without it. Invite the
+   bot to the test server via **OAuth2 → URL Generator** with the scopes `bot` and `applications.commands` and
+   the permission **Manage Roles**. The bot can only give roles below its own highest role. Copy the ID of
    the server (developer mode in Discord, right-click on the server → **Copy Server ID**). For the dashboard
    login, copy **Client ID** and **Client Secret** under **OAuth2** and add
    `<BITS_PUBLIC_URL>/auth/oauth2/callback/discord` under **Redirects**.

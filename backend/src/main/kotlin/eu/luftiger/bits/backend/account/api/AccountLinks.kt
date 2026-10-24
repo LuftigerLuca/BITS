@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.account.api
 
+import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.account.api.dto.LinkedWareraAccount
 import org.springframework.modulith.NamedInterface
 
@@ -7,4 +8,6 @@ import org.springframework.modulith.NamedInterface
 @NamedInterface("api")
 interface AccountLinks {
     fun findByDiscordUserId(discordUserId: String): LinkedWareraAccount?
+
+    fun findAll(): List<LinkedAccount>
 }

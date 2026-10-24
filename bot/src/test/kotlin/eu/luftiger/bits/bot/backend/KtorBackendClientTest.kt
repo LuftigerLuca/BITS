@@ -1,5 +1,6 @@
 package eu.luftiger.bits.bot.backend
 
+import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
 import io.ktor.client.engine.mock.MockEngine
@@ -83,5 +84,23 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", MockEngine { respond("", HttpStatusCode.InternalServerError) })
 
             assertFalse(assertFails { client.checkVerification("42", "BITS-ABC234") } is WareraUnavailableException)
+        }
+
+    @Test
+    fun `roles are reported with PUT`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals(HttpMethod.Put, request.method)
+                    assertEquals("http://backend:8080/api/discord-roles", request.url.toString())
+                    assertEquals(
+                        """{"roles":[{"id":"1","name":"Veteran","color":null,"position":2,"assignable":true}]}""",
+                        request.body.toByteArray().decodeToString(),
+                    )
+                    respond("", HttpStatusCode.NoContent)
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            client.reportRoles(listOf(DiscordRoleDto(id = "1", name = "Veteran", color = null, position = 2, assignable = true)))
         }
 }

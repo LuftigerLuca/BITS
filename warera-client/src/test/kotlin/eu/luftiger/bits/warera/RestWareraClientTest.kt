@@ -45,10 +45,81 @@ class RestWareraClientTest {
         server
             .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
             .andRespond(
-                withSuccess("""{"result":{"data":{"_id":"u1","username":"Luftiger","country":"c1"}}}""", MediaType.APPLICATION_JSON),
+                withSuccess("""{"result":{"data":{"_id":"u1","username":"Luftiger"}}}""", MediaType.APPLICATION_JSON),
             )
 
         assertEquals(WareraUser(id = "u1", username = "Luftiger"), client.getUser("u1"))
+        server.verify()
+    }
+
+    @Test
+    fun `user carries country, military unit, rank and level`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D"))
+            .andRespond(
+                withSuccess(
+                    """{"result":{"data":{"_id":"u1","username":"Luftiger","country":"c1","mu":"m1","militaryRank":12,""" +
+                        """"leveling":{"level":30,"totalXp":5}}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        assertEquals(
+            WareraUser(
+                id = "u1",
+                username = "Luftiger",
+                country = "c1",
+                mu = "m1",
+                militaryRank = 12,
+                leveling = WareraUser.Leveling(level = 30),
+            ),
+            client.getUser("u1"),
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `government lists the office holders`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/government.getByCountryId?input=%7B%22countryId%22%3A%22c1%22%7D"))
+            .andRespond(
+                withSuccess(
+                    """{"result":{"data":{"_id":"g1","country":"c1","president":"u1","minOfDefense":"u2",""" +
+                        """"congressMembers":["u1","u3"]}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        assertEquals(
+            WareraGovernment(country = "c1", president = "u1", minOfDefense = "u2", congressMembers = listOf("u1", "u3")),
+            client.getGovernment("c1"),
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `military units are searched and looked up`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/search.searchAnything?input=%7B%22searchText%22%3A%22Marine%22%7D"))
+            .andRespond(withSuccess("""{"result":{"data":{"userIds":["u1"],"muIds":["m1"]}}}""", MediaType.APPLICATION_JSON))
+        server
+            .expect(requestTo("https://warera.test/trpc/mu.getById?input=%7B%22muId%22%3A%22m1%22%7D"))
+            .andRespond(
+                withSuccess("""{"result":{"data":{"_id":"m1","name":"Deutsche Marine","members":["u1"]}}}""", MediaType.APPLICATION_JSON),
+            )
+
+        assertEquals(listOf("m1"), client.searchMilitaryUnitIds("Marine"))
+        assertEquals(WareraMilitaryUnit(id = "m1", name = "Deutsche Marine"), client.getMilitaryUnit("m1"))
+        server.verify()
+    }
+
+    @Test
+    fun `unknown objects are reported as not found`() {
+        server
+            .expect(times(1), requestTo("https://warera.test/trpc/mu.getById?input=%7B%22muId%22%3A%22m9%22%7D"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+
+        assertFailsWith<WareraNotFoundException> { client.getMilitaryUnit("m9") }
         server.verify()
     }
 

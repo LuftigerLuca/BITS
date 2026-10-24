@@ -1,0 +1,58 @@
+package eu.luftiger.bits.bot.roles
+
+import eu.luftiger.bits.shared.RoleSyncEvent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.future.await
+import net.dv8tion.jda.api.JDA
+import net.dv8tion.jda.api.entities.Member
+import net.dv8tion.jda.api.exceptions.ErrorResponseException
+import net.dv8tion.jda.api.requests.ErrorResponse
+import org.slf4j.LoggerFactory
+
+/**
+ * Brings the managed roles of the members to the target state from the backend. A change that fails is logged and
+ * skipped instead of failing the event, since the next sync tries again anyway.
+ */
+class RoleSyncHandler(
+    private val jda: JDA,
+    private val guildId: String,
+) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    suspend fun handle(event: RoleSyncEvent) {
+        val guild = jda.getGuildById(guildId) ?: error("Bot is not a member of guild $guildId")
+        val members = event.discordUserIds?.mapNotNull { findMember(it) } ?: guild.members
+        val membersById = members.associateBy { it.id }
+        val changes = members.flatMap { member -> roleChanges(member.id, member.roles.mapTo(HashSet()) { it.id }, event) }
+        var applied = 0
+        changes.forEach { change ->
+            val role = guild.getRoleById(change.roleId)
+            if (role == null || !guild.selfMember.canInteract(role)) {
+                log.warn("Skipping role {} for member {}: it is gone or above the bot", change.roleId, change.discordUserId)
+                return@forEach
+            }
+            try {
+                val member = membersById.getValue(change.discordUserId)
+                val action = if (change.add) guild.addRoleToMember(member, role) else guild.removeRoleFromMember(member, role)
+                action.reason(change.reason).submit().await()
+                applied++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("Changing role {} of member {} failed", change.roleId, change.discordUserId, e)
+            }
+        }
+        log.info("Role sync applied {} of {} changes for {} members", applied, changes.size, members.size)
+    }
+
+    /** Members who left the guild are skipped. */
+    private suspend fun findMember(discordUserId: String): Member? {
+        val guild = jda.getGuildById(guildId) ?: return null
+        guild.getMemberById(discordUserId)?.let { return it }
+        return try {
+            guild.retrieveMemberById(discordUserId).submit().await()
+        } catch (e: ErrorResponseException) {
+            if (e.errorResponse == ErrorResponse.UNKNOWN_MEMBER || e.errorResponse == ErrorResponse.UNKNOWN_USER) null else throw e
+        }
+    }
+}

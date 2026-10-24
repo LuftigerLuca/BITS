@@ -49,7 +49,7 @@ class AccountVerificationTest {
 
     @BeforeTest
     fun reset() {
-        jdbc.execute("TRUNCATE account_link, account_verification")
+        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role")
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
@@ -239,6 +239,12 @@ class AccountVerificationTest {
         override fun getCompanyIds(userId: String) = available { companies[userId].orEmpty().map { it.id } }
 
         override fun getCompany(companyId: String) = available { companies.values.flatten().first { it.id == companyId } }
+
+        override fun getGovernment(countryId: String) = TODO()
+
+        override fun searchMilitaryUnitIds(text: String) = TODO()
+
+        override fun getMilitaryUnit(muId: String) = TODO()
 
         private fun <T> available(block: () -> T): T = if (down) throw WareraApiException("down") else block()
     }

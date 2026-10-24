@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
 
@@ -19,6 +20,9 @@ interface BackendClient {
         discordUserId: String,
         code: String,
     ): CheckVerificationResponse
+
+    /** Replaces the roles of the guild known to the backend. */
+    suspend fun reportRoles(roles: List<DiscordRoleDto>)
 }
 
 class WareraUnavailableException(

@@ -1,5 +1,9 @@
 # Loaded on top of the main application.yml in every backend test.
 bits:
+  role-sync:
+    # Tests start syncs themselves and do not wait between WarEra calls.
+    cron: "-"
+    user-lookup-interval: 0s
   auth:
     public-url: https://bits.test
     jwt-secret: test-secret-that-is-at-least-32-bytes-long

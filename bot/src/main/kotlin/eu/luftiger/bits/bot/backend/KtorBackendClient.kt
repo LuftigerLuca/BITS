@@ -3,6 +3,8 @@ package eu.luftiger.bits.bot.backend
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationRequest
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.DiscordRolesReport
 import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.StartVerificationRequest
@@ -16,6 +18,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -55,6 +58,13 @@ class KtorBackendClient(
         discordUserId: String,
         code: String,
     ): CheckVerificationResponse = post("api/verifications/check", CheckVerificationRequest(discordUserId, code))
+
+    override suspend fun reportRoles(roles: List<DiscordRoleDto>) {
+        http.put("api/discord-roles") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordRolesReport(roles))
+        }
+    }
 
     /** The backend answers 503 if WarEra cannot be reached. */
     private suspend inline fun <reified R : Any, reified T> post(

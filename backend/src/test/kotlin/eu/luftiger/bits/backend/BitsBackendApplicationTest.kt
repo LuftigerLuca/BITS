@@ -82,6 +82,12 @@ class BitsBackendApplicationTest {
                 override fun getCompanyIds(userId: String) = TODO()
 
                 override fun getCompany(companyId: String) = TODO()
+
+                override fun getGovernment(countryId: String) = TODO()
+
+                override fun searchMilitaryUnitIds(text: String) = TODO()
+
+                override fun getMilitaryUnit(muId: String) = TODO()
             }
     }
 }

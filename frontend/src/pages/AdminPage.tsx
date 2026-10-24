@@ -1,15 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { RoleRulesCard } from './RoleRulesCard'
 
 export function AdminPage() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Verwaltung</CardTitle>
-        <CardDescription>Nur für Administratoren sichtbar.</CardDescription>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
-        Hier entstehen die Verwaltungsfunktionen des Bots.
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-4">
+      <h1 className="font-heading text-xl font-semibold">Verwaltung</h1>
+      <RoleRulesCard />
+    </div>
   )
 }

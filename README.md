@@ -31,6 +31,18 @@ einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer s
 „Prüfen“. Das Backend sucht den Code über die öffentliche API, speichert die Verknüpfung und publiziert ein
 `AccountLinkedEvent`.
 
+Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an ein WarEra-Merkmal koppeln:
+Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit, Level oder Militärrang ab
+einem Schwellwert. Mehrere Regeln für dieselbe Rolle gelten als ODER. Eine Rolle mit mindestens einer Regel
+verwaltet BITS: Wer keine ihrer Regeln erfüllt, verliert sie, auch wenn sie von Hand vergeben wurde. Das Backend
+berechnet die Soll-Rollen und publiziert ein `RoleSyncEvent`, der Bot setzt es mit Grund im Audit-Log um. Abgeglichen
+wird beim Verknüpfen für den Nutzer (und den zuvor verknüpften Discord-Account), nach jeder Regeländerung für alle
+mit den WarEra-Daten des letzten Abgleichs und stündlich für alle mit frischen Daten, eine WarEra-Abfrage pro
+Sekunde. Kann ein Nutzer oder eine Regierung nicht geladen werden, bleiben die betroffenen Rollen unverändert. Der
+Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und bei jeder Änderung; Regeln für
+gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
+Server-Members-Intent und die Berechtigung „Rollen verwalten“.
+
 Im Dashboard melden sich Mitglieder des Discord-Servers mit Discord an (OAuth2, Scopes `identify guilds`).
 Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, bekommt die Rolle `ADMIN` und sieht
 den Verwaltungsbereich, alle anderen `USER`. Zusätzlich gibt es optional einen Admin-Account mit Benutzername

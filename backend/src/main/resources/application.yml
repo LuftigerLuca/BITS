@@ -18,6 +18,8 @@ bits:
   service-token: ${BITS_SERVICE_TOKEN:}
   warera:
     base-url: ${WARERA_BASE_URL:https://api2.warera.io/trpc}
+  role-sync:
+    cron: "0 0 * * * *"
   auth:
     public-url: ${BITS_PUBLIC_URL:http://localhost:5173}
     jwt-secret: ${BITS_JWT_SECRET:}

@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.events
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.PingEvent
+import eu.luftiger.bits.shared.RoleSyncEvent
 import org.slf4j.LoggerFactory
 
 /** Example handler: only logs the events it receives. */
@@ -13,6 +14,8 @@ class LoggingEventHandler : EventHandler {
         when (event) {
             is PingEvent -> log.info("Backend handled a ping of user {}", event.discordUserId)
             is AccountLinkedEvent -> log.info("User {} linked WarEra account {}", event.discordUserId, event.wareraUserId)
+            is RoleSyncEvent ->
+                log.info("Role sync for {} members, {} with target roles", event.discordUserIds?.size ?: "all", event.members.size)
         }
     }
 }
