@@ -29,6 +29,11 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,6 +118,38 @@ class AccountVerificationTest {
 
         clock.advance(Duration.ofMillis(2_500))
         assertEquals(CheckVerificationResponse.TooEarly(retryAfterSeconds = 8), check("1", code))
+    }
+
+    @Test
+    fun `two checks at the same time run once`() {
+        val code = startedCode("1", "Luftiger")
+        warera.rename("c1", code)
+        warera.companyLookups.set(0)
+
+        val responses = inParallel(2) { checkRequest("1", code) }
+
+        assertEquals(setOf(CheckVerificationResponse.Checking, CheckVerificationResponse.TooEarly(10)), responses.toSet())
+        assertEquals(CheckVerificationResponse.Linked("Luftiger"), awaitResult(code))
+        assertEquals(1, warera.companyLookups.get())
+        assertEquals(1, events().filterIsInstance<AccountLinkedEvent>().size)
+    }
+
+    @Test
+    fun `two accounts linking the same WarEra account at the same time both succeed, the later one wins`() {
+        val first = startedCode("1", "Luftiger")
+        val second = startedCode("2", "Luftiger")
+        warera.rename("c1", "$first $second")
+        // Both checks find their code before either links, so neither sees the other's link.
+        warera.holdCompanies(2)
+
+        val results = inParallel(2) { i -> check(if (i == 0) "1" else "2", if (i == 0) first else second) }
+
+        assertEquals(List(2) { CheckVerificationResponse.Linked("Luftiger") }, results)
+        val linked = events().filterIsInstance<AccountLinkedEvent>()
+        val winner = jdbc.queryForObject("SELECT discord_user_id FROM account_link WHERE warera_user_id = 'w1'", String::class.java)
+        assertEquals(1, count("account_link"))
+        assertEquals(winner, linked.last().discordUserId)
+        assertEquals(setOf("1", "2") - winner, setOfNotNull(linked.last().previousDiscordUserId))
     }
 
     @Test
@@ -220,17 +257,48 @@ class AccountVerificationTest {
         code: String,
     ): CheckVerificationResponse {
         val before = checkedEvents(code).size
-        val body =
-            post("/api/verifications/check", """{"discordUserId":"$discordUserId","code":"$code"}""")
-                .andReturn()
-                .response.contentAsString
-        val response = BitsJson.decodeFromString<CheckVerificationResponse>(body)
+        val response = checkRequest(discordUserId, code)
         if (response != CheckVerificationResponse.Checking) return response
         repeat(100) {
             checkedEvents(code).getOrNull(before)?.let { return it.result }
             Thread.sleep(50)
         }
         fail("no result for the check of $code")
+    }
+
+    private fun checkRequest(
+        discordUserId: String,
+        code: String,
+    ): CheckVerificationResponse {
+        val body =
+            post("/api/verifications/check", """{"discordUserId":"$discordUserId","code":"$code"}""")
+                .andReturn()
+                .response.contentAsString
+        return BitsJson.decodeFromString<CheckVerificationResponse>(body)
+    }
+
+    /** Runs [block] on [threads] threads that start at the same moment. */
+    private fun <T> inParallel(
+        threads: Int,
+        block: (Int) -> T,
+    ): List<T> {
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(threads)
+        try {
+            val futures = (0 until threads).map { i -> executor.submit<T> { start.await().let { block(i) } } }
+            start.countDown()
+            return futures.map { it.get(10, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun awaitResult(code: String): CheckVerificationResponse {
+        repeat(100) {
+            checkedEvents(code).singleOrNull()?.let { return it.result }
+            Thread.sleep(50)
+        }
+        fail("no single result for the check of $code: ${checkedEvents(code)}")
     }
 
     private fun checkedEvents(code: String) = events().filterIsInstance<VerificationCheckedEvent>().filter { it.code == code }
@@ -258,14 +326,23 @@ class AccountVerificationTest {
     /** Two WarEra users, each with one company: Luftiger (w1, c1) and Other (w2, c2). */
     class FakeWarera : WareraClient {
         private val users = listOf(WareraUser("w1", "Luftiger"), WareraUser("w2", "Other"))
-        val companies = mutableMapOf<String, MutableList<WareraCompany>>()
+        val companies = ConcurrentHashMap<String, MutableList<WareraCompany>>()
+        val companyLookups = AtomicInteger()
+        private var companyGate: CountDownLatch? = null
         var down = false
 
         fun reset() {
             companies.clear()
             companies["w1"] = mutableListOf(WareraCompany("c1", "Waffen GmbH"))
             companies["w2"] = mutableListOf(WareraCompany("c2", "Brot AG"))
+            companyLookups.set(0)
+            companyGate = null
             down = false
+        }
+
+        /** The next [lookups] lookups of company lists wait for each other. */
+        fun holdCompanies(lookups: Int) {
+            companyGate = CountDownLatch(lookups)
         }
 
         fun rename(
@@ -283,7 +360,15 @@ class AccountVerificationTest {
 
         override fun getUser(userId: String) = available { users.first { it.id == userId } }
 
-        override fun getCompanyIds(userId: String) = available { companies[userId].orEmpty().map { it.id } }
+        override fun getCompanyIds(userId: String) =
+            available {
+                companyLookups.incrementAndGet()
+                companyGate?.let {
+                    it.countDown()
+                    it.await(10, TimeUnit.SECONDS)
+                }
+                companies[userId].orEmpty().map { it.id }
+            }
 
         override fun getCompany(companyId: String) = available { companies.values.flatten().first { it.id == companyId } }
 

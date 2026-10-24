@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.core.task.TaskExecutor
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -83,13 +84,18 @@ class VerificationService(
             verificationRepository.delete(verification)
             return CheckVerificationResponse.Expired
         }
-        val nextCheckAt = verification.lastCheckedAt?.plus(CHECK_INTERVAL)
-        if (nextCheckAt != null && now.isBefore(nextCheckAt)) {
-            val waitMillis = Duration.between(now, nextCheckAt).toMillis()
+        // Atomic, so that two quick clicks do not both call WarEra and link twice.
+        val claimed =
+            transactionTemplate.execute {
+                verificationRepository.claimCheck(discordUserId, verification.code, now, now - CHECK_INTERVAL)
+            } == 1
+        if (!claimed) {
+            val current = verificationRepository.findByIdOrNull(discordUserId)
+            val lastCheckedAt = current?.lastCheckedAt
+            if (current?.code != verification.code || lastCheckedAt == null) return CheckVerificationResponse.Invalid
+            val waitMillis = Duration.between(now, lastCheckedAt + CHECK_INTERVAL).toMillis().coerceAtLeast(0)
             return CheckVerificationResponse.TooEarly(retryAfterSeconds = (waitMillis + 999) / 1000)
         }
-        verification.lastCheckedAt = now
-        verificationRepository.save(verification)
 
         executor.execute {
             val result = lookForCode(verification) ?: return@execute
@@ -123,8 +129,19 @@ class VerificationService(
     /**
      * Replaces any existing link of either account, so that each side is linked at most once. Returns `false` if the
      * code is no longer the user's current one, e.g. because a newer one was issued during the check.
+     *
+     * Two checks that link the same account at the same time do not see each other's link, so one of them fails on a
+     * unique constraint. It tries once more, then sees the other link and replaces it like any older one.
      */
     private fun link(verification: AccountVerification): Boolean =
+        try {
+            tryLink(verification)
+        } catch (e: DataIntegrityViolationException) {
+            log.info("Account of user {} was linked by another check at the same time, trying again", verification.discordUserId)
+            tryLink(verification)
+        }
+
+    private fun tryLink(verification: AccountVerification): Boolean =
         transactionTemplate.execute {
             val current = verificationRepository.findByIdOrNull(verification.discordUserId)
             if (current?.code != verification.code) return@execute false
