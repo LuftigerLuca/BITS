@@ -11,17 +11,21 @@ import org.slf4j.LoggerFactory
 
 /**
  * Brings the managed roles of the members to the target state from the backend. A change that fails is logged and
- * skipped instead of failing the event, since the next sync tries again anyway.
+ * skipped instead of failing the event, since the next sync tries again anyway. Members whose roles a newer sync has
+ * set already are left alone.
  */
 class RoleSyncHandler(
     private val jda: JDA,
     private val guildId: String,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
+    private val appliedSyncs = AppliedSyncs()
 
     suspend fun handle(event: RoleSyncEvent) {
         val guild = jda.getGuildById(guildId) ?: error("Bot is not a member of guild $guildId")
-        val members = event.discordUserIds?.mapNotNull { findMember(it) } ?: guild.members
+        val (stale, members) =
+            (event.discordUserIds?.mapNotNull { findMember(it) } ?: guild.members)
+                .partition { appliedSyncs.isStale(it.id, event) }
         val membersById = members.associateBy { it.id }
         val changes = members.flatMap { member -> roleChanges(member.id, member.roles.mapTo(HashSet()) { it.id }, event) }
         var applied = 0
@@ -42,7 +46,14 @@ class RoleSyncHandler(
                 log.error("Changing role {} of member {} failed", change.roleId, change.discordUserId, e)
             }
         }
-        log.info("Role sync applied {} of {} changes for {} members", applied, changes.size, members.size)
+        appliedSyncs.record(event)
+        log.info(
+            "Role sync applied {} of {} changes for {} members, skipped {} with a newer sync",
+            applied,
+            changes.size,
+            members.size,
+            stale.size,
+        )
     }
 
     /** Members who left the guild are skipped. */

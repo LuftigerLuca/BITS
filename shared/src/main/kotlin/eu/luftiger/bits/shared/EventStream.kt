@@ -9,4 +9,7 @@ object EventStream {
 
     /** Consumer group of the bot. */
     const val BOT_GROUP = "bot"
+
+    /** Events the bot gave up on after several failed deliveries, with the original stream ID in `originalId`. */
+    const val DEAD_LETTER_KEY = "bits:events:dead"
 }

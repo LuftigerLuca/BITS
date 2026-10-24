@@ -10,19 +10,36 @@ import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
 import eu.luftiger.bits.shared.RoleSyncEvent
 import io.lettuce.core.RedisClient
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.requests.GatewayIntent
 import net.dv8tion.jda.api.utils.ChunkingFilter
 import net.dv8tion.jda.api.utils.MemberCachePolicy
+import org.slf4j.LoggerFactory
+import java.time.Duration
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
+import kotlin.system.exitProcess
+
+private val log = LoggerFactory.getLogger("eu.luftiger.bits.bot.Main")
+
+/** Time the bot takes to stop, below the 10 s Docker waits before it kills the container. */
+private val SHUTDOWN_GRACE: Duration = Duration.ofSeconds(6)
+private val CLOSE_TIMEOUT: Duration = Duration.ofSeconds(2)
 
 fun main() {
     val config = BotConfig.fromEnv()
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val job = SupervisorJob()
+    val scope = CoroutineScope(job + Dispatchers.IO)
     val backend = KtorBackendClient(config.backendUrl, config.serviceToken)
     val redis = RedisClient.create(config.redisUrl)
     val roleReporter = RoleReporter(config.guildId, backend, scope)
@@ -49,14 +66,44 @@ fun main() {
             logging.handle(event)
             if (event is RoleSyncEvent) roleSync.handle(event)
         }
-    scope.launch { RedisStreamEventConsumer(redis, events).run() }
+    val consumer = RedisStreamEventConsumer(redis, events)
+    // The consumer only ends when it is stopped. Anything else would leave a bot that answers commands but never
+    // handles events again, so the process ends and Docker starts it anew.
+    scope.launch(
+        CoroutineExceptionHandler { _, e ->
+            log.error("Event consumer died, exiting", e)
+            // exitProcess blocks until the shutdown hook is done, which waits for this very coroutine.
+            thread(name = "exit") { exitProcess(1) }
+        },
+    ) { consumer.run() }
 
     Runtime.getRuntime().addShutdownHook(
-        Thread {
-            scope.cancel()
-            jda.shutdown()
-            backend.close()
-            redis.shutdown()
-        },
+        Thread { shutdown(jda, consumer, job, backend, redis) },
     )
+}
+
+/**
+ * Takes no new commands or events, gives running work [SHUTDOWN_GRACE] to finish and only then closes the clients it
+ * needs. An event cut off by the grace period stays pending and is handled again after the restart.
+ */
+private fun shutdown(
+    jda: JDA,
+    consumer: RedisStreamEventConsumer,
+    job: Job,
+    backend: KtorBackendClient,
+    redis: RedisClient,
+) {
+    log.info("Shutting down")
+    jda.registeredListeners.forEach { jda.removeEventListener(it) }
+    consumer.stop()
+    runBlocking {
+        val done = withTimeoutOrNull(SHUTDOWN_GRACE.toMillis()) { job.children.toList().joinAll() }
+        if (done == null) log.warn("Work still running after {}, cancelling it", SHUTDOWN_GRACE)
+    }
+    // No join: a blocking Redis call only returns once the client below is shut down.
+    job.cancel()
+    jda.shutdown()
+    if (!jda.awaitShutdown(CLOSE_TIMEOUT)) jda.shutdownNow()
+    backend.close()
+    redis.shutdown(0, CLOSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
 }

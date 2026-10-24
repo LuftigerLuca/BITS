@@ -13,7 +13,7 @@ class LoggingEventHandler : EventHandler {
     override suspend fun handle(event: BitsEvent) {
         when (event) {
             is PingEvent -> log.info("Backend handled a ping of user {}", event.discordUserId)
-            is AccountLinkedEvent -> log.info("User {} linked WarEra account {}", event.discordUserId, event.wareraUserId)
+            is AccountLinkedEvent -> log.info("User {} linked a WarEra account", event.discordUserId)
             is RoleSyncEvent ->
                 log.info("Role sync for {} members, {} with target roles", event.discordUserIds?.size ?: "all", event.members.size)
         }
