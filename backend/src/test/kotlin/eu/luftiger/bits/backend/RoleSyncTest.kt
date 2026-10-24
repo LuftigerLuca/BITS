@@ -32,6 +32,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.connection.stream.StreamOffset
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
@@ -46,6 +47,7 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.fail
 
 @SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
@@ -148,6 +150,44 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-veteran","type":"MILITARY_UNIT","muId":"not an id"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":0}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-gone","type":"LEVEL","threshold":5}""").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `the same rule twice for a role is a conflict`() {
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""").andExpect { status { isCreated() } }
+
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""").andExpect { status { isConflict() } }
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":20}""").andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-citizen","type":"LEVEL","threshold":10}""").andExpect { status { isCreated() } }
+    }
+
+    @Test
+    fun `the database rejects rules without the fields of their type`() {
+        fun insert(
+            type: String,
+            countryId: String? = null,
+            office: String? = null,
+            threshold: Int? = null,
+            targetName: String? = null,
+        ) = jdbc.update(
+            "INSERT INTO role_rule (role_id, type, country_id, office, threshold, target_name, created_at) VALUES ('r', ?, ?, ?, ?, ?, now())",
+            type,
+            countryId,
+            office,
+            threshold,
+            targetName,
+        )
+
+        listOf(
+            { insert("GOVERNMENT_OFFICE", countryId = "de", targetName = "Germany") },
+            { insert("GOVERNMENT_OFFICE", countryId = "de", office = "KING", targetName = "Germany") },
+            { insert("CITIZENSHIP", countryId = "de") },
+            { insert("LEVEL") },
+            { insert("LEVEL", threshold = 0) },
+            { insert("LEVEL", threshold = 5, countryId = "de") },
+            { insert("UNKNOWN", threshold = 5) },
+        ).forEach { assertFailsWith<DataIntegrityViolationException> { it() } }
+        assertEquals(1, insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany"))
     }
 
     @Test
