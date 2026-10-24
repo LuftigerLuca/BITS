@@ -3,6 +3,8 @@ package eu.luftiger.bits.backend
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.decodeEvent
+import eu.luftiger.bits.warera.RestWareraClient
+import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraCountry
 import org.springframework.beans.factory.annotation.Autowired
@@ -19,9 +21,14 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.web.client.RestClient
+import java.net.ServerSocket
+import java.time.Duration
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 @SpringBootTest(properties = ["bits.service-token=test-token"])
 @AutoConfigureMockMvc
@@ -35,6 +42,9 @@ class BitsBackendApplicationTest {
 
     @Autowired
     lateinit var jdbc: JdbcTemplate
+
+    @Autowired
+    lateinit var restClientBuilder: RestClient.Builder
 
     /** The containers are shared with the other test classes. */
     @BeforeTest
@@ -79,13 +89,30 @@ class BitsBackendApplicationTest {
         assertEquals("42", (event as PingEvent).discordUserId)
     }
 
+    @Test
+    fun `a WarEra call that gets no answer ends after the read timeout`() {
+        // Accepts the connection, but never answers.
+        ServerSocket(0).use { server ->
+            val client =
+                RestWareraClient(
+                    restClientBuilder.baseUrl("http://localhost:${server.localPort}").build(),
+                    retry = RestWareraClient.defaultRetry(Duration.ofMillis(1)),
+                )
+
+            val started = System.nanoTime()
+            assertFailsWith<WareraApiException> { client.getAllCountries() }
+            val elapsed = Duration.ofNanos(System.nanoTime() - started)
+            assertTrue(elapsed < Duration.ofSeconds(5), "took $elapsed")
+        }
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     class FakeWarera {
         @Bean
         @Primary
         fun fakeWareraClient() =
             object : WareraClient {
-                override fun getAllCountries() = listOf(WareraCountry(id = "c1", name = "Germany", code = "de"))
+                override fun getAllCountries() = listOf(WareraCountry(id = "c1", name = "Germany"))
 
                 override fun searchUserIds(text: String) = TODO()
 

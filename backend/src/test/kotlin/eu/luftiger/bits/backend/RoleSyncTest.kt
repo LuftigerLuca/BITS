@@ -7,18 +7,22 @@ import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsEvent
+import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
+import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
+import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraCompany
 import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraNotFoundException
+import eu.luftiger.bits.warera.WareraSchemaException
 import eu.luftiger.bits.warera.WareraUser
 import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
@@ -42,6 +46,7 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 @SpringBootTest(properties = ["bits.service-token=test-token"])
 @AutoConfigureMockMvc
@@ -140,6 +145,7 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"xx"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-minister","type":"GOVERNMENT_OFFICE","countryId":"de"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-veteran","type":"MILITARY_UNIT","muId":"m9"}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","type":"MILITARY_UNIT","muId":"not an id"}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":0}""").andExpect { status { isBadRequest() } }
         createRule("""{"roleId":"r-gone","type":"LEVEL","threshold":5}""").andExpect { status { isBadRequest() } }
     }
@@ -308,7 +314,14 @@ class RoleSyncTest {
                 header("Authorization", "Bearer test-token")
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"discordUserId":"$discordUserId","code":"$code"}"""
-            }.andExpect { jsonPath("$.type") { value("linked") } }
+            }.andExpect { jsonPath("$.type") { value("checking") } }
+        // The check runs in the background. Its result is published after the link, which starts the sync of the member.
+        repeat(100) {
+            val result = streamEvents().filterIsInstance<VerificationCheckedEvent>().singleOrNull { it.code == code }?.result
+            if (result != null) return assertEquals(CheckVerificationResponse.Linked(username), result)
+            Thread.sleep(50)
+        }
+        fail("no result for the check of $code")
     }
 
     private fun grantedRoles(
@@ -326,13 +339,14 @@ class RoleSyncTest {
         return roleSyncEvents().also { assertEquals(count, it.size, "expected $count role syncs, got $it") }
     }
 
-    private fun roleSyncEvents() =
+    private fun roleSyncEvents() = streamEvents().filterIsInstance<RoleSyncEvent>()
+
+    private fun streamEvents() =
         redisTemplate
             .opsForStream<String, String>()
             .read(StreamOffset.fromStart(EventStream.KEY))
             .orEmpty()
             .map { decodeEvent(it.value[EventStream.PAYLOAD_FIELD]!!) }
-            .filterIsInstance<RoleSyncEvent>()
 
     private fun session(user: SessionUser) = sessionTokens.cookie(user).let { Cookie(it.name, it.value) }
 
@@ -363,7 +377,8 @@ class RoleSyncTest {
 
         override fun getUser(userId: String) =
             available {
-                if (userId in failingUsers) throw WareraApiException("down")
+                // WarEra changed its answer in a way BITS cannot read.
+                if (userId in failingUsers) throw WareraSchemaException("unexpected response")
                 users.getValue(userId)
             }
 
@@ -381,6 +396,7 @@ class RoleSyncTest {
 
         override fun getMilitaryUnit(muId: String) =
             available {
+                if (" " in muId) throw WareraBadRequestException("invalid id")
                 if (muId != "m1") throw WareraNotFoundException("no such MU")
                 WareraMilitaryUnit("m1", "Deutsche Marine")
             }

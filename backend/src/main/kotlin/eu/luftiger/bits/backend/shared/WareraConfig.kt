@@ -5,6 +5,7 @@ import eu.luftiger.bits.warera.WareraClient
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.client.RestClient
+import java.time.Clock
 
 @Configuration(proxyBeanMethods = false)
 class WareraConfig {
@@ -12,5 +13,6 @@ class WareraConfig {
     fun wareraClient(
         builder: RestClient.Builder,
         properties: BitsProperties,
-    ): WareraClient = RestWareraClient(builder.baseUrl(properties.warera.baseUrl).build())
+        clock: Clock,
+    ): WareraClient = CachingWareraClient(RestWareraClient(builder.baseUrl(properties.warera.baseUrl).build()), clock)
 }

@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
+import org.springframework.http.converter.FormHttpMessageConverter
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -18,12 +19,14 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClient
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient
+import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler
 import org.springframework.security.oauth2.client.registration.ClientRegistration
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod
+import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.oauth2.jwt.JwtEncoder
@@ -131,9 +134,20 @@ class AuthSecurityConfig {
                 .build(),
         )
 
+    /** Built like Spring Security's own client, but from Boot's builder, so that the HTTP timeouts apply. */
     @Bean
-    fun discordTokenResponseClient(): OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> =
-        RestClientAuthorizationCodeTokenResponseClient()
+    fun discordTokenResponseClient(builder: RestClient.Builder): OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> =
+        RestClientAuthorizationCodeTokenResponseClient().apply {
+            setRestClient(
+                builder
+                    .clone()
+                    .messageConverters {
+                        it.add(0, FormHttpMessageConverter())
+                        it.add(0, OAuth2AccessTokenResponseHttpMessageConverter())
+                    }.defaultStatusHandler(OAuth2ErrorResponseErrorHandler())
+                    .build(),
+            )
+        }
 
     @Bean
     fun discordApi(builder: RestClient.Builder): DiscordApi = RestDiscordApi(builder.baseUrl(DISCORD_API_URL).build())

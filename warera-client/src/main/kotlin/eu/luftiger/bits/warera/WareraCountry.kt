@@ -7,5 +7,6 @@ import kotlinx.serialization.Serializable
 data class WareraCountry(
     @SerialName("_id") val id: String,
     val name: String,
-    val code: String,
+    /** Not used by BITS, so it may be missing. */
+    val code: String? = null,
 )

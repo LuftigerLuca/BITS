@@ -1,4 +1,9 @@
 # Loaded on top of the main application.yml in every backend test.
+spring:
+  http:
+    clients:
+      # Short, so that the timeout test does not wait for long.
+      read-timeout: 500ms
 bits:
   role-sync:
     # Tests start syncs themselves and do not wait between WarEra calls.

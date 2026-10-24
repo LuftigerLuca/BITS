@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.springframework.http.HttpHeaders
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.ResourceAccessException
@@ -23,7 +24,7 @@ import java.time.Duration
  * [WareraClient] for the tRPC API of WarEra (`https://api2.warera.io/trpc`).
  *
  * The API allows 100 requests per minute and IP, so calls are throttled by [rateLimiter]. Rate-limit
- * responses, server errors and network errors are retried by [retry].
+ * responses, server errors and network errors are retried by [retry]. Timeouts come from the [RestClient].
  */
 class RestWareraClient(
     private val restClient: RestClient,
@@ -91,12 +92,20 @@ class RestWareraClient(
                 Retry.decorateCallable(retry, call).call()
             } catch (e: HttpClientErrorException.NotFound) {
                 throw WareraNotFoundException("WarEra API call $procedure found nothing", e)
+            } catch (e: HttpClientErrorException.BadRequest) {
+                throw WareraBadRequestException("WarEra API call $procedure rejected its input", e)
             } catch (e: RestClientException) {
                 throw WareraApiException("WarEra API call $procedure failed", e)
             } catch (e: RequestNotPermitted) {
                 throw WareraApiException("WarEra API call $procedure was throttled for too long", e)
             }
-        return json.decodeFromString(TrpcResponse.serializer(serializer), body).result.data
+        return try {
+            json.decodeFromString(TrpcResponse.serializer(serializer), body).result.data
+        } catch (e: IllegalArgumentException) {
+            // Covers SerializationException. Its message quotes the response, which may hold user data, so only
+            // the first line goes along, and no cause.
+            throw WareraSchemaException("WarEra API call $procedure returned an unexpected response: ${e.message?.lineSequence()?.first()}")
+        }
     }
 
     @Serializable
@@ -129,27 +138,53 @@ class RestWareraClient(
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun defaultRateLimiter(): RateLimiter =
+        /** WarEra counts the requests of the last minute, not per fixed minute. */
+        const val WARERA_LIMIT_PER_MINUTE = 100
+
+        const val CALLS_PER_PERIOD = 3
+
+        /** Longest `Retry-After` that is waited for; a longer one would outlast any request. */
+        private val MAX_RETRY_AFTER: Duration = Duration.ofSeconds(10)
+
+        /**
+         * Three calls every two seconds, i.e. 90 per minute. The limiter refills per period, so a sliding minute can
+         * catch 31 periods: at most 93 calls, below WarEra's 100. One large period would allow twice its limit
+         * around the refill. A caller waits up to [timeout] for a permit.
+         */
+        fun defaultRateLimiter(
+            period: Duration = Duration.ofSeconds(2),
+            timeout: Duration = Duration.ofSeconds(10),
+        ): RateLimiter =
             RateLimiter.of(
                 "warera",
                 RateLimiterConfig
                     .custom()
-                    .limitForPeriod(90)
-                    .limitRefreshPeriod(Duration.ofMinutes(1))
-                    .timeoutDuration(Duration.ofSeconds(30))
+                    .limitForPeriod(CALLS_PER_PERIOD)
+                    .limitRefreshPeriod(period)
+                    .timeoutDuration(timeout)
                     .build(),
             )
 
+        /** Waits as long as a 429 asks for, up to [MAX_RETRY_AFTER], otherwise [waitDuration], doubled per attempt. */
         fun defaultRetry(waitDuration: Duration = Duration.ofSeconds(2)): Retry =
             Retry.of(
                 "warera",
                 RetryConfig
                     .custom<Any>()
                     .maxAttempts(3)
-                    .waitDuration(waitDuration)
-                    .retryOnException(::isRetryable)
+                    .intervalBiFunction { attempt, result ->
+                        val retryAfter = if (result.isLeft) retryAfter(result.left) else null
+                        retryAfter?.toMillis() ?: (waitDuration.toMillis() shl (attempt - 1))
+                    }.retryOnException(::isRetryable)
                     .build(),
             )
+
+        private fun retryAfter(e: Throwable): Duration? =
+            (e as? HttpClientErrorException.TooManyRequests)
+                ?.responseHeaders
+                ?.getFirst(HttpHeaders.RETRY_AFTER)
+                ?.toLongOrNull()
+                ?.let { minOf(Duration.ofSeconds(it), MAX_RETRY_AFTER) }
 
         private fun isRetryable(e: Throwable): Boolean =
             when (e) {

@@ -37,4 +37,10 @@ class VerifyCommandTest {
     fun `too early message names the seconds to wait`() {
         assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.TooEarly(retryAfterSeconds = 7)), "7 Sekunden")
     }
+
+    @Test
+    fun `results of the background check have their own messages`() {
+        assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.Linked("Luftiger")), "Fertig!")
+        assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.WareraUnavailable), "WarEra ist gerade nicht erreichbar")
+    }
 }

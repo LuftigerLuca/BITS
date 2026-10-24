@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraNotFoundException
 import org.springframework.data.repository.findByIdOrNull
@@ -70,6 +71,9 @@ class RoleRuleService(
                             wareraClient.getMilitaryUnit(muId)
                         } catch (_: WareraNotFoundException) {
                             // Without the cause, which would let the 503 handler for WarEra errors take over.
+                            throw badRequest("Unknown military unit $muId")
+                        } catch (_: WareraBadRequestException) {
+                            // An ID in a format WarEra does not accept.
                             throw badRequest("Unknown military unit $muId")
                         }
                     RoleRule(role.id, request.type, muId = mu.id, targetName = mu.name, createdAt = now())

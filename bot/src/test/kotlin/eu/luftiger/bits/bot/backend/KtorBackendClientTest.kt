@@ -10,7 +10,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -102,5 +104,18 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
             client.reportRoles(listOf(DiscordRoleDto(id = "1", name = "Veteran", color = null, position = 2, assignable = true)))
+        }
+
+    @Test
+    fun `a backend that does not answer in time is reported as its own exception`() =
+        runTest {
+            val engine =
+                MockEngine {
+                    delay(5_000)
+                    respond("")
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine, requestTimeout = Duration.ofMillis(100))
+
+            assertFailsWith<BackendTimeoutException> { client.startVerification("42", "Luftiger") }
         }
 }
