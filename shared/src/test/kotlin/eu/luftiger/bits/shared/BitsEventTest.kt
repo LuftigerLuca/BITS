@@ -2,6 +2,7 @@ package eu.luftiger.bits.shared
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class BitsEventTest {
@@ -30,5 +31,17 @@ class BitsEventTest {
             )
 
         assertEquals(event, decodeEvent(event.encode()))
+    }
+
+    @Test
+    fun `fields added by a newer sender are ignored`() {
+        val payload = """{"type":"ping","discordUserId":"123","occurredAt":5,"addedLater":{"any":"thing"}}"""
+
+        assertEquals(PingEvent(discordUserId = "123", occurredAt = 5), decodeEvent(payload))
+    }
+
+    @Test
+    fun `an unknown event type is rejected, not mistaken for a known one`() {
+        assertFailsWith<IllegalArgumentException> { decodeEvent("""{"type":"added_later","occurredAt":5}""") }
     }
 }
