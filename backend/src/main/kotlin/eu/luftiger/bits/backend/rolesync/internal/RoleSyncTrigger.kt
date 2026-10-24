@@ -6,7 +6,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionalEventListener
+import java.time.Duration
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Starts syncs in the background, one after the other: right away for a member who links an account, for everybody
@@ -28,6 +30,11 @@ class RoleSyncTrigger(
 
     @Scheduled(cron = "\${bits.role-sync.cron}")
     fun hourly() = submit { syncService.syncAll(refresh = true) }
+
+    /** Waits until all syncs started so far have finished, so that tests do not see syncs of the previous test. */
+    fun awaitIdle(timeout: Duration = Duration.ofSeconds(10)) {
+        executor.submit {}.get(timeout.toMillis(), TimeUnit.MILLISECONDS)
+    }
 
     private fun submit(sync: () -> Unit) {
         executor.execute {
