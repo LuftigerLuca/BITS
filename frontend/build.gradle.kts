@@ -13,6 +13,12 @@ val lint by tasks.registering(Exec::class) {
     commandLine("npm", "run", "lint")
 }
 
+val test by tasks.registering(Exec::class) {
+    group = "verification"
+    dependsOn(npmInstall)
+    commandLine("npm", "test")
+}
+
 val npmBuild by tasks.registering(Exec::class) {
     group = "build"
     dependsOn(npmInstall)
@@ -25,7 +31,7 @@ val npmBuild by tasks.registering(Exec::class) {
 
 tasks.register("check") {
     group = "verification"
-    dependsOn(lint)
+    dependsOn(lint, test)
 }
 
 tasks.register("build") {

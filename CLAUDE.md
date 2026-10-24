@@ -39,7 +39,7 @@ reference for new features that span all parts.
 ./gradlew build            # all modules incl. ktlint and tests (backend tests need Docker)
 ./gradlew :bot:test        # a single module
 ./gradlew ktlintFormat     # fix ktlint violations
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm test && npm run build
 ```
 
 Only report work as done when the checks of the affected modules pass. If something could not run (e.g. no

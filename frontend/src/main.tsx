@@ -1,45 +1,17 @@
 import { StrictMode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
-import { Navigate, RouterProvider, createBrowserRouter } from 'react-router'
+import { RouterProvider, createBrowserRouter } from 'react-router'
 import './index.css'
 import { AuthProvider } from './auth/AuthProvider.tsx'
-import { RequireAdmin, RequireAuth } from './auth/guards.tsx'
-import { HomePage } from './pages/HomePage.tsx'
-import { Layout } from './pages/Layout.tsx'
-import { LoginPage } from './pages/LoginPage.tsx'
 import { createQueryClient } from './lib/queryClient.ts'
 import { followSystemTheme } from './lib/theme.ts'
+import { routes } from './routes.tsx'
 
 followSystemTheme()
 
 const queryClient = createQueryClient()
-
-const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  {
-    element: <RequireAuth />,
-    children: [
-      {
-        element: <Layout />,
-        children: [
-          { index: true, element: <HomePage /> },
-          {
-            element: <RequireAdmin />,
-            children: [
-              {
-                path: 'admin',
-                // Only admins need the admin area, so its code is loaded on demand.
-                lazy: async () => ({ Component: (await import('./pages/AdminPage.tsx')).AdminPage }),
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  { path: '*', element: <Navigate to="/" replace /> },
-])
+const router = createBrowserRouter(routes)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
