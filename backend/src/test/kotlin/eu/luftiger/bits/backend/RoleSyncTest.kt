@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
+import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.MemberRoles
@@ -41,8 +42,6 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.test.fail
 
 @SpringBootTest(properties = ["bits.service-token=test-token"])
 @AutoConfigureMockMvc
@@ -64,6 +63,9 @@ class RoleSyncTest {
     lateinit var syncService: RoleSyncService
 
     @Autowired
+    lateinit var syncTrigger: RoleSyncTrigger
+
+    @Autowired
     lateinit var warera: FakeWarera
 
     @Autowired
@@ -73,6 +75,7 @@ class RoleSyncTest {
 
     @BeforeTest
     fun reset() {
+        syncTrigger.awaitIdle()
         jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role")
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
@@ -317,17 +320,10 @@ class RoleSyncTest {
         .orEmpty()
         .mapTo(HashSet()) { it.roleId }
 
-    /** Syncs run in the background; waits until at least [count] role syncs have been published. */
+    /** Syncs run in the background, one after the other; waits for them and expects exactly [count] role syncs. */
     private fun awaitEvents(count: Int): List<BitsEvent> {
-        repeat(100) {
-            val events = roleSyncEvents()
-            if (events.size >= count) {
-                assertTrue(events.size == count, "expected $count role syncs, got $events")
-                return events
-            }
-            Thread.sleep(50)
-        }
-        fail("expected $count role syncs, got ${roleSyncEvents()}")
+        syncTrigger.awaitIdle()
+        return roleSyncEvents().also { assertEquals(count, it.size, "expected $count role syncs, got $it") }
     }
 
     private fun roleSyncEvents() =
