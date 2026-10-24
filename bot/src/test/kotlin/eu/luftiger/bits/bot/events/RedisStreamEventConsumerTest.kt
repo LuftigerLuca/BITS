@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.wait.strategy.Wait
 import java.net.ServerSocket
 import java.time.Duration
 import java.util.Collections
@@ -133,17 +134,19 @@ class RedisStreamEventConsumerTest {
             consumers.launch { consumer(client = client("redis://localhost:$port")).run() }
             delay(300)
 
-            GenericContainer(
-                IMAGE,
-            ).withCreateContainerCmdModifier { it.hostConfig!!.withPortBindings(PortBinding.parse("$port:6379")) }.use { late ->
-                late.start()
-                val lateRedis = client("redis://localhost:$port").connect().sync()
-                eventually { assertTrue(lateRedis.exists(EventStream.KEY) == 1L) }
+            GenericContainer(IMAGE)
+                // Without an exposed port Testcontainers does not wait for Redis by itself.
+                .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1))
+                .withCreateContainerCmdModifier { it.hostConfig!!.withPortBindings(PortBinding.parse("$port:6379")) }
+                .use { late ->
+                    late.start()
+                    val lateRedis = client("redis://localhost:$port").connect().sync()
+                    eventually { assertTrue(lateRedis.exists(EventStream.KEY) == 1L) }
 
-                lateRedis.xadd(EventStream.KEY, mapOf(EventStream.PAYLOAD_FIELD to ping("1").encode()))
+                    lateRedis.xadd(EventStream.KEY, mapOf(EventStream.PAYLOAD_FIELD to ping("1").encode()))
 
-                awaitHandled(ping("1"))
-            }
+                    awaitHandled(ping("1"))
+                }
         }
 
     @Test
