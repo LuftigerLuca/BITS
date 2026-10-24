@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.account.internal
 
+import eu.luftiger.bits.backend.shared.BotInput
 import eu.luftiger.bits.shared.CheckVerificationRequest
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationRequest
@@ -16,7 +17,10 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
-/** Expected outcomes are part of the response body; only an unreachable WarEra API is an error (503). */
+/**
+ * Expected outcomes are part of the response body; only an unreachable WarEra API (503) and malformed input (400) are
+ * errors.
+ */
 @RestController
 @RequestMapping("/api/verifications")
 class VerificationController(
@@ -27,17 +31,28 @@ class VerificationController(
     @PostMapping
     fun start(
         @RequestBody request: StartVerificationRequest,
-    ): StartVerificationResponse = verificationService.start(request.discordUserId, request.wareraUsername)
+    ): StartVerificationResponse {
+        BotInput.discordUserId(request.discordUserId)
+        BotInput.wareraUsername(request.wareraUsername)
+        return verificationService.start(request.discordUserId, request.wareraUsername)
+    }
 
     @PostMapping("/check")
     fun check(
         @RequestBody request: CheckVerificationRequest,
-    ): CheckVerificationResponse = verificationService.check(request.discordUserId, request.code)
+    ): CheckVerificationResponse {
+        BotInput.discordUserId(request.discordUserId)
+        BotInput.code(request.code)
+        return verificationService.check(request.discordUserId, request.code)
+    }
 
     @PostMapping("/unlink")
     fun unlink(
         @RequestBody request: UnlinkAccountRequest,
-    ): UnlinkAccountResponse = verificationService.unlink(request.discordUserId)
+    ): UnlinkAccountResponse {
+        BotInput.discordUserId(request.discordUserId)
+        return verificationService.unlink(request.discordUserId)
+    }
 
     @ExceptionHandler(WareraApiException::class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)

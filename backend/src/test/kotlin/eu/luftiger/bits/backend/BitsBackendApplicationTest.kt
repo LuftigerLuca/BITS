@@ -26,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.client.RestClient
 import java.net.ServerSocket
@@ -151,6 +152,45 @@ class BitsBackendApplicationTest {
             assertFailsWith<WareraApiException> { client.getAllCountries() }
             val elapsed = Duration.ofNanos(System.nanoTime() - started)
             assertTrue(elapsed < Duration.ofSeconds(5), "took $elapsed")
+        }
+    }
+
+    @Test
+    fun `malformed input from the bot is a 400 without details`() {
+        val tooManyRoles = (1..251).joinToString(",") { """{"id":"$it","name":"R","color":null,"position":$it,"assignable":true}""" }
+        val invalid =
+            listOf(
+                "/api/ping" to """{"discordUserId":"abc"}""",
+                "/api/ping" to """{"discordUserId":"${"1".repeat(21)}"}""",
+                "/api/verifications" to """{"discordUserId":"1","wareraUsername":"${"a".repeat(33)}"}""",
+                "/api/verifications" to """{"discordUserId":"1","wareraUsername":"  "}""",
+                "/api/verifications" to """{"discordUserId":"x1","wareraUsername":"Luftiger"}""",
+                "/api/verifications/check" to """{"discordUserId":"1","code":"BITS-ABC"}""",
+                "/api/verifications/check" to """{"discordUserId":"1 OR 1=1","code":"BITS-ABC234"}""",
+                "/api/verifications/unlink" to """{"discordUserId":""}""",
+            )
+        invalid.forEach { (path, body) ->
+            mockMvc
+                .post(path) {
+                    header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = body
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.message") { doesNotExist() }
+                }
+        }
+        listOf(
+            """[{"id":"1","name":"${"n".repeat(101)}","color":null,"position":1,"assignable":true}]""",
+            """[{"id":"${"1".repeat(33)}","name":"R","color":null,"position":1,"assignable":true}]""",
+            "[$tooManyRoles]",
+        ).forEach { roles ->
+            mockMvc
+                .put("/api/discord-roles") {
+                    header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"roles":$roles}"""
+                }.andExpect { status { isBadRequest() } }
         }
     }
 

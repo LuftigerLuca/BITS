@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
+import eu.luftiger.bits.backend.shared.BotInput
 import eu.luftiger.bits.shared.DiscordRolesReport
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PutMapping
@@ -18,5 +19,12 @@ class DiscordRoleController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun replace(
         @RequestBody report: DiscordRolesReport,
-    ) = roleService.replaceAll(report.roles)
+    ) {
+        BotInput.roleCount(report.roles.size)
+        report.roles.forEach {
+            BotInput.roleId(it.id)
+            BotInput.roleName(it.name)
+        }
+        roleService.replaceAll(report.roles)
+    }
 }

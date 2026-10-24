@@ -17,6 +17,7 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter
 import net.dv8tion.jda.api.interactions.InteractionHook
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
+import net.dv8tion.jda.api.interactions.commands.build.OptionData
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
 import net.dv8tion.jda.api.utils.MarkdownSanitizer
 import org.slf4j.LoggerFactory
@@ -114,6 +115,7 @@ class VerifyCommand(
     companion object {
         const val NAME = "verify"
         private const val OPTION_NAME = "name"
+        private const val MAX_NAME_LENGTH = 32
         private const val CHECK_BUTTON_PREFIX = "verify:check:"
 
         /**
@@ -131,7 +133,8 @@ class VerifyCommand(
         val data: SlashCommandData =
             Commands
                 .slash(NAME, "Verknüpft deinen Discord-Account mit deinem WarEra-Account")
-                .addOption(OptionType.STRING, OPTION_NAME, "Dein Name in WarEra", true)
+                // The backend rejects longer names, so Discord should not let them through.
+                .addOptions(OptionData(OptionType.STRING, OPTION_NAME, "Dein Name in WarEra", true).setMaxLength(MAX_NAME_LENGTH))
 
         internal fun startedMessage(response: StartVerificationResponse.Started): String {
             val expiresAt = response.expiresAt / 1000
