@@ -23,8 +23,8 @@ Login ins Dashboard ruft das Backend Discord im Namen des Nutzers auf (OAuth2).
 - **Backend → Bot:** Events im Redis Stream `bits:events` (`EventPublisher`). Der Bot liest sie über die
   Consumer Group `bot` und bestätigt jedes verarbeitete Event mit `XACK`.
 
-Der Command `/ping` geht einmal durch alle Teile: Der Bot ruft `POST /api/ping` auf, das Backend speichert den
-Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das der Bot verarbeitet und bestätigt.
+Der Command `/ping` geht als Smoke-Test einmal durch alle Teile: Der Bot ruft `POST /api/ping` auf, das Backend
+speichert den Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das der Bot verarbeitet und bestätigt.
 
 Mit `/verify <WarEra-Name>` verknüpft ein Nutzer seinen Discord-Account mit seinem WarEra-Account. Er bekommt
 einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer seiner WarEra-Firmen und klickt auf

@@ -16,8 +16,9 @@ conventions. Both apply to Claude as well.
   `Main.kt`.
 - `frontend`: Vite, React 19, Tailwind 4, shadcn/ui
 
-The `/ping` flow (`PingCommand` → `PingController`/`PingService` → `PingEvent` → `EventHandler`) is the
-reference for new features that span all parts.
+The verification (`VerifyCommand` → `VerificationController`/`VerificationService` → `AccountLinked` and
+`VerificationCheckedEvent`) is the reference for new features that span all parts, the role sync for the dashboard
+and background jobs. CONTRIBUTING.md, "Reference flows", lists the patterns they show. `/ping` is only a smoke test.
 
 ## Key rules
 

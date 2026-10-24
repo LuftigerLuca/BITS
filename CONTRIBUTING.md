@@ -139,6 +139,38 @@ backend/src/main/kotlin/eu/luftiger/bits/backend/
 
 Modules without anything to expose have no `api/`, and modules without their own data have no `domain/`.
 
+## Reference flows
+
+New features follow the existing ones rather than inventing their own patterns:
+
+- **Bot → backend → event:** the verification. `VerifyCommand` → `VerificationController`/`VerificationService` →
+  `AccountLinked` for other modules and `AccountLinkedEvent`/`VerificationCheckedEvent` for the bot.
+- **Dashboard and background job:** the role sync. `RoleRuleController` under `/web/admin` with `RuleType` as API
+  type, `RoleSyncTrigger` with `@Scheduled` and its own thread, `features/role-sync/` in the frontend.
+
+`/ping` stays as a smoke test that goes through every part once, but it is too simple to copy: it has no
+transaction, no expected failures and swallows WarEra errors.
+
+What these flows show:
+
+- **Expected outcomes are part of the answer.** A sealed response (`StartVerificationResponse`,
+  `CheckVerificationResponse`) has one subtype per outcome the user should hear about, such as "user not found"
+  or "code expired". HTTP errors are for what is not the user's doing: 503 when WarEra cannot be reached
+  (`@ExceptionHandler(WareraApiException::class)`), 400 for malformed input (`BotInput` for the bot,
+  `RoleRuleService` for the dashboard), 409 for a conflict such as a rule that exists already.
+- **WarEra calls run outside of transactions**, since the rate limiter can make them wait for seconds. Writes go
+  into short `TransactionTemplate` blocks before or after them. Work that may take longer than the bot waits runs
+  in the background and reports its result as event (`VerificationCheckedEvent`).
+- **Other modules hear about changes through application events** from their `api/` (`AccountLinked`,
+  `AccountUnlinked`), published inside the transaction and received with `@ApplicationModuleListener` after the
+  commit. Events for the bot go through `EventPublisher` inside the same transaction, so they reach the bot only if
+  it commits.
+- **Background jobs** use `@Scheduled` with a cron from the configuration (`-` in tests, which start them by hand)
+  and the injected `Clock`. A job that must not run twice at once gets its own single thread.
+- **The bot** defers the reply, does the work in its coroutine scope and turns each failure into a German
+  message (`BITS_UNAVAILABLE_MESSAGE` when the backend does not answer). Event handlers are idempotent and never
+  let an expected failure, such as closed direct messages, keep an event pending.
+
 ## Code style
 
 - **Kotlin:** ktlint (`ktlint_official`), no wildcard imports. `./gradlew ktlintFormat` formats the code,
