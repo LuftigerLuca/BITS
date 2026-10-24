@@ -5,6 +5,11 @@
 # Only the frontend is published, and only on the loopback interface unless PUBLIC_BIND says otherwise.
 # Its nginx forwards the dashboard's endpoints (/auth, /web) to the backend; the bot's API (/api) is
 # reachable inside the compose network only. The bot needs no inbound connection, it dials out to Discord.
+#
+# Three networks keep the frontend, the one service reachable from outside, away from the data: edge holds the
+# frontend and the backend, internal the backend, the bot, Postgres and Redis, without a way out, and egress
+# gives the bot its way to Discord. Code that runs in the frontend container reaches neither Postgres nor Redis,
+# and so cannot write events that the bot would act on.
 
 # What every container gets: it cannot gain privileges it did not start with, and it starts with no Linux
 # capabilities at all. A service that needs some back names them itself.
@@ -26,6 +31,7 @@ services:
     # the postgres user. These are what that step needs.
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     mem_limit: ${POSTGRES_MEMORY:-512m}
+    networks: [internal]
     environment:
       POSTGRES_DB: bits
       POSTGRES_USER: bits
@@ -45,8 +51,31 @@ services:
     # Like Postgres, the entrypoint fixes the ownership of the data directory before dropping root.
     cap_add: [CHOWN, SETGID, SETUID]
     mem_limit: ${REDIS_MEMORY:-256m}
-    # Append-only, so events the bot has not acknowledged yet survive a restart.
-    command: ["redis-server", "--appendonly", "yes"]
+    networks: [internal]
+    # Append-only, so events the bot has not acknowledged yet survive a restart. AOF rewrites keep their defaults;
+    # the data is small, the stream is trimmed to a week.
+    #
+    # maxmemory stays well below the container's limit, which also has to hold the copy-on-write pages of the fork
+    # that rewrites the AOF. noeviction, since nothing here may silently disappear: neither a login lockout nor an
+    # event the bot has not read. When memory is full, writes fail with an error the backend logs, and Redis keeps
+    # running instead of being killed by the kernel.
+    #
+    # Each service has its own user. The backend may do everything except the dangerous commands, on its own keys.
+    # The bot may only read the event stream with its consumer group and write to the dead-letter stream, so it
+    # cannot fake an event. The default user, without password, is left with PING for the healthcheck. Redis
+    # replaces its command line in the process list, so the passwords do not show up there.
+    # Compose splits the command into words like a shell would, but runs no shell; the quotes keep `>`, `|` and the
+    # parentheses from being read as redirection, pipe and subshell. Redis reads the words after each --user as one
+    # rule set.
+    command: >-
+      redis-server
+      --appendonly yes
+      --maxmemory ${REDIS_MAXMEMORY:-128mb}
+      --maxmemory-policy noeviction
+      --user default on nopass resetkeys resetchannels -@all +ping
+      --user backend on '>${REDIS_BACKEND_PASSWORD:?REDIS_BACKEND_PASSWORD is required}' resetchannels ~bits:* +@all -@dangerous +info
+      --user bot on '>${REDIS_BOT_PASSWORD:?REDIS_BOT_PASSWORD is required}' resetchannels ~bits:events -@all +hello '+client|setinfo'
+      +ping +exists +xreadgroup +xack +xpending +xclaim '+xgroup|create' '+xinfo|groups' '(~bits:events:dead +xadd)'
     volumes:
       - redis-data:/data
     healthcheck:
@@ -66,6 +95,7 @@ services:
       - /tmp
     # The JVM sizes its heap to 25 % of this by default.
     mem_limit: ${BACKEND_MEMORY:-768m}
+    networks: [edge, internal]
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,6 +106,8 @@ services:
       DB_USER: bits
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       REDIS_HOST: redis
+      REDIS_USERNAME: backend
+      REDIS_PASSWORD: ${REDIS_BACKEND_PASSWORD}
       BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN:?BITS_SERVICE_TOKEN is required}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:?DISCORD_GUILD_ID is required}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:?DISCORD_CLIENT_ID is required}
@@ -101,6 +133,7 @@ services:
     tmpfs:
       - /tmp
     mem_limit: ${BOT_MEMORY:-512m}
+    networks: [internal, egress]
     depends_on:
       redis:
         condition: service_healthy
@@ -111,7 +144,7 @@ services:
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
       BACKEND_URL: http://backend:8080
       BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://bot:${REDIS_BOT_PASSWORD}@redis:6379
 
   frontend:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
@@ -122,6 +155,11 @@ services:
     tmpfs:
       - /tmp
     mem_limit: ${FRONTEND_MEMORY:-64m}
+    networks: [edge]
+    environment:
+      # Address of the TLS proxy in front, the only peer whose X-Forwarded-For nginx believes (see
+      # frontend/nginx.conf.template). The default believes nobody.
+      REAL_IP_FROM: ${REAL_IP_FROM:-127.0.0.1}
     # A proxy on another host needs an address it can reach: name the interface that faces it in
     # PUBLIC_BIND rather than 0.0.0.0, and let the firewall decide who may talk to it.
     ports:
@@ -131,6 +169,12 @@ services:
       interval: 15s
       timeout: 5s
       retries: 10
+
+networks:
+  edge:
+  internal:
+    internal: true
+  egress:
 
 volumes:
   postgres-data:

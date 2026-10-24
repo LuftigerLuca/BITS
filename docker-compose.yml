@@ -1,3 +1,5 @@
+# Local stack for development. Every port is bound to the loopback interface: Docker bypasses the host firewall, and
+# Redis runs without password here. To reach a service from another device, change its binding deliberately.
 services:
   postgres:
     image: postgres:17-alpine
@@ -6,7 +8,7 @@ services:
       POSTGRES_USER: bits
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bits}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -19,7 +21,7 @@ services:
     image: redis:8-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -46,7 +48,7 @@ services:
       BITS_ADMIN_USERNAME: ${BITS_ADMIN_USERNAME:-}
       BITS_ADMIN_PASSWORD_HASH: ${BITS_ADMIN_PASSWORD_HASH:-}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,7 +75,7 @@ services:
   frontend:
     build: frontend
     ports:
-      - "5173:8080"
+      - "127.0.0.1:5173:8080"
 
 volumes:
   postgres-data:

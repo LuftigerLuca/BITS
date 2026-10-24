@@ -36,6 +36,7 @@ jobs:
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       PUBLIC_PORT: ${{ vars.PUBLIC_PORT || '8080' }}
       PUBLIC_BIND: ${{ vars.PUBLIC_BIND || '127.0.0.1' }}
+      REAL_IP_FROM: ${{ vars.REAL_IP_FROM }}
       # Per environment, so a deployment to one never removes the images another one runs.
       IMAGE_PREFIX: bits-${{ inputs.environment }}
       COMPOSE_PROJECT_NAME: bits-${{ inputs.environment }}
@@ -70,11 +71,23 @@ jobs:
               exit 1
             fi
           done
+          if [ -z "$REAL_IP_FROM" ]; then
+            echo "::warning::REAL_IP_FROM is not set, so nginx takes the TLS proxy for the client and the admin login lockout hits everybody at once, see deploy/README.md"
+          fi
           mkdir -p "$DEPLOY_PATH"
           cp deploy/docker-compose.yml "$DEPLOY_PATH/"
           # The .env holds every deployment secret, so it is written unreadable to anyone else and never
           # leaves this host.
           umask 077
+          # Only the services of this host use the Redis passwords, so they are made here on the first deployment
+          # and kept, rather than stored in GitHub. Deleting the file makes new ones on the next deployment.
+          redis_passwords="$DEPLOY_PATH/redis-passwords.env"
+          if [ ! -s "$redis_passwords" ]; then
+            {
+              echo "REDIS_BACKEND_PASSWORD=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+              echo "REDIS_BOT_PASSWORD=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+            } > "$redis_passwords"
+          fi
           {
             echo "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME"
             echo "BACKEND_IMAGE=$IMAGE_PREFIX-backend:$GITHUB_SHA"
@@ -82,6 +95,8 @@ jobs:
             echo "FRONTEND_IMAGE=$IMAGE_PREFIX-frontend:$GITHUB_SHA"
             echo "PUBLIC_PORT=$PUBLIC_PORT"
             echo "PUBLIC_BIND=$PUBLIC_BIND"
+            echo "REAL_IP_FROM=${REAL_IP_FROM:-127.0.0.1}"
+            cat "$redis_passwords"
             echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
             echo "BITS_SERVICE_TOKEN=$BITS_SERVICE_TOKEN"
             echo "DISCORD_TOKEN=$DISCORD_TOKEN"
@@ -157,6 +172,50 @@ jobs:
             docker compose logs --tail=60 frontend backend
             exit 1
           fi
+
+          # The bot's API must stay out of reach through nginx, also for paths that only turn into /api after
+          # normalization. The token filter's 401 is the only one without WWW-Authenticate: the session chain sends
+          # `Bearer`, the default deny a 403. --path-as-is keeps curl from normalizing the paths itself.
+          for path in /api/ping /web/../api/ping //api/ping /web/me/..\;/..\;/api/ping /%61pi/ping /web/%2e%2e/api/ping; do
+            headers=$(curl -s --path-as-is -o /dev/null -D - -X POST "http://$PUBLIC_BIND:$PUBLIC_PORT$path" || echo "HTTP/1.1 000")
+            code=$(echo "$headers" | head -1 | cut -d' ' -f2)
+            if [ "$code" = "401" ] && ! echo "$headers" | grep -qi '^www-authenticate:'; then
+              echo "the bot API answered through nginx to POST $path"
+              exit 1
+            fi
+          done
+
+          # Whatever a client claims in X-Forwarded-For, the backend sees the peer of nginx, or the address the
+          # TLS proxy at REAL_IP_FROM names. One failed admin login is the probe; it counts like any other.
+          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          curl -s -o /dev/null -X POST -H 'Content-Type: application/json' -H 'X-Forwarded-For: 203.0.113.7' \
+            -d '{"username":"smoke-test","password":"smoke-test"}' "http://$PUBLIC_BIND:$PUBLIC_PORT/auth/login" || true
+          sleep 1
+          line=$(docker compose logs --since "$since" backend 2>&1 | grep 'Admin login from' | tail -1)
+          if [ -z "$line" ] || echo "$line" | grep -q '203.0.113.7'; then
+            echo "the backend did not log the client address of nginx' peer for the admin login: ${line:-no log line}"
+            exit 1
+          fi
+
+          # Security headers on every kind of answer: the app, a hashed asset, and what nginx forwards.
+          asset=$(curl -fsS "http://$PUBLIC_BIND:$PUBLIC_PORT/" | grep -o '/assets/[^"]*\.js' | head -1)
+          for path in / "$asset" /web/me; do
+            headers=$(curl -s -o /dev/null -D - "http://$PUBLIC_BIND:$PUBLIC_PORT$path")
+            for header in content-security-policy x-frame-options x-content-type-options referrer-policy; do
+              if ! echo "$headers" | grep -qi "^$header:"; then
+                echo "$header is missing on $path"
+                exit 1
+              fi
+            done
+          done
+
+          # The frontend, the one container reachable from outside, must not reach the data.
+          for target in redis:6379 postgres:5432; do
+            if docker compose exec -T frontend nc -z -w 2 "${target%:*}" "${target#*:}" 2>/dev/null; then
+              echo "the frontend container reaches $target"
+              exit 1
+            fi
+          done
 
           echo "backend, bot and frontend are up"
 

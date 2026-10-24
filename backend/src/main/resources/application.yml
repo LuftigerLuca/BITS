@@ -24,6 +24,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # Set in the deployment, where Redis has a user per service; empty locally.
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
 
 bits:
   service-token: ${BITS_SERVICE_TOKEN:}
