@@ -12,11 +12,13 @@ import org.slf4j.LoggerFactory
 /**
  * Brings the managed roles of the members to the target state from the backend. A change that fails is logged and
  * skipped instead of failing the event, since the next sync tries again anyway. Members whose roles a newer sync has
- * set already are left alone.
+ * set already are left alone, and a role that a sync would take from too many of its holders stays, see
+ * [RemovalLimit].
  */
 class RoleSyncHandler(
     private val jda: JDA,
     private val guildId: String,
+    private val removalLimit: RemovalLimit = RemovalLimit(),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val appliedSyncs = AppliedSyncs()
@@ -27,7 +29,19 @@ class RoleSyncHandler(
             (event.discordUserIds?.mapNotNull { findMember(it) } ?: guild.members)
                 .partition { appliedSyncs.isStale(it.id, event) }
         val membersById = members.associateBy { it.id }
-        val changes = members.flatMap { member -> roleChanges(member.id, member.roles.mapTo(HashSet()) { it.id }, event) }
+        val proposed = members.flatMap { member -> roleChanges(member.id, member.roles.mapTo(HashSet()) { it.id }, event) }
+        val holders = members.flatMap { member -> member.roles.map { it.id } }.groupingBy { it }.eachCount()
+        val heldBack = rolesOverRemovalLimit(proposed, holders, event, removalLimit)
+        heldBack.forEach { (roleId, removals) ->
+            log.warn(
+                "Role sync would take role {} from {} of its {} holders, more than the limit, so nobody loses it. Missing " +
+                    "WarEra data is the likely cause; if the change is real, any change to a rule of the role applies it.",
+                roleId,
+                removals,
+                holders[roleId],
+            )
+        }
+        val changes = proposed.filterNot { !it.add && it.roleId in heldBack }
         var applied = 0
         changes.forEach { change ->
             val role = guild.getRoleById(change.roleId)

@@ -30,3 +30,33 @@ fun roleChanges(
 }
 
 const val REMOVE_REASON = "BITS: keine passende Regel"
+
+/**
+ * How many holders one sync of all members may take a role from. Members change citizenship or military unit one at
+ * a time, so a real change from one hourly sync to the next takes a role from a few of its holders. A field WarEra
+ * stops sending or renames takes it from all of them at once. A role is held back when the sync would take it from at
+ * least [minRemovals] members and from more than [maxShare] of its holders; the small minimum keeps roles with few
+ * holders, like an office, out of it.
+ */
+data class RemovalLimit(
+    val minRemovals: Int = 10,
+    val maxShare: Double = 0.25,
+)
+
+/**
+ * Roles whose removals in [changes] exceed [limit], given how many members hold each role now ([holders]). Only syncs
+ * of all members are limited, and never for the roles of [RoleSyncEvent.confirmedRoleIds].
+ */
+fun rolesOverRemovalLimit(
+    changes: List<RoleChange>,
+    holders: Map<String, Int>,
+    event: RoleSyncEvent,
+    limit: RemovalLimit,
+): Map<String, Int> {
+    if (event.discordUserIds != null) return emptyMap()
+    return changes
+        .filter { !it.add && it.roleId !in event.confirmedRoleIds }
+        .groupingBy { it.roleId }
+        .eachCount()
+        .filter { (roleId, removals) -> removals >= limit.minRemovals && removals > limit.maxShare * (holders[roleId] ?: 0) }
+}
