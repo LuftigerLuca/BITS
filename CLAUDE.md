@@ -20,6 +20,9 @@ The verification (`VerifyCommand` → `VerificationController`/`VerificationServ
 `VerificationCheckedEvent`) is the reference for new features that span all parts, the role sync for the dashboard
 and background jobs. CONTRIBUTING.md, "Reference flows", lists the patterns they show. `/ping` is only a smoke test.
 
+The reasons behind the architecture are in [docs/adr](docs/adr/README.md), the behavior when a part is down in
+[docs/failure-modes.md](docs/failure-modes.md). Update them when a change affects them.
+
 ## Key rules
 
 - Only the backend talks to the database and the WarEra API. Only the bot talks to Discord with the bot token

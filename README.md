@@ -1,7 +1,7 @@
 # BITS
 
 Discord-Bot für den deutschen WarEra-Discord, mit Backend und Web-Dashboard. BITS verknüpft Discord- mit
-WarEra-Accounts und gleicht Rollen und Nicknames anhand von WarEra-Daten ab.
+WarEra-Accounts und vergibt Discord-Rollen anhand von WarEra-Daten.
 
 ## Aufbau
 
@@ -73,6 +73,9 @@ oder für jemanden löschen, steht in [deploy/README.md](deploy/README.md#data-p
 
 Verifiziert sich ein anderer Discord-Account für einen schon verknüpften WarEra-Account, ersetzt die neue
 Verknüpfung die alte. Der vorherige Account bekommt dann eine Direktnachricht vom Bot, falls er welche annimmt.
+
+Warum BITS so gebaut ist, halten die [Architekturentscheidungen](docs/adr/README.md) fest, das Verhalten bei
+Ausfällen beschreibt [docs/failure-modes.md](docs/failure-modes.md).
 
 ## Starten
 
