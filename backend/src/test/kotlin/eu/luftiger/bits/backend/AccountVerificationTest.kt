@@ -2,7 +2,10 @@ package eu.luftiger.bits.backend
 
 import com.jayway.jsonpath.JsonPath
 import eu.luftiger.bits.shared.AccountLinkedEvent
+import eu.luftiger.bits.shared.BitsJson
+import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
@@ -27,6 +30,7 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 @SpringBootTest(properties = ["bits.service-token=test-token"])
 @AutoConfigureMockMvc
@@ -74,19 +78,16 @@ class AccountVerificationTest {
     @Test
     fun `code in a company name links the accounts`() {
         val code = startedCode("1", "luftiger")
-        check("1", code).andExpect { jsonPath("$.type") { value("code_missing") } }
+        assertEquals(CheckVerificationResponse.CodeMissing, check("1", code))
 
         warera.rename("c1", "Waffen ${code.lowercase()} GmbH")
         clock.advance(Duration.ofSeconds(10))
-        check("1", code).andExpect {
-            jsonPath("$.type") { value("linked") }
-            jsonPath("$.wareraUsername") { value("Luftiger") }
-        }
+        assertEquals(CheckVerificationResponse.Linked("Luftiger"), check("1", code))
 
         assertEquals("w1", jdbc.queryForObject("SELECT warera_user_id FROM account_link WHERE discord_user_id = '1'", String::class.java))
         assertEquals(
             AccountLinkedEvent(discordUserId = "1", wareraUserId = "w1", previousDiscordUserId = null, occurredAt = clock.millis()),
-            events().single(),
+            events().filterIsInstance<AccountLinkedEvent>().single(),
         )
     }
 
@@ -95,8 +96,8 @@ class AccountVerificationTest {
         val code = startedCode("1", "Luftiger")
         warera.rename("c1", code)
 
-        check("1", code).andExpect { jsonPath("$.type") { value("linked") } }
-        check("1", code).andExpect { jsonPath("$.type") { value("invalid") } }
+        assertEquals(CheckVerificationResponse.Linked("Luftiger"), check("1", code))
+        assertEquals(CheckVerificationResponse.Invalid, check("1", code))
     }
 
     @Test
@@ -105,10 +106,7 @@ class AccountVerificationTest {
         check("1", code)
 
         clock.advance(Duration.ofMillis(2_500))
-        check("1", code).andExpect {
-            jsonPath("$.type") { value("too_early") }
-            jsonPath("$.retryAfterSeconds") { value(8) }
-        }
+        assertEquals(CheckVerificationResponse.TooEarly(retryAfterSeconds = 8), check("1", code))
     }
 
     @Test
@@ -117,7 +115,7 @@ class AccountVerificationTest {
         warera.rename("c1", code)
 
         clock.advance(Duration.ofMinutes(15))
-        check("1", code).andExpect { jsonPath("$.type") { value("expired") } }
+        assertEquals(CheckVerificationResponse.Expired, check("1", code))
         assertEquals(0, count("account_verification"))
     }
 
@@ -127,8 +125,8 @@ class AccountVerificationTest {
         val second = startedCode("1", "Luftiger")
         warera.rename("c1", "$first $second")
 
-        check("1", first).andExpect { jsonPath("$.type") { value("invalid") } }
-        check("1", second).andExpect { jsonPath("$.type") { value("linked") } }
+        assertEquals(CheckVerificationResponse.Invalid, check("1", first))
+        assertEquals(CheckVerificationResponse.Linked("Luftiger"), check("1", second))
     }
 
     @Test
@@ -144,7 +142,7 @@ class AccountVerificationTest {
             listOf("2" to "w2"),
             jdbc.query("SELECT discord_user_id, warera_user_id FROM account_link") { rs, _ -> rs.getString(1) to rs.getString(2) },
         )
-        assertEquals(listOf(null, "1", null), events().map { (it as AccountLinkedEvent).previousDiscordUserId })
+        assertEquals(listOf(null, "1", null), events().filterIsInstance<AccountLinkedEvent>().map { it.previousDiscordUserId })
     }
 
     @Test
@@ -153,11 +151,11 @@ class AccountVerificationTest {
         warera.rename("c1", code)
         warera.down = true
 
-        check("1", code).andExpect { status { isServiceUnavailable() } }
+        assertEquals(CheckVerificationResponse.WareraUnavailable, check("1", code))
 
         warera.down = false
         clock.advance(Duration.ofSeconds(10))
-        check("1", code).andExpect { jsonPath("$.type") { value("linked") } }
+        assertEquals(CheckVerificationResponse.Linked("Luftiger"), check("1", code))
     }
 
     private fun link(
@@ -166,7 +164,7 @@ class AccountVerificationTest {
     ) {
         val code = startedCode(discordUserId, username)
         warera.rename(if (username == "Other") "c2" else "c1", code)
-        check(discordUserId, code).andExpect { jsonPath("$.type") { value("linked") } }
+        assertEquals(CheckVerificationResponse.Linked(username), check(discordUserId, code))
     }
 
     private fun startedCode(
@@ -186,10 +184,26 @@ class AccountVerificationTest {
         username: String,
     ): ResultActionsDsl = post("/api/verifications", """{"discordUserId":"$discordUserId","wareraUsername":"$username"}""")
 
+    /** The answer to the request, or the result of the background check that follows as event. */
     private fun check(
         discordUserId: String,
         code: String,
-    ): ResultActionsDsl = post("/api/verifications/check", """{"discordUserId":"$discordUserId","code":"$code"}""")
+    ): CheckVerificationResponse {
+        val before = checkedEvents(code).size
+        val body =
+            post("/api/verifications/check", """{"discordUserId":"$discordUserId","code":"$code"}""")
+                .andReturn()
+                .response.contentAsString
+        val response = BitsJson.decodeFromString<CheckVerificationResponse>(body)
+        if (response != CheckVerificationResponse.Checking) return response
+        repeat(100) {
+            checkedEvents(code).getOrNull(before)?.let { return it.result }
+            Thread.sleep(50)
+        }
+        fail("no result for the check of $code")
+    }
+
+    private fun checkedEvents(code: String) = events().filterIsInstance<VerificationCheckedEvent>().filter { it.code == code }
 
     private fun post(
         path: String,
@@ -205,7 +219,8 @@ class AccountVerificationTest {
     private fun events() =
         redisTemplate
             .opsForStream<String, String>()
-            .read(StreamOffset.fromStart(EventStream.KEY))!!
+            .read(StreamOffset.fromStart(EventStream.KEY))
+            .orEmpty()
             .map { decodeEvent(it.value[EventStream.PAYLOAD_FIELD]!!) }
 
     /** Two WarEra users, each with one company: Luftiger (w1, c1) and Other (w2, c2). */

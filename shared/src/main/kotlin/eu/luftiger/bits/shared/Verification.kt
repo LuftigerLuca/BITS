@@ -43,14 +43,28 @@ data class CheckVerificationRequest(
     val code: String,
 )
 
-/** Outcome of checking a verification code. Each subtype is identified by its `type` field. */
+/**
+ * Outcome of checking a verification code. Each subtype is identified by its `type` field. The answer to the request
+ * is either [Checking] or one of the outcomes that need no WarEra call; the others follow in a
+ * [VerificationCheckedEvent].
+ */
 @Serializable
 sealed interface CheckVerificationResponse {
+    /** The code is being looked for in the company names; WarEra can take a while, so the result follows as event. */
+    @Serializable
+    @SerialName("checking")
+    data object Checking : CheckVerificationResponse
+
     @Serializable
     @SerialName("linked")
     data class Linked(
         val wareraUsername: String,
     ) : CheckVerificationResponse
+
+    /** WarEra could not be reached during the check; the code stays valid. */
+    @Serializable
+    @SerialName("warera_unavailable")
+    data object WareraUnavailable : CheckVerificationResponse
 
     /** None of the user's company names contains the code yet; the code stays valid. */
     @Serializable

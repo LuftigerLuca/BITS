@@ -29,6 +29,17 @@ data class AccountLinkedEvent(
     override val occurredAt: Long,
 ) : BitsEvent
 
+/** Result of a verification check that answered [CheckVerificationResponse.Checking]. */
+@Serializable
+@SerialName("verification_checked")
+data class VerificationCheckedEvent(
+    val discordUserId: String,
+    val code: String,
+    /** [CheckVerificationResponse.Linked], [CheckVerificationResponse.CodeMissing] or another final outcome. */
+    val result: CheckVerificationResponse,
+    override val occurredAt: Long,
+) : BitsEvent
+
 /**
  * Target state of the roles BITS manages. The bot gives each member the roles in [members] and takes away every other
  * role of [managedRoleIds], except for those listed in [MemberRoles.keepRoleIds].

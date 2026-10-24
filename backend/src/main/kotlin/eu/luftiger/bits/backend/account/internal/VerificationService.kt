@@ -7,9 +7,14 @@ import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.VerificationCheckedEvent
+import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.core.task.TaskExecutor
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -21,7 +26,9 @@ import java.time.Duration
  * Links Discord accounts to WarEra accounts. A user proves ownership of a WarEra account by putting a one-time code
  * into the name of one of its companies, which the backend then finds through the public API.
  *
- * WarEra calls run outside of transactions, since they can take a while when the client is throttled.
+ * WarEra calls run outside of transactions, since they can take a while when the client is throttled. For the same
+ * reason the check runs in the background and reports its result as [VerificationCheckedEvent]: the bot would
+ * otherwise give up waiting while the backend still links the accounts.
  */
 @Service
 class VerificationService(
@@ -32,7 +39,9 @@ class VerificationService(
     private val applicationEvents: ApplicationEventPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
+    @param:Qualifier("applicationTaskExecutor") private val executor: TaskExecutor,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     private val random = SecureRandom()
 
     fun start(
@@ -82,21 +91,43 @@ class VerificationService(
         verification.lastCheckedAt = now
         verificationRepository.save(verification)
 
-        val codeFound =
-            wareraClient
-                .getCompanyIds(verification.wareraUserId)
-                .asSequence()
-                .map(wareraClient::getCompany)
-                .any { it.name.contains(verification.code, ignoreCase = true) }
-        if (!codeFound) return CheckVerificationResponse.CodeMissing
-
-        link(verification)
-        return CheckVerificationResponse.Linked(verification.wareraUsername)
+        executor.execute {
+            val result = lookForCode(verification) ?: return@execute
+            eventPublisher.publish(VerificationCheckedEvent(discordUserId, verification.code, result, clock.millis()))
+        }
+        return CheckVerificationResponse.Checking
     }
 
-    /** Replaces any existing link of either account, so that each side is linked at most once. */
-    private fun link(verification: AccountVerification) {
-        transactionTemplate.executeWithoutResult {
+    /** Returns `null` on an unexpected error; the bot then tells the user to try again once it stops waiting. */
+    private fun lookForCode(verification: AccountVerification): CheckVerificationResponse? =
+        try {
+            val codeFound =
+                wareraClient
+                    .getCompanyIds(verification.wareraUserId)
+                    .asSequence()
+                    .map(wareraClient::getCompany)
+                    .any { it.name.contains(verification.code, ignoreCase = true) }
+            when {
+                !codeFound -> CheckVerificationResponse.CodeMissing
+                link(verification) -> CheckVerificationResponse.Linked(verification.wareraUsername)
+                else -> CheckVerificationResponse.Invalid
+            }
+        } catch (e: WareraApiException) {
+            log.warn("WarEra API not reachable during a verification check", e)
+            CheckVerificationResponse.WareraUnavailable
+        } catch (e: Exception) {
+            log.error("Verification check failed", e)
+            null
+        }
+
+    /**
+     * Replaces any existing link of either account, so that each side is linked at most once. Returns `false` if the
+     * code is no longer the user's current one, e.g. because a newer one was issued during the check.
+     */
+    private fun link(verification: AccountVerification): Boolean =
+        transactionTemplate.execute {
+            val current = verificationRepository.findByIdOrNull(verification.discordUserId)
+            if (current?.code != verification.code) return@execute false
             val now = clock.instant()
             val previous = linkRepository.findByWareraUserId(verification.wareraUserId)
             previous?.let(linkRepository::delete)
@@ -122,8 +153,8 @@ class VerificationService(
                     occurredAt = now.toEpochMilli(),
                 ),
             )
-        }
-    }
+            true
+        } == true
 
     /** WarEra has no lookup by name, so the search candidates are compared with the exact username. */
     private fun findUser(username: String): WareraUser? {

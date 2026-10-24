@@ -9,6 +9,7 @@ import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
 import eu.luftiger.bits.shared.RoleSyncEvent
+import eu.luftiger.bits.shared.VerificationCheckedEvent
 import io.lettuce.core.RedisClient
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +44,7 @@ fun main() {
     val backend = KtorBackendClient(config.backendUrl, config.serviceToken)
     val redis = RedisClient.create(config.redisUrl)
     val roleReporter = RoleReporter(config.guildId, backend, scope)
+    val verifyCommand = VerifyCommand(backend, scope)
 
     // The role sync needs all members, which takes the privileged GUILD_MEMBERS intent.
     val jda =
@@ -51,7 +53,7 @@ fun main() {
             .enableIntents(GatewayIntent.GUILD_MEMBERS)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .setChunkingFilter(ChunkingFilter.ALL)
-            .addEventListeners(PingCommand(backend, scope), VerifyCommand(backend, scope), roleReporter)
+            .addEventListeners(PingCommand(backend, scope), verifyCommand, roleReporter)
             .build()
             .awaitReady()
 
@@ -64,7 +66,11 @@ fun main() {
     val events =
         EventHandler { event ->
             logging.handle(event)
-            if (event is RoleSyncEvent) roleSync.handle(event)
+            when (event) {
+                is RoleSyncEvent -> roleSync.handle(event)
+                is VerificationCheckedEvent -> verifyCommand.onChecked(event)
+                else -> Unit
+            }
         }
     val consumer = RedisStreamEventConsumer(redis, events)
     // The consumer only ends when it is stopped. Anything else would leave a bot that answers commands but never

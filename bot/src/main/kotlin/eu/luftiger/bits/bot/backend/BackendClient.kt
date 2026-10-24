@@ -25,6 +25,11 @@ interface BackendClient {
     suspend fun reportRoles(roles: List<DiscordRoleDto>)
 }
 
+/** The backend did not answer in time; it may still finish what it was asked to do. */
+class BackendTimeoutException(
+    cause: Throwable,
+) : RuntimeException("The backend did not answer in time", cause)
+
 class WareraUnavailableException(
     cause: Throwable,
 ) : RuntimeException("The backend cannot reach the WarEra API", cause)

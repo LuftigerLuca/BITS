@@ -7,10 +7,12 @@ import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsEvent
+import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
+import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraBadRequestException
@@ -44,6 +46,7 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 @SpringBootTest(properties = ["bits.service-token=test-token"])
 @AutoConfigureMockMvc
@@ -311,7 +314,14 @@ class RoleSyncTest {
                 header("Authorization", "Bearer test-token")
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"discordUserId":"$discordUserId","code":"$code"}"""
-            }.andExpect { jsonPath("$.type") { value("linked") } }
+            }.andExpect { jsonPath("$.type") { value("checking") } }
+        // The check runs in the background. Its result is published after the link, which starts the sync of the member.
+        repeat(100) {
+            val result = streamEvents().filterIsInstance<VerificationCheckedEvent>().singleOrNull { it.code == code }?.result
+            if (result != null) return assertEquals(CheckVerificationResponse.Linked(username), result)
+            Thread.sleep(50)
+        }
+        fail("no result for the check of $code")
     }
 
     private fun grantedRoles(
@@ -329,13 +339,14 @@ class RoleSyncTest {
         return roleSyncEvents().also { assertEquals(count, it.size, "expected $count role syncs, got $it") }
     }
 
-    private fun roleSyncEvents() =
+    private fun roleSyncEvents() = streamEvents().filterIsInstance<RoleSyncEvent>()
+
+    private fun streamEvents() =
         redisTemplate
             .opsForStream<String, String>()
             .read(StreamOffset.fromStart(EventStream.KEY))
             .orEmpty()
             .map { decodeEvent(it.value[EventStream.PAYLOAD_FIELD]!!) }
-            .filterIsInstance<RoleSyncEvent>()
 
     private fun session(user: SessionUser) = sessionTokens.cookie(user).let { Cookie(it.name, it.value) }
 
