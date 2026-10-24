@@ -27,6 +27,11 @@ import java.time.Duration
  * Links Discord accounts to WarEra accounts. A user proves ownership of a WarEra account by putting a one-time code
  * into the name of one of its companies, which the backend then finds through the public API.
  *
+ * This holds only if nobody but the owner can rename a company. In WarEra's data a company has exactly one owner
+ * (`user`) and no managers or other roles; workers are only counted (checked against the API in October 2026). To be
+ * safe, the code counts only in companies whose owner is the user. What no check can catch is an owner who is talked
+ * into putting somebody else's code into a company name, so `/verify` warns about exactly that.
+ *
  * WarEra calls run outside of transactions, since they can take a while when the client is throttled. For the same
  * reason the check runs in the background and reports its result as [VerificationCheckedEvent]: the bot would
  * otherwise give up waiting while the backend still links the accounts.
@@ -112,7 +117,7 @@ class VerificationService(
                     .getCompanyIds(verification.wareraUserId)
                     .asSequence()
                     .map(wareraClient::getCompany)
-                    .any { it.name.contains(verification.code, ignoreCase = true) }
+                    .any { it.ownerId == verification.wareraUserId && it.name.contains(verification.code, ignoreCase = true) }
             when {
                 !codeFound -> CheckVerificationResponse.CodeMissing
                 link(verification) -> CheckVerificationResponse.Linked(verification.wareraUsername)

@@ -490,7 +490,8 @@ class RoleSyncTest {
 
         override fun getCompanyIds(userId: String) = available { listOf("c-$userId") }
 
-        override fun getCompany(companyId: String) = available { WareraCompany(companyId, companyName) }
+        override fun getCompany(companyId: String) =
+            available { WareraCompany(companyId, companyName, ownerId = companyId.removePrefix("c-")) }
 
         override fun getGovernment(countryId: String) =
             available {

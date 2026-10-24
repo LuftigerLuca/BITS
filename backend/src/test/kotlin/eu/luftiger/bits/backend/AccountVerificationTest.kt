@@ -153,6 +153,16 @@ class AccountVerificationTest {
     }
 
     @Test
+    fun `code in the name of a company the user does not own does not count`() {
+        val code = startedCode("1", "Luftiger")
+        // WarEra lists a company of somebody else among the user's companies.
+        warera.companies.getValue("w1") += WareraCompany("c3", code, ownerId = "w2")
+
+        assertEquals(CheckVerificationResponse.CodeMissing, check("1", code))
+        assertEquals(0, count("account_link"))
+    }
+
+    @Test
     fun `code expires after 15 minutes`() {
         val code = startedCode("1", "Luftiger")
         warera.rename("c1", code)
@@ -333,8 +343,8 @@ class AccountVerificationTest {
 
         fun reset() {
             companies.clear()
-            companies["w1"] = mutableListOf(WareraCompany("c1", "Waffen GmbH"))
-            companies["w2"] = mutableListOf(WareraCompany("c2", "Brot AG"))
+            companies["w1"] = mutableListOf(WareraCompany("c1", "Waffen GmbH", "w1"))
+            companies["w2"] = mutableListOf(WareraCompany("c2", "Brot AG", "w2"))
             companyLookups.set(0)
             companyGate = null
             down = false

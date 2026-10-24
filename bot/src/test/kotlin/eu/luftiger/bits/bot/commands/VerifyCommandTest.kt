@@ -27,6 +27,11 @@ class VerifyCommandTest {
     }
 
     @Test
+    fun `started message warns against entering codes of others`() {
+        assertTrue(VerifyCommand.startedMessage(started).endsWith(VerifyCommand.SOCIAL_ENGINEERING_WARNING))
+    }
+
+    @Test
     fun `started message warns about an existing link`() {
         val message = VerifyCommand.startedMessage(started.copy(linkedWareraUsername = "Old"))
 
