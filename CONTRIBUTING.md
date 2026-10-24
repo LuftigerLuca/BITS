@@ -19,10 +19,15 @@ GitHub Actions runs on every pull request and on `main`; all three jobs are requ
 - **Frontend:** `npm ci`, `npm run lint` and `npm run build`
 - **Conventions:** PR title and branch name follow the rules below
 
+The workflow **Images** builds the backend, bot and frontend images and scans them with Trivy; it fails on a
+critical vulnerability that has a fix. It also runs weekly, since new vulnerabilities turn up without a change here.
+It is not a required check, so a fresh CVE in a base image does not block unrelated pull requests.
+
 The manual workflow **CD** deploys `main` to a GitHub environment such as `staging`; see
 [deploy/README.md](deploy/README.md).
 
-Dependabot opens weekly update PRs for Gradle, npm, GitHub Actions and Docker images. The rules for `main` are
+Dependabot opens weekly update PRs for Gradle, npm, GitHub Actions and Docker images. Actions are pinned by
+commit SHA and images by digest, each with the version next to it; Dependabot updates both. The rules for `main` are
 kept in `.github/rulesets/main.json`; change them there and apply them to the repository.
 
 ## Branches

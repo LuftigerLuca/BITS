@@ -1,0 +1,48 @@
+name: Images
+
+# Separate from CI so the weekly run, which catches vulnerabilities published after the last change, does not
+# rerun the whole build.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  scan:
+    name: Scan ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            context: .
+            dockerfile: backend/Dockerfile
+          - image: bot
+            context: .
+            dockerfile: bot/Dockerfile
+          - image: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the image
+        run: docker build -t "bits-${{ matrix.image }}:scan" -f "${{ matrix.dockerfile }}" "${{ matrix.context }}"
+      # Fails only on critical vulnerabilities that have a fix, so the run stays actionable: a newer base image or
+      # dependency resolves it.
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: bits-${{ matrix.image }}:scan
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

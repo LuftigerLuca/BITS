@@ -37,11 +37,12 @@ jobs:
       PUBLIC_PORT: ${{ vars.PUBLIC_PORT || '8080' }}
       PUBLIC_BIND: ${{ vars.PUBLIC_BIND || '127.0.0.1' }}
       REAL_IP_FROM: ${{ vars.REAL_IP_FROM }}
+      BACKUP_PATH: ${{ vars.BACKUP_PATH || format('{0}/backups', vars.DEPLOY_PATH) }}
       # Per environment, so a deployment to one never removes the images another one runs.
       IMAGE_PREFIX: bits-${{ inputs.environment }}
       COMPOSE_PROJECT_NAME: bits-${{ inputs.environment }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Tagged with the commit, so what is running can always be traced back to a revision, and a failed
       # deployment leaves the previous images untouched.
@@ -50,6 +51,25 @@ jobs:
           docker build -t "$IMAGE_PREFIX-backend:$GITHUB_SHA" -f backend/Dockerfile .
           docker build -t "$IMAGE_PREFIX-bot:$GITHUB_SHA" -f bot/Dockerfile .
           docker build -t "$IMAGE_PREFIX-frontend:$GITHUB_SHA" frontend
+
+      # Flyway migrates on startup, and rolling back the images does not undo a migration, so the database as it was
+      # before is dumped first. Done with the postgres container of the running stack; on the first deployment there
+      # is none and nothing to keep. Without a dump, nothing is deployed.
+      - name: Back up the database
+        run: |
+          if [ -z "$DEPLOY_PATH" ] || [ ! -f "$DEPLOY_PATH/docker-compose.yml" ] \
+            || [ -z "$(cd "$DEPLOY_PATH" && docker compose ps -q --status running postgres)" ]; then
+            echo "no running database, nothing to back up"
+            exit 0
+          fi
+          umask 077
+          mkdir -p "$BACKUP_PATH/pre-deploy"
+          file="$BACKUP_PATH/pre-deploy/bits-$(date -u +%Y-%m-%dT%H%M%SZ)-${GITHUB_SHA::7}.dump"
+          (cd "$DEPLOY_PATH" && docker compose exec -T postgres pg_dump -U bits -Fc bits) > "$file.part"
+          mv "$file.part" "$file"
+          echo "dumped the database to $file"
+          # The newest ten; the daily dumps of the backup service cover the time before.
+          ls -1 "$BACKUP_PATH"/pre-deploy/*.dump | sort -r | tail -n +11 | xargs -r rm -f
 
       - name: Install the stack
         env:
@@ -74,8 +94,8 @@ jobs:
           if [ -z "$REAL_IP_FROM" ]; then
             echo "::warning::REAL_IP_FROM is not set, so nginx takes the TLS proxy for the client and the admin login lockout hits everybody at once, see deploy/README.md"
           fi
-          mkdir -p "$DEPLOY_PATH"
-          cp deploy/docker-compose.yml "$DEPLOY_PATH/"
+          mkdir -p "$DEPLOY_PATH" "$BACKUP_PATH"
+          cp deploy/docker-compose.yml deploy/backup.sh "$DEPLOY_PATH/"
           # The .env holds every deployment secret, so it is written unreadable to anyone else and never
           # leaves this host.
           umask 077
@@ -96,6 +116,9 @@ jobs:
             echo "PUBLIC_PORT=$PUBLIC_PORT"
             echo "PUBLIC_BIND=$PUBLIC_BIND"
             echo "REAL_IP_FROM=${REAL_IP_FROM:-127.0.0.1}"
+            echo "BACKUP_PATH=$BACKUP_PATH"
+            echo "BACKUP_UID=$(id -u)"
+            echo "BACKUP_GID=$(id -g)"
             cat "$redis_passwords"
             echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
             echo "BITS_SERVICE_TOKEN=$BITS_SERVICE_TOKEN"

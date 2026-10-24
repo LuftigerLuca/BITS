@@ -26,6 +26,7 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
+  # Actions are pinned by commit SHA with the version as a comment; Dependabot updates both.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -37,8 +38,8 @@ updates:
       github-actions:
         patterns: ["*"]
 
-  # Major versions of base images and services are upgraded by hand: the JDK is tied to the Gradle toolchain,
-  # PostgreSQL needs a data migration.
+  # Images are pinned by digest next to their tag; Dependabot updates both. Major versions of base images and
+  # services are upgraded by hand: the JDK is tied to the Gradle toolchain, PostgreSQL needs a data migration.
   - package-ecosystem: docker
     directories: [/backend, /bot, /frontend]
     schedule:
