@@ -5,6 +5,8 @@ import eu.luftiger.bits.backend.account.api.AccountUnlinked
 import eu.luftiger.bits.backend.account.domain.AccountLink
 import eu.luftiger.bits.backend.account.domain.AccountVerification
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
+import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -44,6 +46,7 @@ class VerificationService(
     private val verificationRepository: AccountVerificationRepository,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
+    private val systemLog: SystemLog,
     private val applicationEvents: ApplicationEventPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
@@ -78,9 +81,11 @@ class VerificationService(
         )
     }
 
+    /** [discordName] is the member's name for the [SystemLog], if the bot sent it. */
     fun check(
         discordUserId: String,
         code: String,
+        discordName: String? = null,
     ): CheckVerificationResponse {
         val now = clock.instant()
         val verification = verificationRepository.findByIdOrNull(discordUserId)
@@ -105,14 +110,17 @@ class VerificationService(
         }
 
         executor.execute {
-            val result = lookForCode(verification) ?: return@execute
+            val result = lookForCode(verification, discordName) ?: return@execute
             eventPublisher.publish(VerificationCheckedEvent(discordUserId, verification.code, result, clock.millis()))
         }
         return CheckVerificationResponse.Checking
     }
 
     /** Returns `null` on an unexpected error; the bot then tells the user to try again once it stops waiting. */
-    private fun lookForCode(verification: AccountVerification): CheckVerificationResponse? =
+    private fun lookForCode(
+        verification: AccountVerification,
+        discordName: String?,
+    ): CheckVerificationResponse? =
         try {
             val codeFound =
                 wareraClient
@@ -122,7 +130,7 @@ class VerificationService(
                     .any { it.ownerId == verification.wareraUserId && it.name.contains(verification.code, ignoreCase = true) }
             when {
                 !codeFound -> CheckVerificationResponse.CodeMissing
-                link(verification) -> CheckVerificationResponse.Linked(verification.wareraUsername)
+                link(verification, discordName) -> CheckVerificationResponse.Linked(verification.wareraUsername)
                 else -> CheckVerificationResponse.Invalid
             }
         } catch (e: WareraApiException) {
@@ -140,15 +148,21 @@ class VerificationService(
      * Two checks that link the same account at the same time do not see each other's link, so one of them fails on a
      * unique constraint. It tries once more, then sees the other link and replaces it like any older one.
      */
-    private fun link(verification: AccountVerification): Boolean =
+    private fun link(
+        verification: AccountVerification,
+        discordName: String?,
+    ): Boolean =
         try {
-            tryLink(verification)
+            tryLink(verification, discordName)
         } catch (e: DataIntegrityViolationException) {
             log.info("Account of user {} was linked by another check at the same time, trying again", verification.discordUserId)
-            tryLink(verification)
+            tryLink(verification, discordName)
         }
 
-    private fun tryLink(verification: AccountVerification): Boolean =
+    private fun tryLink(
+        verification: AccountVerification,
+        discordName: String?,
+    ): Boolean =
         transactionTemplate.execute {
             val current = verificationRepository.findByIdOrNull(verification.discordUserId)
             if (current?.code != verification.code) return@execute false
@@ -169,6 +183,15 @@ class VerificationService(
             verificationRepository.deleteById(verification.discordUserId)
             val previousDiscordUserId = previous?.discordUserId?.takeIf { it != verification.discordUserId }
             applicationEvents.publishEvent(AccountLinked(verification.discordUserId, verification.wareraUserId, previousDiscordUserId))
+            systemLog.recordAccountLinked(
+                AccountLinkRecord(
+                    discordUserId = verification.discordUserId,
+                    discordName = discordName,
+                    wareraUserId = verification.wareraUserId,
+                    wareraUsername = verification.wareraUsername,
+                    previousDiscordUserId = previousDiscordUserId,
+                ),
+            )
             eventPublisher.publish(
                 AccountLinkedEvent(
                     discordUserId = verification.discordUserId,

@@ -4,7 +4,9 @@ import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
+import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.UnlinkAccountResponse
 import io.mockk.every
 import io.mockk.mockk
@@ -186,8 +188,16 @@ class RoleReporterTest {
         override suspend fun checkVerification(
             discordUserId: String,
             code: String,
+            discordName: String?,
         ): CheckVerificationResponse = TODO()
 
         override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse = TODO()
+
+        override suspend fun reportRoleSync(
+            syncId: Long,
+            report: RoleSyncReport,
+        ) = TODO()
+
+        override suspend fun reportUndeliveredEvent(report: UndeliveredEventReport) = TODO()
     }
 }

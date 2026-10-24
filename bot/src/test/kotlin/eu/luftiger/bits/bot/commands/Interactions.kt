@@ -50,6 +50,7 @@ fun buttonClick(
     val event = mockk<ButtonInteractionEvent>(relaxed = true)
     every { event.componentId } returns componentId
     every { event.user.id } returns "42"
+    every { event.member!!.effectiveName } returns "Luca"
     every { event.hook } returns replies.hook
     return event
 }

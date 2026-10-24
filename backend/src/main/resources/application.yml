@@ -37,6 +37,9 @@ bits:
   # Deletes data BITS no longer needs, see "Datenschutz" in the README.
   cleanup:
     cron: "0 30 * * * *"
+  system-log:
+    # Once a day is enough for entries kept 30 days.
+    cleanup-cron: "0 15 3 * * *"
   auth:
     public-url: ${BITS_PUBLIC_URL:http://localhost:5173}
     jwt-secret: ${BITS_JWT_SECRET:}

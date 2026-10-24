@@ -17,6 +17,8 @@ bits:
   cleanup:
     # Tests clean up themselves.
     cron: "-"
+  system-log:
+    cleanup-cron: "-"
   auth:
     public-url: https://bits.test
     jwt-secret: test-signing-key-that-is-at-least-32-bytes-long

@@ -7,8 +7,10 @@ import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.DiscordRolesReport
 import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
+import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.UnlinkAccountRequest
 import eu.luftiger.bits.shared.UnlinkAccountResponse
 import io.ktor.client.HttpClient
@@ -67,7 +69,8 @@ class KtorBackendClient(
     override suspend fun checkVerification(
         discordUserId: String,
         code: String,
-    ): CheckVerificationResponse = post("api/verifications/check", CheckVerificationRequest(discordUserId, code))
+        discordName: String?,
+    ): CheckVerificationResponse = post("api/verifications/check", CheckVerificationRequest(discordUserId, code, discordName))
 
     override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse =
         post("api/verifications/unlink", UnlinkAccountRequest(discordUserId))
@@ -76,6 +79,23 @@ class KtorBackendClient(
         http.put("api/discord-roles") {
             contentType(ContentType.Application.Json)
             setBody(DiscordRolesReport(roles))
+        }
+    }
+
+    override suspend fun reportRoleSync(
+        syncId: Long,
+        report: RoleSyncReport,
+    ) {
+        http.post("api/system-log/role-syncs/$syncId") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportUndeliveredEvent(report: UndeliveredEventReport) {
+        http.post("api/system-log/undelivered-events") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
         }
     }
 

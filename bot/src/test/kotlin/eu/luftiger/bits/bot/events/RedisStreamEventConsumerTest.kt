@@ -4,6 +4,7 @@ import com.github.dockerjava.api.model.PortBinding
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.PingEvent
+import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.encode
 import io.lettuce.core.Range
 import io.lettuce.core.RedisClient
@@ -35,6 +36,7 @@ import kotlin.test.assertTrue
 /** Runs against a real Redis, since the consumer is mostly about how Redis streams behave. */
 class RedisStreamEventConsumerTest {
     private val handled: MutableList<BitsEvent> = Collections.synchronizedList(mutableListOf())
+    private val undelivered: MutableList<UndeliveredEventReport> = Collections.synchronizedList(mutableListOf())
     private val clients = mutableListOf<RedisClient>()
 
     /** Consumers run until the test ends, outside of the test's own coroutine, which would wait for them. */
@@ -99,6 +101,7 @@ class RedisStreamEventConsumerTest {
             awaitNoPending()
             val dead = redis.xrange(EventStream.DEAD_LETTER_KEY, Range.unbounded()).single()
             assertEquals(ping("broken").encode(), dead.body[EventStream.PAYLOAD_FIELD])
+            assertEquals(listOf(UndeliveredEventReport(dead.body.getValue("originalId"), "ping", 3)), undelivered)
         }
 
     @Test
@@ -198,7 +201,7 @@ class RedisStreamEventConsumerTest {
     private fun consumer(
         client: RedisClient = client(REDIS_URL),
         handler: EventHandler = EventHandler { handled += it },
-    ) = RedisStreamEventConsumer(client, handler, settings)
+    ) = RedisStreamEventConsumer(client, handler, settings, onDeadLetter = { undelivered += it })
 
     private fun consumer(handler: EventHandler) = consumer(client(REDIS_URL), handler)
 

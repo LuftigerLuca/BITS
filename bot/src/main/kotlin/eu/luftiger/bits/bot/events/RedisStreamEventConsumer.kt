@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.events
 
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.decodeEvent
 import io.lettuce.core.Consumer
 import io.lettuce.core.Limit
@@ -19,6 +20,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.time.Duration
 
@@ -31,6 +35,8 @@ import java.time.Duration
  * so a broken event never blocks the ones after it. Unreadable entries, e.g. of an event type this bot does not know
  * yet, take the same way: a newer bot can still pick them up before they run out of deliveries.
  *
+ * Every event given up on goes to [onDeadLetter] as well, for the backend's system log.
+ *
  * The consumer survives Redis going away: it reconnects with backoff and creates the group again if it is lost.
  */
 class RedisStreamEventConsumer(
@@ -38,6 +44,7 @@ class RedisStreamEventConsumer(
     private val handler: EventHandler,
     private val settings: Settings = Settings(),
     consumerName: String = "bot",
+    private val onDeadLetter: (UndeliveredEventReport) -> Unit = {},
 ) {
     data class Settings(
         /** How long a read waits for new events. Also bounds how long [stop] takes. */
@@ -172,7 +179,22 @@ class RedisStreamEventConsumer(
         )
         commands.xack(EventStream.KEY, EventStream.BOT_GROUP, message.id)
         log.error("Giving up on event {} after {} deliveries, moved it to {}", message.id, deliveries, EventStream.DEAD_LETTER_KEY)
+        onDeadLetter(UndeliveredEventReport(message.id, eventType(message.body[EventStream.PAYLOAD_FIELD]), deliveries))
     }
+
+    /** Only the `type` of the event, the rest may hold member data. `null` if the payload is no JSON object. */
+    private fun eventType(payload: String?): String? =
+        try {
+            payload?.let {
+                Json
+                    .parseToJsonElement(it)
+                    .jsonObject["type"]
+                    ?.jsonPrimitive
+                    ?.content
+            }
+        } catch (_: IllegalArgumentException) {
+            null
+        }
 
     private fun createGroup(
         commands: RedisCommands<String, String>,

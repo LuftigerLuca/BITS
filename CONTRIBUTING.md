@@ -169,6 +169,10 @@ What these flows show:
   of the change, with the actor from `SessionPrincipal.of(session)` and a German description that stays readable
   after the changed object is gone. New actions get a value in `AuditAction` and a label in
   `features/audit-log/labels.ts`.
+- **What BITS does on its own is recorded** in the system log through `SystemLog` from `systemlog.api`: sync runs,
+  account links and problems nobody sees right away, such as missing WarEra data. A sync run is written together
+  with its `RoleSyncEvent`, whose `syncId` the bot reports back under (`RoleSyncReport`). New problems get a
+  `SystemProblem` subtype; errors that only matter for debugging stay in the application log.
 - **Background jobs** use `@Scheduled` with a cron from the configuration (`-` in tests, which start them by hand)
   and the injected `Clock`. A job that must not run twice at once gets its own single thread.
 - **The bot** defers the reply, does the work in its coroutine scope and turns each failure into a German

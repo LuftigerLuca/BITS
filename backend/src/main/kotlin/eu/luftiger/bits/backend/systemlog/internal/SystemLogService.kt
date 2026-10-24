@@ -1,0 +1,242 @@
+package eu.luftiger.bits.backend.systemlog.internal
+
+import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
+import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
+import eu.luftiger.bits.backend.systemlog.api.SystemLog
+import eu.luftiger.bits.backend.systemlog.api.SystemProblem
+import eu.luftiger.bits.backend.systemlog.domain.EntryKind
+import eu.luftiger.bits.backend.systemlog.domain.ItemOutcome
+import eu.luftiger.bits.backend.systemlog.domain.SyncStatus
+import eu.luftiger.bits.backend.systemlog.domain.SystemLogEntry
+import eu.luftiger.bits.backend.systemlog.domain.SystemLogItem
+import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.RoleChangeOutcome
+import eu.luftiger.bits.shared.RoleSyncReport
+import eu.luftiger.bits.shared.UndeliveredEventReport
+import org.springframework.data.repository.findByIdOrNull
+import org.springframework.http.HttpStatus
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
+import java.time.Clock
+import java.time.Duration
+
+@Service
+class SystemLogService(
+    private val entries: SystemLogEntryRepository,
+    private val items: SystemLogItemRepository,
+    private val clock: Clock,
+) : SystemLog {
+    @Transactional
+    override fun recordSyncRun(
+        trigger: SyncTrigger,
+        linkedCount: Int,
+    ): Long =
+        requireNotNull(
+            entries
+                .save(
+                    SystemLogEntry(
+                        clock.instant(),
+                        EntryKind.SYNC_RUN,
+                        syncTrigger = trigger,
+                        syncStatus = SyncStatus.PENDING,
+                        linkedCount = linkedCount,
+                    ),
+                ).id,
+        )
+
+    @Transactional
+    override fun recordSyncWithoutRules(trigger: SyncTrigger) {
+        entries.save(SystemLogEntry(clock.instant(), EntryKind.SYNC_RUN, syncTrigger = trigger, syncStatus = SyncStatus.NO_RULES))
+    }
+
+    @Transactional
+    override fun recordAccountLinked(link: AccountLinkRecord) {
+        val previous = link.previousDiscordUserId
+        entries.save(
+            SystemLogEntry(
+                clock.instant(),
+                if (previous == null) EntryKind.ACCOUNT_LINKED else EntryKind.ACCOUNT_RELINKED,
+                discordUserId = link.discordUserId,
+                discordName = link.discordName ?: latestNames(listOf(link.discordUserId))[link.discordUserId],
+                previousDiscordUserId = previous,
+                previousDiscordName = previous?.let { latestNames(listOf(it))[it] },
+                wareraUserId = link.wareraUserId,
+                wareraUsername = link.wareraUsername,
+            ),
+        )
+    }
+
+    @Transactional
+    override fun recordProblem(problem: SystemProblem) {
+        val now = clock.instant()
+        when (problem) {
+            is SystemProblem.WareraUsersUnavailable -> {
+                val ids = problem.discordUserIds.distinct()
+                val entry =
+                    entries.save(
+                        SystemLogEntry(
+                            now,
+                            EntryKind.WARERA_USERS_UNAVAILABLE,
+                            message =
+                                "Die WarEra-Daten von ${members(ids.size)} konnten nicht geladen werden. Ihre Rollen bleiben, " +
+                                    "wie sie sind.",
+                        ),
+                    )
+                val names = latestNames(ids)
+                items.saveAll(
+                    ids.map { id ->
+                        SystemLogItem(requireNotNull(entry.id), id, names[id], null, null, ItemOutcome.SKIPPED, "WarEra-Daten nicht ladbar")
+                    },
+                )
+            }
+            is SystemProblem.GovernmentUnavailable ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.GOVERNMENT_UNAVAILABLE,
+                        message =
+                            "Die Regierung von ${problem.countryName ?: problem.countryId} konnte nicht geladen werden. " +
+                                "Regeln für Regierungsämter dieses Landes wurden übersprungen.",
+                    ),
+                )
+            is SystemProblem.RoleNotAssignable ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.ROLE_NOT_ASSIGNABLE,
+                        roleId = problem.roleId,
+                        roleName = problem.roleName,
+                        message =
+                            if (problem.roleName == null) {
+                                "Die Rolle wurde in Discord gelöscht. Ihre Regeln laufen nicht mehr."
+                            } else {
+                                "Der Bot kann die Rolle nicht vergeben, z. B. weil sie über seiner Rolle steht. Ihre Regeln " +
+                                    "laufen nicht mehr."
+                            },
+                    ),
+                )
+            is SystemProblem.SyncAborted ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.SYNC_ABORTED,
+                        syncTrigger = problem.trigger,
+                        message = "Der Sync ist abgebrochen: ${problem.error.take(MAX_ERROR_LENGTH)}",
+                    ),
+                )
+            is SystemProblem.OutboxStuck ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.OUTBOX_STUCK,
+                        message =
+                            "${problem.count} Events für den Bot warten seit über 10 Minuten auf die Zustellung. Redis ist " +
+                                "vermutlich nicht erreichbar; sie werden zugestellt, sobald es wieder geht.",
+                    ),
+                )
+        }
+    }
+
+    /**
+     * Stores what the bot changed for the sync [syncId]. A report that comes again, e.g. because the answer to the first
+     * got lost, changes nothing.
+     *
+     * @throws ResponseStatusException 404 if there is no such sync run, e.g. because it was deleted already
+     */
+    @Transactional
+    fun applyReport(
+        syncId: Long,
+        report: RoleSyncReport,
+    ) {
+        val entry =
+            entries.findByIdOrNull(syncId)?.takeIf { it.kind == EntryKind.SYNC_RUN }
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        if (entry.reportedAt != null) return
+        items.saveAll(
+            report.changes.map {
+                SystemLogItem(syncId, it.discordUserId, it.memberName, it.roleId, it.roleName, outcome(it.outcome), it.reason)
+            },
+        )
+        val counts = report.changes.groupingBy { it.outcome }.eachCount()
+        entry.memberCount = report.memberCount
+        entry.staleMemberCount = report.staleMemberCount
+        entry.grantedCount = counts[RoleChangeOutcome.GRANTED] ?: 0
+        entry.removedCount = counts[RoleChangeOutcome.REMOVED] ?: 0
+        entry.skippedCount = counts[RoleChangeOutcome.SKIPPED] ?: 0
+        entry.failedCount = counts[RoleChangeOutcome.FAILED] ?: 0
+        entry.syncStatus = if (report.memberCount == 0 && report.staleMemberCount > 0) SyncStatus.STALE else SyncStatus.APPLIED
+        entry.reportedAt = clock.instant()
+    }
+
+    @Transactional
+    fun recordUndelivered(report: UndeliveredEventReport) {
+        entries.save(
+            SystemLogEntry(
+                clock.instant(),
+                EntryKind.EVENT_UNDELIVERED,
+                message =
+                    "Der Bot hat das Event ${report.eventType ?: "(unlesbar)"} ${report.streamId} nach ${report.deliveries} " +
+                        "Zustellversuchen aufgegeben. Es liegt in ${EventStream.DEAD_LETTER_KEY}.",
+            ),
+        )
+    }
+
+    fun page(
+        category: LogCategory?,
+        member: String?,
+        roleId: String?,
+        before: Long?,
+    ): SystemLogPage {
+        val kinds = EntryKind.entries.filter { category == null || it.category == category.category }.map { it.name }
+        // One more than a page tells whether another page follows.
+        val found = entries.findPage(kinds, member?.trim()?.ifEmpty { null }, roleId, before, PAGE_SIZE + 1)
+        val page = found.take(PAGE_SIZE)
+        val withItems = if (page.isEmpty()) emptySet() else items.findEntryIdsWithItems(page.map { requireNotNull(it.id) }).toSet()
+        val noResponseBefore = clock.instant() - NO_RESPONSE_AFTER
+        return SystemLogPage(
+            entries = page.map { SystemLogEntryResponse.of(it, it.id in withItems, noResponseBefore) },
+            nextBefore = if (found.size > PAGE_SIZE) page.last().id else null,
+        )
+    }
+
+    fun items(
+        entryId: Long,
+        member: String?,
+        roleId: String?,
+    ): List<SystemLogItemResponse> {
+        if (!entries.existsById(entryId)) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return items.findByEntry(entryId, member?.trim()?.ifEmpty { null }, roleId).map(SystemLogItemResponse::of)
+    }
+
+    fun roles(): List<NamedRef> = entries.findRoles().map { NamedRef(it.id, it.name) }.sortedBy { (it.name ?: it.id).lowercase() }
+
+    @Transactional
+    fun deleteOlderThan(retention: Duration): Int = entries.deleteOccurredBefore(clock.instant() - retention)
+
+    private fun latestNames(discordUserIds: Collection<String>): Map<String, String> =
+        if (discordUserIds.isEmpty()) {
+            emptyMap()
+        } else {
+            entries.findLatestNames(discordUserIds).mapNotNull { row -> row.name?.let { row.id to it } }.toMap()
+        }
+
+    private fun members(count: Int) = if (count == 1) "einem Mitglied" else "$count Mitgliedern"
+
+    private fun outcome(outcome: RoleChangeOutcome) =
+        when (outcome) {
+            RoleChangeOutcome.GRANTED -> ItemOutcome.GRANTED
+            RoleChangeOutcome.REMOVED -> ItemOutcome.REMOVED
+            RoleChangeOutcome.SKIPPED -> ItemOutcome.SKIPPED
+            RoleChangeOutcome.FAILED -> ItemOutcome.FAILED
+        }
+
+    companion object {
+        const val PAGE_SIZE = 50
+
+        /** A sync the bot has not reported back on after this long shows as "Keine Rückmeldung vom Bot". */
+        val NO_RESPONSE_AFTER: Duration = Duration.ofMinutes(15)
+
+        private const val MAX_ERROR_LENGTH = 500
+    }
+}

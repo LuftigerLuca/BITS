@@ -138,6 +138,8 @@ SELECT * FROM account_link WHERE discord_user_id = :'id';
 SELECT * FROM account_verification WHERE discord_user_id = :'id';
 SELECT * FROM ping_log WHERE discord_user_id = :'id';
 SELECT * FROM audit_entry WHERE actor_subject = 'discord:' || :'id';
+SELECT * FROM system_log_entry WHERE :'id' IN (discord_user_id, previous_discord_user_id);
+SELECT * FROM system_log_item WHERE discord_user_id = :'id';
 SQL
 ```
 

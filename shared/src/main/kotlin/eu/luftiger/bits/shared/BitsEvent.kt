@@ -62,6 +62,11 @@ data class RoleSyncEvent(
      * these roles, the change is what the admin asked for.
      */
     val confirmedRoleIds: List<String> = emptyList(),
+    /**
+     * Run in the backend's system log that this sync belongs to; the bot reports what it changed under this ID, see
+     * [RoleSyncReport]. `null` from a backend before the system log.
+     */
+    val syncId: Long? = null,
 ) : BitsEvent
 
 @Serializable

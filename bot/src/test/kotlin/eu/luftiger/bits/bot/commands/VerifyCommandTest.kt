@@ -119,7 +119,7 @@ class VerifyCommandTest {
     @Test
     fun `a check answers once its result arrives as event`() =
         runTest {
-            coEvery { backend.checkVerification("42", "BITS-ABC234") } returns CheckVerificationResponse.Checking
+            coEvery { backend.checkVerification("42", "BITS-ABC234", "Luca") } returns CheckVerificationResponse.Checking
             val command = command()
 
             command.onButtonInteraction(buttonClick("verify:check:BITS-ABC234", replies))
@@ -134,7 +134,7 @@ class VerifyCommandTest {
     @Test
     fun `a check answered right away needs no event`() =
         runTest {
-            coEvery { backend.checkVerification("42", "BITS-ABC234") } returns CheckVerificationResponse.TooEarly(4)
+            coEvery { backend.checkVerification("42", "BITS-ABC234", "Luca") } returns CheckVerificationResponse.TooEarly(4)
 
             command().onButtonInteraction(buttonClick("verify:check:BITS-ABC234", replies))
             runCurrent()

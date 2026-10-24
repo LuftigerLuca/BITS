@@ -41,6 +41,8 @@ sealed interface StartVerificationResponse {
 data class CheckVerificationRequest(
     val discordUserId: String,
     val code: String,
+    /** Name of the member in the guild, for the backend's system log; `null` from a bot before it. */
+    val discordName: String? = null,
 )
 
 /**

@@ -43,7 +43,8 @@ class VerificationController(
     ): CheckVerificationResponse {
         BotInput.discordUserId(request.discordUserId)
         BotInput.code(request.code)
-        return verificationService.check(request.discordUserId, request.code)
+        BotInput.discordName(request.discordName)
+        return verificationService.check(request.discordUserId, request.code, request.discordName)
     }
 
     @PostMapping("/unlink")

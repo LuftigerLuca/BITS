@@ -2,6 +2,9 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinked
 import eu.luftiger.bits.backend.account.api.AccountUnlinked
+import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
+import eu.luftiger.bits.backend.systemlog.api.SystemLog
+import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.modulith.events.ApplicationModuleListener
@@ -25,10 +28,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * asked for since wait, however many requests came in. A refresh that is still running when the next hour starts is
  * not repeated. One refresh takes about a second per linked user, so the hourly schedule holds up to roughly 3000
  * links; beyond that, refreshes are skipped and run every other hour.
+ *
+ * A sync that fails is recorded in the [SystemLog]; a merged sync of all members counts as a rule change if one of the
+ * requests was.
  */
 @Component
 class RoleSyncTrigger(
     private val syncService: RoleSyncService,
+    private val systemLog: SystemLog,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val syncs = Executors.newSingleThreadExecutor { Thread(it, "role-sync") }
@@ -110,16 +117,29 @@ class RoleSyncTrigger(
                     }
                 }
             // Members first: a single lookup each, while the sync of everybody may have to load users it has not seen.
-            if (members.isNotEmpty()) attempt { syncService.syncMembers(members) }
-            if (syncAll) attempt { syncService.syncAll(confirmedRoleIds) }
+            if (members.isNotEmpty()) attempt(SyncTrigger.ACCOUNT_CHANGE) { syncService.syncMembers(members) }
+            if (syncAll) {
+                // Only rule changes confirm roles, see syncAllWithCachedData.
+                val trigger = if (confirmedRoleIds.isEmpty()) SyncTrigger.HOURLY else SyncTrigger.RULE_CHANGE
+                attempt(trigger) { syncService.syncAll(confirmedRoleIds, trigger) }
+            }
         }
     }
 
-    private fun attempt(sync: () -> Unit) {
+    private fun attempt(
+        trigger: SyncTrigger,
+        sync: () -> Unit,
+    ) {
         try {
             sync()
         } catch (e: Exception) {
             log.error("Role sync failed", e)
+            try {
+                systemLog.recordProblem(SystemProblem.SyncAborted(trigger, e.message ?: e::class.simpleName.orEmpty()))
+            } catch (logFailure: Exception) {
+                // Likely the same cause, e.g. the database is gone.
+                log.warn("Could not record the failed role sync in the system log", logFailure)
+            }
         }
     }
 
