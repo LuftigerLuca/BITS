@@ -11,4 +11,12 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  // Like nginx in production: the dashboard and its backend endpoints share one origin, so the session
+  // cookie works without CORS. The bot's /api is not forwarded.
+  server: {
+    proxy: {
+      '/auth': 'http://localhost:8080',
+      '/web': 'http://localhost:8080',
+    },
+  },
 })

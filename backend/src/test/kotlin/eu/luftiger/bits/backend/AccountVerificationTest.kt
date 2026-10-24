@@ -22,11 +22,8 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
-import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -244,20 +241,6 @@ class AccountVerificationTest {
         override fun getCompany(companyId: String) = available { companies.values.flatten().first { it.id == companyId } }
 
         private fun <T> available(block: () -> T): T = if (down) throw WareraApiException("down") else block()
-    }
-
-    class MutableClock(
-        var now: Instant = Instant.EPOCH,
-    ) : Clock() {
-        fun advance(duration: Duration) {
-            now += duration
-        }
-
-        override fun instant(): Instant = now
-
-        override fun getZone(): ZoneId = ZoneOffset.UTC
-
-        override fun withZone(zone: ZoneId): Clock = this
     }
 
     @TestConfiguration(proxyBeanMethods = false)

@@ -3,8 +3,8 @@
 # that .env, so several environments can share a host.
 #
 # Only the frontend is published, and only on the loopback interface unless PUBLIC_BIND says otherwise.
-# The backend API is for the bot alone and is reachable inside the compose network only; the bot needs no
-# inbound connection, it dials out to Discord.
+# Its nginx forwards the dashboard's endpoints (/auth, /web) to the backend; the bot's API (/api) is
+# reachable inside the compose network only. The bot needs no inbound connection, it dials out to Discord.
 
 # What every container gets: it cannot gain privileges it did not start with, and it starts with no Linux
 # capabilities at all. A service that needs some back names them itself.
@@ -77,6 +77,13 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       REDIS_HOST: redis
       BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN:?BITS_SERVICE_TOKEN is required}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:?DISCORD_GUILD_ID is required}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:?DISCORD_CLIENT_ID is required}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:?DISCORD_CLIENT_SECRET is required}
+      BITS_PUBLIC_URL: ${BITS_PUBLIC_URL:?BITS_PUBLIC_URL is required}
+      BITS_JWT_SECRET: ${BITS_JWT_SECRET:?BITS_JWT_SECRET is required}
+      BITS_ADMIN_USERNAME: ${BITS_ADMIN_USERNAME:-}
+      BITS_ADMIN_PASSWORD_HASH: ${BITS_ADMIN_PASSWORD_HASH:-}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
       interval: 10s
@@ -101,7 +108,7 @@ services:
         condition: service_healthy
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN:?DISCORD_TOKEN is required}
-      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:?DISCORD_GUILD_ID is required}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
       BACKEND_URL: http://backend:8080
       BITS_SERVICE_TOKEN: ${BITS_SERVICE_TOKEN}
       REDIS_URL: redis://redis:6379

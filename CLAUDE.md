@@ -21,9 +21,12 @@ reference for new features that span all parts.
 
 ## Key rules
 
-- Only the backend talks to the database and the WarEra API. Only the bot talks to Discord. The bot calls the
-  backend via REST (`BackendClient`), the backend reaches the bot via events in Redis (`EventPublisher`).
-  No shortcuts.
+- Only the backend talks to the database and the WarEra API. Only the bot talks to Discord with the bot token
+  and the gateway; the backend calls Discord solely for the dashboard's OAuth2 login, on behalf of the user who
+  logs in. The bot calls the backend via REST (`BackendClient`), the backend reaches the bot via events in Redis
+  (`EventPublisher`). No shortcuts.
+- The bot's API under `/api/**` is protected by the service token only; the dashboard uses `/auth/**` and
+  `/web/**` with a session cookie. nginx forwards only the latter.
 - Backend modules use each other only through `api/`. Never import another module's `domain/` or `internal/`;
   `ModulithStructureTest` fails on it.
 - Change the database schema only with a new Flyway migration. Never touch existing migrations.
