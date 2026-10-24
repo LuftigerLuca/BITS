@@ -24,7 +24,7 @@ x-hardening: &hardening
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     restart: unless-stopped
     <<: *hardening
     # The entrypoint starts as root to take ownership of a fresh data directory and then hands over to
@@ -45,7 +45,7 @@ services:
       retries: 12
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:0bf6577d7774e592b29d093e3ac9390eb91e13d72c21e506afce736de5e0eeb0
     restart: unless-stopped
     <<: *hardening
     # Like Postgres, the entrypoint fixes the ownership of the data directory before dropping root.
