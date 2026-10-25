@@ -11,6 +11,8 @@ import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileRequest
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.RoleExplanationRequest
+import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -80,6 +82,9 @@ class KtorBackendClient(
         post("api/verifications/unlink", UnlinkAccountRequest(discordUserId))
 
     override suspend fun profile(discordUserId: String): ProfileResponse = post("api/profiles", ProfileRequest(discordUserId))
+
+    override suspend fun explainRoles(discordUserId: String): RoleExplanationResponse =
+        post("api/role-explanations", RoleExplanationRequest(discordUserId))
 
     override suspend fun reportRoles(roles: List<DiscordRoleDto>) {
         http.put("api/discord-roles") {

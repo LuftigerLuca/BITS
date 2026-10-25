@@ -5,6 +5,7 @@ import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.UndeliveredEventReport
@@ -195,6 +196,8 @@ class RoleReporterTest {
         override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse = TODO()
 
         override suspend fun profile(discordUserId: String): ProfileResponse = TODO()
+
+        override suspend fun explainRoles(discordUserId: String): RoleExplanationResponse = TODO()
 
         override suspend fun reportRoleSync(
             syncId: Long,
