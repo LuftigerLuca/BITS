@@ -4,6 +4,7 @@ import eu.luftiger.bits.backend.audit.api.AuditAction
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
+import eu.luftiger.bits.backend.rolesync.domain.DiscordRole
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
@@ -68,6 +69,32 @@ class RoleRuleService(
         request: CreateRuleRequest,
         actor: AuditActor,
     ): RuleResponse {
+        val (role, rule) = newRule(request)
+        val saved =
+            requireNotNull(
+                transactionTemplate.execute {
+                    val created =
+                        try {
+                            ruleRepository.saveAndFlush(rule)
+                        } catch (_: DataIntegrityViolationException) {
+                            // The unique index on role and condition; the CHECK constraints cannot fail after the
+                            // checks of newRule.
+                            throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
+                        }
+                    auditLog.record(actor, AuditAction.ROLE_RULE_CREATED, describe(role.id, role.name, created))
+                    created
+                },
+            )
+        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
+        return RuleResponse(requireNotNull(saved.id), role.id, role.name, role.color, saved.label, RuleStatus.ACTIVE)
+    }
+
+    /**
+     * The rule [request] asks for, not saved yet, with its role.
+     *
+     * @throws ResponseStatusException 400 if the role cannot be given or the condition is incomplete or unknown
+     */
+    fun newRule(request: CreateRuleRequest): Pair<DiscordRole, RoleRule> {
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
         val rule =
@@ -108,23 +135,7 @@ class RoleRuleService(
                     RoleRule(role.id, request.type.condition, threshold = threshold, createdAt = now())
                 }
             }
-        val saved =
-            requireNotNull(
-                transactionTemplate.execute {
-                    val created =
-                        try {
-                            ruleRepository.saveAndFlush(rule)
-                        } catch (_: DataIntegrityViolationException) {
-                            // The unique index on role and condition; the CHECK constraints cannot fail after the
-                            // checks above.
-                            throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
-                        }
-                    auditLog.record(actor, AuditAction.ROLE_RULE_CREATED, describe(role.id, role.name, created))
-                    created
-                },
-            )
-        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
-        return RuleResponse(requireNotNull(saved.id), role.id, role.name, role.color, saved.label, RuleStatus.ACTIVE)
+        return role to rule
     }
 
     /** @return the deleted rule, for the log */

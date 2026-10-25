@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/web/admin/role-sync")
 class RoleRuleController(
     private val ruleService: RoleRuleService,
+    private val previewService: RulePreviewService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -47,6 +48,18 @@ class RoleRuleController(
         log.info("Rule {} ({}) for role {} created by {}", rule.id, rule.label, rule.roleId, session.subject)
         return rule
     }
+
+    /** What creating the rule would change, without creating it. */
+    @PostMapping("/rules/preview")
+    fun previewCreate(
+        @RequestBody request: CreateRuleRequest,
+    ): RulePreviewResponse = previewService.previewCreate(request)
+
+    /** What deleting the rule would change, without deleting it. */
+    @GetMapping("/rules/{id}/deletion-preview")
+    fun previewDelete(
+        @PathVariable id: Long,
+    ): RulePreviewResponse = previewService.previewDelete(id)
 
     @DeleteMapping("/rules/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -105,6 +118,33 @@ enum class RuleStatus {
     /** The role exists, but the bot cannot give it, e.g. because it is above the bot's highest role. */
     NOT_ASSIGNABLE,
 }
+
+/**
+ * Whom a rule change gives its role and from whom it takes it, for the members the bot reported last. Members whose
+ * WarEra data is missing are [unknown]: the sync keeps their role as it is, or loads their data first.
+ */
+@Serializable
+data class RulePreviewResponse(
+    val roleId: String,
+    /** `null` if the role was deleted in Discord. */
+    val roleName: String?,
+    /** `false` if no active rule is left for the role: BITS no longer manages it, and nobody gets or loses it. */
+    val managed: Boolean,
+    /** `false` until the bot has reported the members with their roles since the backend started; there is no preview. */
+    val membersReported: Boolean,
+    /** `false` until the WarEra data of all linked members was loaded since the backend started; many are [unknown]. */
+    val usersLoaded: Boolean,
+    val gains: List<PreviewMember> = emptyList(),
+    val losses: List<PreviewMember> = emptyList(),
+    val unknown: List<PreviewMember> = emptyList(),
+)
+
+@Serializable
+data class PreviewMember(
+    val discordUserId: String,
+    /** `null` for a member who joined after the bot's last list. */
+    val name: String?,
+)
 
 /** Which of the optional fields are needed depends on [type]. */
 @Serializable

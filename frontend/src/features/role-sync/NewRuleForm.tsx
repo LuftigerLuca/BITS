@@ -26,9 +26,10 @@ import {
 } from '@/lib/api'
 import { CONDITION_TYPES, OFFICES, errorMessage } from './labels'
 import { RoleName } from './RoleName'
-import { useCreateRoleRule } from './queries'
+import { RulePreview } from './RulePreview'
+import { useCreatePreview, useCreateRoleRule } from './queries'
 
-/** Form for a new rule; the first rule of a role asks first, since it hands the role over to BITS. */
+/** Form for a new rule; it shows whom the rule gives and takes the role and saves it only once confirmed. */
 export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
   const [roleId, setRoleId] = useState<string | null>(null)
   const [type, setType] = useState<ConditionType>('CITIZENSHIP')
@@ -38,9 +39,11 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
   const [muResults, setMuResults] = useState<Option[]>([])
   const [muId, setMuId] = useState<string | null>(null)
   const [threshold, setThreshold] = useState('1')
-  const [confirming, setConfirming] = useState(false)
+  /** The rule waiting for confirmation. */
+  const [pending, setPending] = useState<CreateRoleRule | null>(null)
   const [error, setError] = useState<string | null>(null)
   const createRule = useCreateRoleRule()
+  const preview = useCreatePreview(pending)
 
   const needsCountry = type === 'CITIZENSHIP' || type === 'GOVERNMENT_OFFICE'
   const countries = useCountries(needsCountry)
@@ -76,17 +79,14 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    // The first rule of a role hands the role over to BITS, which may take it from many members at once.
-    if (role && !role.managed) setConfirming(true)
-    else create()
+    setError(null)
+    setPending(rule())
   }
 
   function create() {
-    const newRule = rule()
-    if (!newRule) return
-    setConfirming(false)
-    setError(null)
-    createRule.mutate(newRule, { onError: (e) => setError(errorMessage(e)) })
+    if (!pending) return
+    setPending(null)
+    createRule.mutate(pending, { onError: (e) => setError(errorMessage(e)) })
   }
 
   const roleItems = roles.map((r) => ({ value: r.id, label: r.name }))
@@ -236,17 +236,23 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
       <Button type="submit" className="self-start" disabled={createRule.isPending || rule() === null}>
         Regel anlegen
       </Button>
-      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Rolle an BITS übergeben?</AlertDialogTitle>
+            {/* The first rule of a role hands the role over to BITS, which takes it from everybody without a match. */}
+            <AlertDialogTitle>{role?.managed ? 'Regel anlegen?' : 'Rolle an BITS übergeben?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Die Rolle {role?.name} wird ab jetzt von BITS verwaltet; Mitglieder ohne passende Regel verlieren sie.
+              {role?.managed
+                ? `BITS gleicht die Rolle ${role.name} danach sofort ab.`
+                : `Die Rolle ${role?.name} wird ab jetzt von BITS verwaltet; Mitglieder ohne passende Regel verlieren sie, auch wenn sie sie von Hand bekommen haben.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <RulePreview preview={preview} />
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={create}>Regel anlegen</AlertDialogAction>
+            <AlertDialogAction onClick={create} disabled={preview.isPending}>
+              Regel anlegen
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

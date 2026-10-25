@@ -57,11 +57,27 @@ class RoleSyncService(
         val user: WareraUser?,
     )
 
+    @Volatile
+    private var loadedAll = false
+
+    /**
+     * Whether the data of all linked users was loaded since the backend started; until then, [lastLoadedUsers] misses
+     * many of them, since it is kept in memory only.
+     */
+    fun loadedAll(): Boolean = loadedAll
+
+    /**
+     * The WarEra data a rule change would be judged with now, by WarEra user ID. A user who is missing would be loaded
+     * by that sync first; a `null` value could not be loaded.
+     */
+    fun lastLoadedUsers(): Map<String, WareraUser?> = users.mapValues { it.value.user }
+
     /** Loads the WarEra data of every linked user again, without syncing; [syncAll] uses it afterwards. */
     fun refreshUsers() {
         val links = accountLinks.findAll()
         users.keys.retainAll(links.mapTo(HashSet()) { it.wareraUserId })
         links.forEachIndexed { index, link -> loadUser(link.wareraUserId, pauseBefore = index > 0) }
+        loadedAll = true
         log.info("WarEra data of {} linked users refreshed", links.size)
     }
 
@@ -127,6 +143,7 @@ class RoleSyncService(
             }
             evaluator.evaluate(user)?.let { members[link.discordUserId] = it }
         }
+        if (discordUserIds == null) loadedAll = true
         if (unavailable.isNotEmpty()) systemLog.recordProblem(SystemProblem.WareraUsersUnavailable(unavailable))
         val linkedIds = links.mapTo(HashSet()) { it.discordUserId }
         // The nickname was set from the data loaded last, which may be newer than the name at the time of linking.

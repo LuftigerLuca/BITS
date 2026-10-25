@@ -17,8 +17,9 @@ coordinates several instances.
 Running more than one instance breaks things, not just wastes them:
 
 - **Two backends** would both run the hourly sync and the cleanup jobs, and each would throttle itself to the WarEra
-  limit, so together they would exceed it. The queue of role syncs (`RoleSyncTrigger`) and the member list of the guild
-  (`GuildMemberService`) live in memory and do not span processes.
+  limit, so together they would exceed it. The queue of role syncs (`RoleSyncTrigger`), the WarEra data of the last sync
+  (`RoleSyncService`) and the member list of the guild with its roles (`GuildMemberService`) live in memory and do not
+  span processes.
 - **Two bots** would read the stream under the same consumer name, so each event goes to whichever asks first,
   each takes the other's pending events for its own, and both report roles.
 - **A second guild** needs its own environment; links, rules and roles are not separated by guild.
