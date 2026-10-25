@@ -33,6 +33,24 @@ describe('home page', () => {
     ])
   })
 
+  it('marks each tile with a decorative icon, also when a figure is missing', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+    })
+
+    renderApp('/')
+
+    const section = await screen.findByRole('region', { name: 'Kennzahlen' })
+    const icons = [...section.querySelectorAll('[data-slot=card] svg')]
+    expect(icons.map((icon) => icon.getAttribute('class'))).toEqual([
+      expect.stringContaining('lucide-users'),
+      expect.stringContaining('lucide-badge-check'),
+      expect.stringContaining('lucide-flag'),
+    ])
+    expect(icons.map((icon) => icon.getAttribute('aria-hidden'))).toEqual(['true', 'true', 'true'])
+  })
+
   it('shows members no figures and does not ask for them', async () => {
     const fetch = stubFetch({ 'GET /web/me': () => json({ ...admin, role: 'USER' }) })
 

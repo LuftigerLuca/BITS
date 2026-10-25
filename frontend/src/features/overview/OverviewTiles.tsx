@@ -1,7 +1,8 @@
+import { BadgeCheckIcon, FlagIcon, type LucideIcon, UsersIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import type { CountryOverview } from '@/lib/api'
 import { ERROR_MESSAGE, formatCount } from './labels'
 import { useOverview } from './queries'
@@ -17,9 +18,10 @@ export function OverviewTiles() {
   // Until the bot reports the members, 0 would be wrong.
   const unknown = 'Der Bot hat die Mitglieder noch nicht gemeldet.'
   return (
-    <section aria-label="Kennzahlen" className="grid gap-4 sm:grid-cols-3">
-      <Tile title="Discord-Mitglieder" value={members} note={members === null ? unknown : 'ohne Bots'} />
+    <section aria-label="Kennzahlen" className="grid gap-4 lg:grid-cols-3">
+      <Tile icon={UsersIcon} title="Discord-Mitglieder" value={members} note={members === null ? unknown : 'ohne Bots'} />
       <Tile
+        icon={BadgeCheckIcon}
         title="davon verifiziert"
         value={verifiedMembers}
         note={
@@ -38,7 +40,7 @@ export function OverviewTiles() {
 function CitizensTile({ country }: { country: CountryOverview | null }) {
   if (!country) {
     return (
-      <Tile title="Bürger" value={null} placeholder="kein Land">
+      <Tile icon={FlagIcon} title="Bürger" value={null} placeholder="kein Land">
         Noch kein Land eingestellt.{' '}
         <Link to="/admin" className="underline underline-offset-4">
           In der Verwaltung einstellen
@@ -49,6 +51,7 @@ function CitizensTile({ country }: { country: CountryOverview | null }) {
   if (!country.available || country.citizens === null) {
     return (
       <Tile
+        icon={FlagIcon}
         title={`Bürger von ${country.name}`}
         value={null}
         placeholder="nicht verfügbar"
@@ -58,6 +61,7 @@ function CitizensTile({ country }: { country: CountryOverview | null }) {
   }
   return (
     <Tile
+      icon={FlagIcon}
       title={`Bürger von ${country.name}`}
       value={country.citizens}
       note={country.activeCitizens === null ? undefined : `davon aktiv: ${formatCount(country.activeCitizens)}`}
@@ -66,12 +70,14 @@ function CitizensTile({ country }: { country: CountryOverview | null }) {
 }
 
 function Tile({
+  icon: Icon,
   title,
   value,
   placeholder = 'unbekannt',
   note,
   children,
 }: {
+  icon: LucideIcon
   title: string
   value: number | null
   placeholder?: string
@@ -79,14 +85,19 @@ function Tile({
   children?: ReactNode
 }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardDescription>{title}</CardDescription>
-        <CardTitle className={value === null ? 'text-xl text-muted-foreground' : 'text-3xl tabular-nums'}>
-          {value === null ? placeholder : formatCount(value)}
-        </CardTitle>
-      </CardHeader>
-      {(note || children) && <CardContent className="text-sm text-muted-foreground">{note ?? children}</CardContent>}
+    <Card>
+      <CardContent className="flex items-start gap-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <Icon aria-hidden="true" className="size-5" />
+        </div>
+        <div className="grid min-w-0 gap-1">
+          <CardDescription>{title}</CardDescription>
+          <CardTitle className={value === null ? 'text-2xl text-muted-foreground' : 'text-4xl tabular-nums'}>
+            {value === null ? placeholder : formatCount(value)}
+          </CardTitle>
+          {(note || children) && <p className="text-sm text-muted-foreground">{note ?? children}</p>}
+        </div>
+      </CardContent>
     </Card>
   )
 }
