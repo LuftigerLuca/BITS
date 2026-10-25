@@ -19,6 +19,7 @@ import kotlin.test.Test
 class VoteEventsTest {
     private val backend = mockk<VoteBackend>(relaxUnitFun = true)
     private val jda = mockk<JDA>(relaxed = true)
+    private val result = VoteResultDto("Steuern?", parties = emptyList(), nonVoters = emptyList(), image = "", posted = false)
     private val vote = VoteDto(7, "Steuern?", "r-congress", "c-votes", endsAt = null, VoteState.OPEN, messageId = null)
 
     @Test
@@ -35,7 +36,7 @@ class VoteEventsTest {
     @Test
     fun `a result that is posted already is not posted again`() =
         runTest {
-            coEvery { backend.voteResult(7) } returns VoteResultDto("Ergebnis", image = "", posted = true)
+            coEvery { backend.voteResult(7) } returns result.copy(posted = true)
 
             VoteEvents(jda, "100", backend).onEvaluated(VoteEvaluatedEvent(7, occurredAt = 0))
 
@@ -46,7 +47,7 @@ class VoteEventsTest {
     @Test
     fun `a result whose channel is gone is given up, since asking again would not help`() =
         runTest {
-            coEvery { backend.voteResult(7) } returns VoteResultDto("Ergebnis", image = "", posted = false)
+            coEvery { backend.voteResult(7) } returns result
             coEvery { backend.vote(7) } returns vote.copy(state = VoteState.EVALUATED)
             val guild = mockk<Guild> { every { getGuildChannelById("c-votes") } returns null }
             every { jda.getGuildById("100") } returns guild

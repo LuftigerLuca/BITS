@@ -58,7 +58,7 @@ class VoteWebController(
                     it.toResponse(
                         resultText =
                             results[it.id]?.let { result ->
-                                VoteResultRenderer.text(result, markdown = false)
+                                VoteResultRenderer.text(result)
                             },
                     )
                 },

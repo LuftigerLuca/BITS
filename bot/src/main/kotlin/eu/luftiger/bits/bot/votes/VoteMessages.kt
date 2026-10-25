@@ -7,7 +7,6 @@ import eu.luftiger.bits.shared.VoteState
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.components.actionrow.ActionRow
 import net.dv8tion.jda.api.components.buttons.Button
-import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.utils.MarkdownSanitizer
 import java.time.Duration
@@ -16,10 +15,8 @@ import java.time.Duration
 object VoteMessages {
     private const val BUTTON_PREFIX = "vote"
 
-    /** Discord's limit for a message, also for each part of a long result. */
-    const val MAX_LENGTH = Message.MAX_CONTENT_LENGTH
-
-    private const val OPEN_COLOR = 0x5865F2
+    /** Also the colour of the result. */
+    const val OPEN_COLOR = 0x5865F2
     private const val CLOSED_COLOR = 0x80848E
 
     /** The vote with its participation, and while it is open a footer for the voters. */
@@ -115,23 +112,6 @@ object VoteMessages {
     const val OPEN_END = "offen"
     const val DEFAULT_DURATION = "48h"
     val MAX_DURATION: Duration = Duration.ofDays(90)
-
-    /** Splits [text] at line breaks into messages Discord takes; a single line too long is cut. */
-    fun split(text: String): List<String> {
-        val parts = mutableListOf<String>()
-        var part = StringBuilder()
-        text.lines().forEach { raw ->
-            val line = raw.take(MAX_LENGTH)
-            if (part.isNotEmpty() && part.length + 1 + line.length > MAX_LENGTH) {
-                parts += part.toString()
-                part = StringBuilder()
-            }
-            if (part.isNotEmpty()) part.append('\n')
-            part.append(line)
-        }
-        if (part.isNotBlank()) parts += part.toString()
-        return parts
-    }
 }
 
 data class VoteButton(
