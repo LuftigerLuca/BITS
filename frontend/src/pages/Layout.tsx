@@ -89,7 +89,7 @@ export function Layout() {
           <SidebarTrigger />
           <span className="font-heading font-semibold">BITS</span>
         </header>
-        <div className="mx-auto w-full max-w-4xl p-4">
+        <div className="w-full p-4">
           <Outlet />
         </div>
       </SidebarInset>
