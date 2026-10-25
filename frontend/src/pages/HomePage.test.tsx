@@ -65,8 +65,6 @@ describe('home page', () => {
     stubFetch({
       'GET /web/me': () => json(admin),
       'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
-      'GET /web/admin/role-sync/roles': () => json([]),
-      'GET /web/admin/role-sync/rules': () => json([]),
       'GET /web/admin/role-sync/countries': () => json([]),
     })
 

@@ -71,8 +71,8 @@ describe('audit log page', () => {
   it('is linked from the sidebar', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
-      'GET /web/admin/role-sync/roles': () => json([]),
-      'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/role-sync/countries': () => json([]),
       'GET /web/admin/audit-log': () => json({ entries: [], nextBefore: null }),
       'GET /web/admin/audit-log/actors': () => json([]),
     })

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { ActivityIcon, ChevronsUpDownIcon, HistoryIcon, HouseIcon, LogOutIcon, SettingsIcon } from 'lucide-react'
+import { ActivityIcon, ChevronsUpDownIcon, HistoryIcon, HouseIcon, LogOutIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -63,9 +63,12 @@ export function Layout() {
                   <SidebarGroupLabel>Admin</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {/* Only the page itself, so the log pages below do not mark it as well. */}
+                      {/* Only the page itself, so the pages below do not mark it as well. */}
                       <NavItem to="/admin" end icon={<SettingsIcon />}>
                         Verwaltung
+                      </NavItem>
+                      <NavItem to="/admin/roles" icon={<ShieldIcon />}>
+                        Rollen
                       </NavItem>
                       <NavItem to="/admin/audit-log" icon={<HistoryIcon />}>
                         Audit-Log

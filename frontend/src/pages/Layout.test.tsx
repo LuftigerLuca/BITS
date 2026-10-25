@@ -22,8 +22,8 @@ describe('layout', () => {
   it('marks the page that is open in the sidebar', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
-      'GET /web/admin/role-sync/roles': () => json([]),
-      'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/role-sync/countries': () => json([]),
     })
 
     renderApp('/admin')
@@ -31,6 +31,22 @@ describe('layout', () => {
     const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
     expect(within(navigation).getByRole('link', { name: 'Verwaltung' })).toHaveAttribute('aria-current', 'page')
     expect(within(navigation).getByRole('link', { name: 'Start' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks only the roles page when it is open, not the admin area above it', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/role-sync/roles': () => json([]),
+      'GET /web/admin/role-sync/rules': () => json([]),
+    })
+
+    renderApp('/admin/roles')
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    const current = within(navigation)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-current') === 'page')
+    expect(current.map((link) => link.textContent)).toEqual(['Rollen'])
   })
 
   it('marks only the log page that is open, not the admin area above it', async () => {
@@ -49,7 +65,7 @@ describe('layout', () => {
     expect(current.map((link) => link.textContent)).toEqual(['Audit-Log'])
   })
 
-  it('shows admins the admin group with the admin area and both logs', async () => {
+  it('shows admins the admin group with the admin area, the roles and both logs', async () => {
     stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json({}) })
 
     renderApp('/')
@@ -59,6 +75,7 @@ describe('layout', () => {
     expect(within(navigation).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Start', '/'],
       ['Verwaltung', '/admin'],
+      ['Rollen', '/admin/roles'],
       ['Audit-Log', '/admin/audit-log'],
       ['System-Log', '/admin/system-log'],
     ])
@@ -111,8 +128,8 @@ describe('layout', () => {
     window.innerWidth = 500
     stubFetch({
       'GET /web/me': () => json(admin),
-      'GET /web/admin/role-sync/roles': () => json([]),
-      'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/role-sync/countries': () => json([]),
     })
     const router = renderApp('/')
 
