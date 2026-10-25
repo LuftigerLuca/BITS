@@ -1,5 +1,5 @@
 import { Navigate, type RouteObject } from 'react-router'
-import { RequireAdmin, RequireAuth } from './auth/guards.tsx'
+import { RequireAdmin, RequireAuth, RequireDiscordUser } from './auth/guards.tsx'
 import { RequireVoteAccess } from './features/votes/RequireVoteAccess.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { Layout } from './pages/Layout.tsx'
@@ -21,6 +21,15 @@ export const routes: RouteObject[] = [
               {
                 path: 'votes',
                 lazy: async () => ({ Component: (await import('./pages/VotesPage.tsx')).VotesPage }),
+              },
+            ],
+          },
+          {
+            element: <RequireDiscordUser />,
+            children: [
+              {
+                path: 'account',
+                lazy: async () => ({ Component: (await import('./pages/AccountPage.tsx')).AccountPage }),
               },
             ],
           },

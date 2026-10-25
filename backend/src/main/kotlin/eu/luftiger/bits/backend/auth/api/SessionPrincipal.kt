@@ -15,13 +15,22 @@ data class SessionPrincipal(
     val admin: Boolean = false,
     /** The member's roles in the guild at login; empty for the admin account. */
     val discordRoleIds: List<String> = emptyList(),
+    /** `null` for the admin account from the environment, which has no Discord account. */
+    val discordUserId: String? = null,
 ) {
     // The companion is a class of its own, which has to be exposed as well.
     @NamedInterface("api")
     companion object {
         fun of(session: Jwt): SessionPrincipal =
             SessionTokens.user(session).let {
-                SessionPrincipal(it.subject, it.name, it.avatarUrl, admin = it.role == Role.ADMIN, discordRoleIds = it.discordRoleIds)
+                SessionPrincipal(
+                    it.subject,
+                    it.name,
+                    it.avatarUrl,
+                    admin = it.role == Role.ADMIN,
+                    discordRoleIds = it.discordRoleIds,
+                    discordUserId = it.discordUserId,
+                )
             }
     }
 }

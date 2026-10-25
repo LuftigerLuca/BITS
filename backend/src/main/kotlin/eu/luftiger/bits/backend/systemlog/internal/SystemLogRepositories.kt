@@ -80,6 +80,30 @@ interface SystemLogEntryRepository : JpaRepository<SystemLogEntry, Long> {
     )
     fun findLatestNames(discordUserIds: Collection<String>): List<NameRow>
 
+    /** Entries that name [discordUserId] as the member or as the previous account of a relink, oldest first. */
+    @Query(
+        """
+        SELECT e FROM SystemLogEntry e
+        WHERE e.discordUserId = :discordUserId OR e.previousDiscordUserId = :discordUserId
+        ORDER BY e.id
+        """,
+    )
+    fun findAboutMember(discordUserId: String): List<SystemLogEntry>
+
+    /** The newest sync of all members the bot reported as applied; syncs of single members are left out. */
+    @Query(
+        """
+        SELECT MAX(e.reportedAt) FROM SystemLogEntry e
+        WHERE e.kind = eu.luftiger.bits.backend.systemlog.domain.EntryKind.SYNC_RUN
+          AND e.syncStatus = eu.luftiger.bits.backend.systemlog.domain.SyncStatus.APPLIED
+          AND e.syncTrigger IN (
+            eu.luftiger.bits.backend.systemlog.api.SyncTrigger.HOURLY,
+            eu.luftiger.bits.backend.systemlog.api.SyncTrigger.RULE_CHANGE
+          )
+        """,
+    )
+    fun findLastAppliedSyncOfAll(): Instant?
+
     @Modifying
     @Query("DELETE FROM system_log_entry WHERE occurred_at < :before", nativeQuery = true)
     fun deleteOccurredBefore(before: Instant): Int
@@ -108,6 +132,8 @@ interface SystemLogItemRepository : JpaRepository<SystemLogItem, Long> {
         member: String?,
         roleId: String?,
     ): List<SystemLogItem>
+
+    fun findByDiscordUserIdOrderById(discordUserId: String): List<SystemLogItem>
 
     /** Which of [entryIds] have items, i.e. can be expanded in the dashboard. */
     @Query("SELECT DISTINCT i.entryId FROM SystemLogItem i WHERE i.entryId IN :entryIds")

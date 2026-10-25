@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 
 interface PingLogRepository : JpaRepository<PingLog, Long> {
+    fun findByDiscordUserIdOrderById(discordUserId: String): List<PingLog>
+
     @Modifying
     @Query("DELETE FROM PingLog p WHERE p.createdAt < :before")
     fun deleteCreatedBefore(before: Instant): Int

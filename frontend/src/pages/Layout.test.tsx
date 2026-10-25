@@ -6,7 +6,7 @@ import type { Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null }
+const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
 afterEach(() => {
   localStorage.clear()
@@ -74,6 +74,7 @@ describe('layout', () => {
     expect(within(navigation).getByText('Admin')).toBeInTheDocument()
     expect(within(navigation).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Start', '/'],
+      ['Mein Account', '/account'],
       ['Verwaltung', '/admin'],
       ['Rollen', '/admin/roles'],
       ['Audit-Log', '/admin/audit-log'],
@@ -88,7 +89,16 @@ describe('layout', () => {
 
     const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
     expect(within(navigation).queryByText('Admin')).not.toBeInTheDocument()
-    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Start'])
+    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Start', 'Mein Account'])
+  })
+
+  it('shows the admin account without Discord no page of its own account', async () => {
+    stubFetch({ 'GET /web/me': () => json({ ...admin, discordUser: false }), 'GET /web/admin/overview': () => json({}) })
+
+    renderApp('/')
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    expect(within(navigation).queryByRole('link', { name: 'Mein Account' })).not.toBeInTheDocument()
   })
 
   it('applies and keeps the theme picked in the user menu', async () => {

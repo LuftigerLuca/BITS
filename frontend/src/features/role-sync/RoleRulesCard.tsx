@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Trash2Icon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
+import { RoleName } from '@/components/RoleName'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -19,7 +20,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { RoleRule } from '@/lib/api'
 import { NewRuleForm } from './NewRuleForm'
 import { STATUS, errorMessage } from './labels'
-import { RoleName } from './RoleName'
 import { RulePreview } from './RulePreview'
 import { useDeleteRoleRule, useDeletionPreview, useRoleRules, useRoles } from './queries'
 

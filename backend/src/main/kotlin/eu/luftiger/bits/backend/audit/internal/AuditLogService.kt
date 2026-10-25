@@ -2,7 +2,9 @@ package eu.luftiger.bits.backend.audit.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditAction
 import eu.luftiger.bits.backend.audit.api.AuditActor
+import eu.luftiger.bits.backend.audit.api.AuditEntries
 import eu.luftiger.bits.backend.audit.api.AuditLog
+import eu.luftiger.bits.backend.audit.api.dto.AuditRecord
 import eu.luftiger.bits.backend.audit.domain.AuditEntry
 import org.springframework.data.domain.Limit
 import org.springframework.stereotype.Service
@@ -14,7 +16,8 @@ import java.time.Clock
 class AuditLogService(
     private val repository: AuditEntryRepository,
     private val clock: Clock,
-) : AuditLog {
+) : AuditLog,
+    AuditEntries {
     @Transactional(propagation = Propagation.MANDATORY)
     override fun record(
         actor: AuditActor,
@@ -23,6 +26,11 @@ class AuditLogService(
     ) {
         repository.save(AuditEntry(clock.instant(), actor.subject, actor.name, actor.avatarUrl, action, description))
     }
+
+    override fun byActor(actorSubject: String): List<AuditRecord> =
+        repository.findByActorSubjectOrderById(actorSubject).map {
+            AuditRecord(it.occurredAt, it.actorName, it.actorAvatarUrl, it.action, it.description)
+        }
 
     fun page(
         actor: String?,

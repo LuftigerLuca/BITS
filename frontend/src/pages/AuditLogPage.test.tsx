@@ -6,7 +6,7 @@ import type { AuditActor, AuditEntry, Me } from '@/lib/api'
 import { json, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null }
+const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 const luca: AuditActor = { subject: 'discord:42', name: 'Luca', avatarUrl: null, kind: 'DISCORD' }
 const envAdmin: AuditActor = { subject: 'admin:admin', name: 'admin', avatarUrl: null, kind: 'ADMIN_ACCOUNT' }
 

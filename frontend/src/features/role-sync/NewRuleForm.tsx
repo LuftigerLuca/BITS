@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ErrorState } from '@/components/QueryState'
+import { RoleName } from '@/components/RoleName'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -25,7 +26,6 @@ import {
   type Option,
 } from '@/lib/api'
 import { CONDITION_TYPES, OFFICES, errorMessage } from './labels'
-import { RoleName } from './RoleName'
 import { RulePreview } from './RulePreview'
 import { useCreatePreview, useCreateRoleRule } from './queries'
 
