@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Me, Vote, VoteOptions } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectToast } from '@/test/toast'
 
 const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: 'luca', discordUser: true }
 
@@ -93,7 +94,8 @@ describe('votes page', () => {
     await userEvent.click(screen.getByLabelText('Ohne Enddatum, bis jemand sie beendet'))
     await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
 
-    expect(await screen.findByText('Die Abstimmung ist gestartet und erscheint gleich im Kanal.')).toBeInTheDocument()
+    const toast = await expectToast('success', 'Abstimmung gestartet')
+    expect(toast).toHaveTextContent('Sie erscheint gleich im Kanal.')
     expect(created).toEqual([{ question: 'Krieg erklären?', roleId: 'r-congress', channelId: 'c-votes', endsAt: null }])
   })
 
@@ -108,6 +110,25 @@ describe('votes page', () => {
 
     await expect.poll(() => fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true)
     expect(fetch).toHaveBeenCalledWith('/web/votes/1/end', expect.objectContaining({ method: 'POST' }))
+    await expectToast('success', 'Abstimmung beendet')
+  })
+
+  it('says in a toast when the bot cannot post in the channel', async () => {
+    stubVotes(member, undefined, { 'POST /web/votes': () => status(409) })
+    renderApp('/votes')
+
+    await userEvent.type(await screen.findByLabelText('Frage'), 'Krieg erklären?')
+    await choose('Stimmberechtigte Rolle', 'Kongress')
+    await choose('Kanal', '#abstimmungen (Politik)')
+    await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
+
+    await expectToast(
+      'error',
+      'Der Bot kann in diesem Kanal nicht posten. Prüfe seine Rechte dort und versuche es in ein paar Sekunden noch einmal.',
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    // Kept, so it can be sent again.
+    expect(screen.getByLabelText('Frage')).toHaveValue('Krieg erklären?')
   })
 
   it('leaves the choice of who may manage votes to the admin page, also for admins', async () => {

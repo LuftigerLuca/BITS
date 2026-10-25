@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { PartyColors } from '@/lib/api'
@@ -80,11 +79,6 @@ function PartyColorsForm({ saved }: { saved: PartyColors }) {
         submit()
       }}
     >
-      {setPartyColors.isError && (
-        <Alert variant="destructive">
-          <AlertDescription>{partyColorsErrorMessage(setPartyColors.error)}</AlertDescription>
-        </Alert>
-      )}
       <p className="text-sm">Parteien in {saved.countryName}</p>
       {saved.parties.length === 0 && (
         <p className="text-sm text-muted-foreground">WarEra kennt in diesem Land keine Parteien.</p>

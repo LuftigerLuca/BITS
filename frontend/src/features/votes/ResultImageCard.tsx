@@ -1,9 +1,9 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useRef, type ChangeEvent } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MAX_BACKGROUND_BYTES, resultPreviewUrl } from '@/lib/api'
+import { notify } from '@/lib/notify'
 import { BACKGROUND_TOO_LARGE, backgroundErrorMessage } from './labels'
 import { useResultSettings, useSetResultBackground } from './queries'
 
@@ -14,24 +14,16 @@ export function ResultImageCard() {
   const settings = useResultSettings()
   const setBackground = useSetResultBackground()
   const input = useRef<HTMLInputElement>(null)
-  // Checked before uploading, so a large file is not sent for nothing.
-  const [rejected, setRejected] = useState<string | null>(null)
-
   function choose(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    if (file.size > MAX_BACKGROUND_BYTES) {
-      setRejected(BACKGROUND_TOO_LARGE)
-    } else if (!TYPES.includes(file.type)) {
-      setRejected('Nur PNG- und JPEG-Bilder sind möglich.')
-    } else {
-      setRejected(null)
-      setBackground.mutate(file)
-    }
+    // Checked before uploading, so a large file is not sent for nothing.
+    if (file.size > MAX_BACKGROUND_BYTES) notify.error(BACKGROUND_TOO_LARGE)
+    else if (!TYPES.includes(file.type)) notify.error('Nur PNG- und JPEG-Bilder sind möglich.')
+    else setBackground.mutate(file)
   }
 
-  const error = rejected ?? (setBackground.isError ? backgroundErrorMessage(setBackground.error) : null)
   return (
     <Card>
       <CardHeader>
@@ -48,11 +40,6 @@ export function ResultImageCard() {
           <ErrorState message={backgroundErrorMessage(settings.error)} onRetry={() => settings.refetch()} />
         ) : (
           <>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
             <p className="text-sm">
               Hintergrund: {settings.data.customBackground ? 'eigenes Bild' : 'BITS-Adler'}
             </p>
@@ -72,10 +59,7 @@ export function ResultImageCard() {
                 type="button"
                 variant="outline"
                 disabled={setBackground.isPending || !settings.data.customBackground}
-                onClick={() => {
-                  setRejected(null)
-                  setBackground.mutate(null)
-                }}
+                onClick={() => setBackground.mutate(null)}
               >
                 Auf Adler zurücksetzen
               </Button>

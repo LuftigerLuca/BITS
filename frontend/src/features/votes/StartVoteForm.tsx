@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,9 +12,6 @@ import { useCreateVote, useVoteOptions } from './queries'
 /** Like the backend's limit. */
 const MAX_QUESTION_LENGTH = 500
 
-const CHANNEL_CONFLICT =
-  'Der Bot kann in diesem Kanal nicht posten. Prüfe seine Rechte dort und versuche es in ein paar Sekunden noch einmal.'
-
 /** Starts a vote; the bot posts it in the channel and pings the role. */
 export function StartVoteForm() {
   const options = useVoteOptions()
@@ -25,8 +21,6 @@ export function StartVoteForm() {
   const [channelId, setChannelId] = useState<string | null>(null)
   const [openEnd, setOpenEnd] = useState(false)
   const [endsAt, setEndsAt] = useState(() => toLocalInput(Date.now() + DEFAULT_DURATION_MILLIS))
-  const [error, setError] = useState<string | null>(null)
-  const [started, setStarted] = useState(false)
 
   const end = openEnd ? null : new Date(endsAt).getTime()
   // An end in the past is left to the backend, which knows the time of the request.
@@ -35,17 +29,9 @@ export function StartVoteForm() {
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!valid) return
-    setError(null)
-    setStarted(false)
     createVote.mutate(
       { question: question.trim(), roleId, channelId, endsAt: end },
-      {
-        onSuccess: () => {
-          setQuestion('')
-          setStarted(true)
-        },
-        onError: (e) => setError(errorMessage(e, CHANNEL_CONFLICT)),
-      },
+      { onSuccess: () => setQuestion('') },
     )
   }
 
@@ -72,16 +58,6 @@ export function StartVoteForm() {
           <ErrorState message={errorMessage(options.error)} onRetry={() => options.refetch()} />
         ) : (
           <form className="flex flex-col gap-4" onSubmit={submit}>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {started && (
-              <Alert>
-                <AlertDescription>Die Abstimmung ist gestartet und erscheint gleich im Kanal.</AlertDescription>
-              </Alert>
-            )}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="vote-question">Frage</Label>
               <Input

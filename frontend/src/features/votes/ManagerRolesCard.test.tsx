@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Me, VoteOptions } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectToast } from '@/test/toast'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -39,5 +40,7 @@ describe('roles that may manage votes', () => {
     await userEvent.click(within(card).getByRole('button', { name: 'Speichern' }))
 
     await expect.poll(() => saved).toEqual([{ roleIds: ['r-congress', 'r-citizen'] }])
+    // Shown although the form starts over with the saved roles.
+    await expectToast('success', 'Rollen gespeichert')
   })
 })

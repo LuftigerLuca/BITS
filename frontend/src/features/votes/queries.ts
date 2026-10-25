@@ -14,8 +14,13 @@ import {
   uploadResultBackground,
   type CreateVote,
 } from '@/lib/api'
+import { notify } from '@/lib/notify'
+import { backgroundErrorMessage, errorMessage, partyColorsErrorMessage } from './labels'
 
 const VOTES = ['votes'] as const
+
+const CHANNEL_CONFLICT =
+  'Der Bot kann in diesem Kanal nicht posten. Prüfe seine Rechte dort und versuche es in ein paar Sekunden noch einmal.'
 
 /** Settings of the result image; the country under "Verwaltung" invalidates them too. */
 export const RESULT_IMAGE = [...VOTES, 'result-image'] as const
@@ -42,7 +47,11 @@ export function useCreateVote() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (vote: CreateVote) => createVote(vote),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: VOTES }),
+    onSuccess: () => {
+      notify.success('Abstimmung gestartet', 'Sie erscheint gleich im Kanal.')
+      return queryClient.invalidateQueries({ queryKey: VOTES })
+    },
+    onError: (error) => notify.error(errorMessage(error, CHANNEL_CONFLICT)),
   })
 }
 
@@ -50,7 +59,12 @@ export function useCloseVote() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, cancel }: { id: number; cancel: boolean }) => closeVote(id, cancel),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: VOTES }),
+    onSuccess: (_, { cancel }) => {
+      if (cancel) notify.success('Abstimmung abgebrochen')
+      else notify.success('Abstimmung beendet', 'Die Auswertung erscheint gleich im Kanal.')
+      return queryClient.invalidateQueries({ queryKey: VOTES })
+    },
+    onError: (error) => notify.error(errorMessage(error)),
   })
 }
 
@@ -58,7 +72,11 @@ export function useSetVoteManagerRoles() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (roleIds: string[]) => setVoteManagerRoles(roleIds),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: VOTES }),
+    onSuccess: () => {
+      notify.success('Rollen gespeichert')
+      return queryClient.invalidateQueries({ queryKey: VOTES })
+    },
+    onError: (error) => notify.error(errorMessage(error)),
   })
 }
 
@@ -75,7 +93,11 @@ export function useSetResultBackground() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (file: File | null) => (file ? uploadResultBackground(file) : resetResultBackground()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: RESULT_IMAGE }),
+    onSuccess: (_, file) => {
+      notify.success(file ? 'Hintergrund gespeichert' : 'Auf Adler zurückgesetzt')
+      return queryClient.invalidateQueries({ queryKey: RESULT_IMAGE })
+    },
+    onError: (error) => notify.error(backgroundErrorMessage(error)),
   })
 }
 
@@ -84,6 +106,10 @@ export function useSetPartyColors() {
   return useMutation({
     mutationFn: ({ colors, noPartyColor }: { colors: Record<string, string>; noPartyColor: string | null }) =>
       setPartyColors(colors, noPartyColor),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: RESULT_IMAGE }),
+    onSuccess: () => {
+      notify.success('Parteifarben gespeichert')
+      return queryClient.invalidateQueries({ queryKey: RESULT_IMAGE })
+    },
+    onError: (error) => notify.error(partyColorsErrorMessage(error)),
   })
 }

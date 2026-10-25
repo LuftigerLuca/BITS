@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Trash2Icon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,11 +39,6 @@ export function RoleRulesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        {deleteRule.isError && (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(deleteRule.error)}</AlertDescription>
-          </Alert>
-        )}
         {rules.isPending ? (
           <LoadingState label="Regeln werden geladen …" />
         ) : rules.isError ? (

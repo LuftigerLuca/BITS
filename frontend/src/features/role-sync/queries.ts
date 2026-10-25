@@ -8,6 +8,8 @@ import {
   previewDeleteRoleRule,
   type CreateRoleRule,
 } from '@/lib/api'
+import { notify } from '@/lib/notify'
+import { errorMessage } from './labels'
 
 /** Everything below changes together: a new or deleted rule changes which roles are managed. */
 const ROLE_SYNC = ['role-sync'] as const
@@ -24,7 +26,11 @@ export function useCreateRoleRule() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (rule: CreateRoleRule) => createRoleRule(rule),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ROLE_SYNC }),
+    onSuccess: () => {
+      notify.success('Regel angelegt')
+      return queryClient.invalidateQueries({ queryKey: ROLE_SYNC })
+    },
+    onError: (error) => notify.error(errorMessage(error)),
   })
 }
 
@@ -32,7 +38,11 @@ export function useDeleteRoleRule() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => deleteRoleRule(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ROLE_SYNC }),
+    onSuccess: () => {
+      notify.success('Regel gelöscht')
+      return queryClient.invalidateQueries({ queryKey: ROLE_SYNC })
+    },
+    onError: (error) => notify.error(errorMessage(error)),
   })
 }
 

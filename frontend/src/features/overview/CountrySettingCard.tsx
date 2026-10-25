@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { ErrorState } from '@/components/QueryState'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -36,11 +35,6 @@ export function CountrySettingCard() {
           {overview.isError && <ErrorState message={ERROR_MESSAGE} onRetry={() => overview.refetch()} />}
           {countries.isError && (
             <ErrorState message={countryErrorMessage(countries.error)} onRetry={() => countries.refetch()} />
-          )}
-          {setCountry.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>{countryErrorMessage(setCountry.error)}</AlertDescription>
-            </Alert>
           )}
           <div className="flex flex-col gap-1.5 sm:max-w-sm">
             <Label htmlFor="overview-country">Land der Startseite</Label>
