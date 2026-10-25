@@ -20,7 +20,7 @@ class VoteEventsTest {
     private val backend = mockk<VoteBackend>(relaxUnitFun = true)
     private val jda = mockk<JDA>(relaxed = true)
     private val result = VoteResultDto("Steuern?", parties = emptyList(), nonVoters = emptyList(), image = "", posted = false)
-    private val vote = VoteDto(7, "Steuern?", "r-congress", "c-votes", endsAt = null, VoteState.OPEN, messageId = null)
+    private val vote = VoteDto(7, "Steuern?", "r-congress", "c-votes", endsAt = null, state = VoteState.OPEN, messageId = null)
 
     @Test
     fun `a vote that is posted already is not posted again`() =

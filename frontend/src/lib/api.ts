@@ -400,6 +400,10 @@ export interface Vote {
   startedBy: string
   /** `null` for a vote without end. */
   endsAt: number | null
+  /** At which the vote ends early, `null` if it does not. */
+  threshold: VoteThreshold | null
+  /** Whether it ended because it reached `threshold`. */
+  endedByThreshold: boolean
   closedAt: number | null
   /** `null` if it ended on its own. */
   closedBy: string | null
@@ -410,6 +414,15 @@ export interface Vote {
   eligible: number | null
   /** Only for evaluated votes; the image is at `voteResultImageUrl(id)`. */
   resultText: string | null
+}
+
+/** Abstaining decides nothing, so a threshold is for Yes or No only. */
+export type ThresholdChoice = 'YES' | 'NO'
+
+/** The vote ends early once more than `percent` (1 to 99) of the eligible members chose `choice`. */
+export interface VoteThreshold {
+  percent: number
+  choice: ThresholdChoice
 }
 
 export interface Votes {
@@ -432,6 +445,8 @@ export interface CreateVote {
   channelId: string
   /** Epoch milliseconds, `null` for a vote without end. */
   endsAt: number | null
+  /** Ends the vote early, whichever comes first with `endsAt`; `null` if it does not. */
+  threshold: VoteThreshold | null
 }
 
 export async function getVoteAccess(): Promise<VoteAccess> {

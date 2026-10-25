@@ -35,6 +35,13 @@ class Vote(
     /** `null` for a vote that runs until somebody ends it. */
     @Column(name = "ends_at")
     val endsAt: Instant?,
+    /** The vote ends early once more than this share of the eligible members chose [thresholdChoice]; set once at the start. */
+    @Column(name = "threshold_percent")
+    val thresholdPercent: Int? = null,
+    /** [Choice.YES] or [Choice.NO]; set exactly when [thresholdPercent] is. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "threshold_choice")
+    val thresholdChoice: Choice? = null,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,6 +79,24 @@ class Vote(
 
     @Column(name = "result_posted_at")
     var resultPostedAt: Instant? = null
+
+    /**
+     * Whether [chosen] of [eligible] members, those who chose [thresholdChoice], are more than [thresholdPercent].
+     * Never without eligible members, so a role without linked members does not end the vote at once.
+     */
+    fun reachesThreshold(
+        chosen: Int,
+        eligible: Int,
+    ): Boolean {
+        val percent = thresholdPercent ?: return false
+        return eligible > 0 && chosen * 100 > percent * eligible
+    }
+
+    /** Ended on its own before its end date, which only the threshold does. */
+    fun endedByThreshold(): Boolean {
+        val closed = closedAt ?: return false
+        return thresholdPercent != null && closedByName == null && (endsAt == null || closed.isBefore(endsAt))
+    }
 }
 
 enum class VoteStatus {

@@ -42,7 +42,7 @@ class VoteButtons(
                         "Abstimmen dürfen nur Mitglieder mit der Rolle <@&${button.roleId}>."
                     } else {
                         castMessage(backend.castVote(button.voteId, member.id, button.choice), button.choice).also {
-                            updateLater(button.voteId, event.message)
+                            updateLater(button.voteId, button.roleId, event.message)
                         }
                     }
                 } catch (e: CancellationException) {
@@ -57,6 +57,7 @@ class VoteButtons(
 
     private fun updateLater(
         voteId: Long,
+        roleId: String,
         message: Message,
     ) {
         pendingUpdates.compute(voteId) { _, pending ->
@@ -65,8 +66,10 @@ class VoteButtons(
                 delay(UPDATE_DELAY_MILLIS)
                 pendingUpdates.remove(voteId, coroutineContext[Job])
                 try {
+                    // Reporting the participation can end the vote by its threshold, so the vote is loaded after it, or
+                    // the message would show the buttons again after the end.
+                    val participation = backend.participation(voteId, VoteEvents.roleMemberIds(message.guild, roleId))
                     val vote = backend.vote(voteId)
-                    val participation = backend.participation(voteId, VoteEvents.roleMemberIds(message.guild, vote.roleId))
                     message
                         .editMessageEmbeds(VoteMessages.embed(vote, participation))
                         .setComponents(VoteMessages.components(vote))

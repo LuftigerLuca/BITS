@@ -22,6 +22,9 @@ and either can be down at that moment.
 - **A vote that cannot be evaluated stays `COUNTING`** and is retried: the backend asks the bot again after 30
   minutes without an answer and retries WarEra every 5 minutes. The result is posted by the bot once it receives
   `VoteEvaluatedEvent`, which is also published again until the bot confirms it.
+- **A threshold can end a vote early**, once more than a set share of the eligible members chose Yes, or No. The
+  backend counts the ballots for it whenever the bot reports the participation, but shows only whether the vote
+  ended, never the count per option before the result.
 - **Who may manage votes** comes from the member's Discord roles: the bot sends them along with each command, the
   dashboard takes them from the session, which reads them at login with the scope `guilds.members.read`.
 
@@ -34,3 +37,6 @@ and either can be down at that moment.
 - The dashboard sees role changes only at the next login, so a member who lost a manager role can keep managing
   votes there for up to the session's lifetime (8 hours). Discord commands always use the current roles.
 - If the bot posts the result but cannot confirm it, it may post the result twice.
+- A vote that ends by its threshold tells everybody, before the result, that the option got past it. That is what the
+  threshold is for. Since the evaluation counts the members at the end, not at the check, the result can rarely lie
+  just below the threshold, for example when a voter lost the role in between.

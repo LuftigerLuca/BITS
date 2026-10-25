@@ -7,6 +7,8 @@ import eu.luftiger.bits.shared.CloseVoteResponse
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.VoteActor
+import eu.luftiger.bits.shared.VoteChoice
+import eu.luftiger.bits.shared.VoteThreshold
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -103,7 +105,20 @@ class VoteCommand(
                 VoteEnd.Open -> null
                 is VoteEnd.After -> clock.instant().plus(end.duration).toEpochMilli()
             }
-        val request = StartVoteRequest(actor(member), question, role.id, channel.id, endsAt)
+        val thresholdText = event.getOption(OPTION_THRESHOLD)?.asString
+        val thresholdChoiceText = event.getOption(OPTION_THRESHOLD_CHOICE)?.asString
+        // Discord keeps the options within their range and choices already; this is for an outdated command.
+        val percent = thresholdText?.toIntOrNull()
+        val choice = thresholdChoiceText?.let { text -> THRESHOLD_CHOICES.firstOrNull { it.name == text } }
+        if (thresholdText != null && (percent == null || percent !in 1..99)) {
+            return "Die Schwelle gibst du in Prozent von 1 bis 99 an, z. B. `50` für mehr als die Hälfte."
+        }
+        if (thresholdChoiceText != null && choice == null) return "Die Schwelle gilt für `Ja` oder `Nein`."
+        if (percent == null && choice != null) {
+            return "Gib zur Stimme auch die Schwelle an, z. B. `$OPTION_THRESHOLD:50`, oder lass beides weg."
+        }
+        val threshold = percent?.let { VoteThreshold(it, choice ?: VoteChoice.YES) }
+        val request = StartVoteRequest(actor(member), question, role.id, channel.id, endsAt, threshold)
         return when (backend.startVote(request)) {
             is StartVoteResponse.Started ->
                 "Die Abstimmung ist gestartet und erscheint gleich in ${channel.asMention}. Beenden oder abbrechen kannst du sie " +
@@ -142,11 +157,16 @@ class VoteCommand(
         private const val OPTION_ROLE = "rolle"
         private const val OPTION_CHANNEL = "kanal"
         private const val OPTION_END = "ende"
+        private const val OPTION_THRESHOLD = "schwelle"
+        private const val OPTION_THRESHOLD_CHOICE = "stimme"
         private const val OPTION_VOTE = "abstimmung"
         private const val AUTOCOMPLETE_TIMEOUT_MILLIS = 2_500L
 
         /** Like the backend's limit. */
         private const val MAX_QUESTION_LENGTH = 500
+
+        /** Abstaining decides nothing, so a threshold is for Yes or No only. */
+        private val THRESHOLD_CHOICES = listOf(VoteChoice.YES, VoteChoice.NO)
 
         internal const val FORBIDDEN_MESSAGE =
             "Abstimmungen verwalten dürfen nur Admins und Mitglieder der Rollen, die dafür im Dashboard freigegeben sind."
@@ -168,6 +188,19 @@ class VoteCommand(
                                 "Dauer wie 48h, 3d oder 90m, oder „${VoteMessages.OPEN_END}“ für kein Enddatum; Standard 48h",
                                 false,
                             ),
+                            OptionData(
+                                OptionType.INTEGER,
+                                OPTION_THRESHOLD,
+                                "Endet vorzeitig, sobald mehr als so viel Prozent aller Stimmberechtigten mit „stimme“ stimmen",
+                                false,
+                            ).setRequiredRange(1, 99),
+                            OptionData(
+                                OptionType.STRING,
+                                OPTION_THRESHOLD_CHOICE,
+                                "Für welche Stimme die Schwelle gilt; Standard Ja",
+                                false,
+                            ).addChoice(VoteMessages.label(VoteChoice.YES), VoteChoice.YES.name)
+                                .addChoice(VoteMessages.label(VoteChoice.NO), VoteChoice.NO.name),
                         ),
                     SubcommandData(END, "Beendet eine Abstimmung vorzeitig; die Auswertung folgt")
                         .addOptions(OptionData(OptionType.STRING, OPTION_VOTE, "Die laufende Abstimmung", true, true)),

@@ -46,6 +46,15 @@ data class StartVoteRequest(
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote that runs until somebody ends it. */
     val endsAt: Long?,
+    /** Ends the vote early, whichever comes first with [endsAt]; `null` if it does not. */
+    val threshold: VoteThreshold? = null,
+)
+
+/** The vote ends early once more than [percent] (1 to 99) of the eligible members chose [choice], Yes or No. */
+@Serializable
+data class VoteThreshold(
+    val percent: Int,
+    val choice: VoteChoice,
 )
 
 /** Outcome of starting a vote. Each subtype is identified by its `type` field. */
@@ -150,6 +159,10 @@ data class VoteDto(
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote without end. */
     val endsAt: Long?,
+    /** At which the vote ends early, `null` if it does not. */
+    val threshold: VoteThreshold? = null,
+    /** Whether it ended because it reached [threshold]. */
+    val endedByThreshold: Boolean = false,
     val state: VoteState,
     /** The bot's message with the buttons, `null` until it is posted. */
     val messageId: String?,

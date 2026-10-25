@@ -6,6 +6,8 @@ import eu.luftiger.bits.bot.commands.slashCommand
 import eu.luftiger.bits.shared.CloseVoteResponse
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
+import eu.luftiger.bits.shared.VoteChoice
+import eu.luftiger.bits.shared.VoteThreshold
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -51,6 +53,40 @@ class VoteCommandTest {
             assertEquals("r-congress" to "c-votes", request.captured.roleId to request.captured.channelId)
             assertEquals(Instant.parse("2026-01-04T12:00:00Z").toEpochMilli(), request.captured.endsAt)
             assertEquals(listOf("r-speaker"), request.captured.actor.roleIds)
+            assertEquals(null, request.captured.threshold)
+        }
+
+    @Test
+    fun `starting sends the threshold at which the vote ends early, for Yes unless told otherwise`() =
+        runTest {
+            val request = slot<StartVoteRequest>()
+            coEvery { backend.startVote(capture(request)) } returns StartVoteResponse.Started(7)
+            val command = VoteCommand(backend, backgroundScope, clock)
+
+            command.onSlashCommandInteraction(start(Replies(), mapOf("frage" to "Steuern?", "ende" to "offen", "schwelle" to "50")))
+            runCurrent()
+            assertEquals(VoteThreshold(50, VoteChoice.YES), request.captured.threshold)
+            assertEquals(null, request.captured.endsAt)
+
+            command.onSlashCommandInteraction(start(Replies(), mapOf("frage" to "Steuern?", "schwelle" to "66", "stimme" to "NO")))
+            runCurrent()
+            assertEquals(VoteThreshold(66, VoteChoice.NO), request.captured.threshold)
+        }
+
+    @Test
+    fun `a threshold outside 1 to 99 percent or without percentage is explained, not sent`() =
+        runTest {
+            val command = VoteCommand(backend, backgroundScope, clock)
+            val tooHigh = Replies()
+            val choiceOnly = Replies()
+
+            command.onSlashCommandInteraction(start(tooHigh, mapOf("frage" to "?", "schwelle" to "100")))
+            command.onSlashCommandInteraction(start(choiceOnly, mapOf("frage" to "?", "stimme" to "NO")))
+            runCurrent()
+
+            assertEquals(listOf("Die Schwelle gibst du in Prozent von 1 bis 99 an, z. B. `50` für mehr als die Hälfte."), tooHigh.messages)
+            assertEquals(listOf("Gib zur Stimme auch die Schwelle an, z. B. `schwelle:50`, oder lass beides weg."), choiceOnly.messages)
+            coVerify(exactly = 0) { backend.startVote(any()) }
         }
 
     @Test
