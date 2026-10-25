@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 BITS is a Discord bot for the German WarEra Discord, with a backend and a web dashboard. The
-[README](README.md) covers setup and commands, [CONTRIBUTING.md](CONTRIBUTING.md) covers workflow and
-conventions. Both apply to Claude as well.
+[README](README.md) covers setup, [CONTRIBUTING.md](CONTRIBUTING.md) covers workflow and conventions. Both apply to
+Claude as well. What the features do for users is in the manual at `/docs` of the dashboard
+(`frontend/src/features/manual/manual.ts`); update it when a change alters user-facing behavior.
 
 ## Modules
 

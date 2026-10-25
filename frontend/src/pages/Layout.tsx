@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import {
   ActivityIcon,
+  BookOpenIcon,
   ChevronsUpDownIcon,
   CircleUserIcon,
   HistoryIcon,
@@ -200,6 +201,10 @@ function UserMenu({ user }: { user: Me }) {
               </DropdownMenuRadioGroup>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuItem render={<Link to="/docs" />}>
+              <BookOpenIcon />
+              Handbuch
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onLogout}>
               <LogOutIcon />
               Abmelden

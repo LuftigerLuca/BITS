@@ -120,6 +120,17 @@ describe('layout', () => {
     expect(localStorage.getItem('theme')).toBeNull()
   })
 
+  it('opens the manual from the user menu', async () => {
+    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json({}) })
+    const router = renderApp('/')
+
+    await openUserMenu()
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Handbuch' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Handbuch' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/docs')
+  })
+
   it('logs out from the user menu and goes to the login page', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),

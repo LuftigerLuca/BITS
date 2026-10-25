@@ -8,6 +8,8 @@ import { LoginPage } from './pages/LoginPage.tsx'
 /** All pages of the dashboard; main.tsx serves them in the browser, the tests from memory. */
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
+  // The manual needs no login, so members who only use Discord can read it too.
+  { path: '/docs/:slug?', lazy: async () => ({ Component: (await import('./pages/ManualPage.tsx')).ManualPage }) },
   {
     element: <RequireAuth />,
     children: [

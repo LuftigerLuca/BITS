@@ -6,7 +6,9 @@ changes are made and how they get into `main`.
 ## Workflow
 
 1. **Branch:** Create a new branch from the current `main` (or from the branch your work builds on).
-2. **Implement:** Code, tests and docs, if needed, go into the same branch.
+2. **Implement:** Code, tests and docs, if needed, go into the same branch. A change users notice also updates
+   the manual in [`frontend/src/features/manual/manual.ts`](frontend/src/features/manual/manual.ts), shown in the
+   dashboard under `/docs`.
 3. **Check:** `./gradlew build` must pass before you open a pull request.
 4. **Pull request:** Open it against `main`. It is squash-merged once CI passes and all review threads are
    resolved. Nobody pushes to `main` directly.

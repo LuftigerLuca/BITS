@@ -26,113 +26,12 @@ Login ins Dashboard ruft das Backend Discord im Namen des Nutzers auf (OAuth2).
 Der Command `/ping` geht als Smoke-Test einmal durch alle Teile: Der Bot ruft `POST /api/ping` auf, das Backend
 speichert den Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das der Bot verarbeitet und bestätigt.
 
-Mit `/verify <WarEra-Name>` verknüpft ein Nutzer seinen Discord-Account mit seinem WarEra-Account. Er bekommt
-einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer seiner WarEra-Firmen und klickt auf
-„Prüfen“. Das Backend sucht den Code über die öffentliche API, speichert die Verknüpfung und publiziert ein
-`AccountLinkedEvent`. Der Code zählt nur in Firmen, die dem Nutzer gehören. Mit `/unverify` oder unter „Mein
-Account“ im Dashboard löst er die Verknüpfung wieder. Wer den Server verlässt, verliert seine Verknüpfung und muss sich nach einem erneuten Beitritt neu
-verifizieren.
+## Funktionen
 
-Mit `/profil` zeigt der Bot im Kanal das WarEra-Profil des eigenen verknüpften Accounts, mit `/profil @nutzer` das
-eines anderen Mitglieds: Name mit Link zu WarEra, Level, Militärrang, Staatsbürgerschaft, Military Unit, Partei im
-Land der Staatsbürgerschaft (mit „(Vorsitz)“ für die Parteiführung), Regierungsamt, Anzahl der Firmen und die von
-BITS verwalteten Rollen, die das Mitglied auf dem Server hat. Das Backend lädt den Nutzer und seine Firmen dafür frisch
-über `POST /api/profiles`; Land und Military Unit kommen aus dem Cache, Parteien und Regierung des Landes ebenfalls,
-bis zu 10 Minuten alt. Kann WarEra Partei, Regierung oder Firmen gerade nicht liefern, zeigt die Karte dort „nicht
-verfügbar“. Hinweise, etwa auf eine fehlende Verknüpfung, sieht nur, wer den Command aufgerufen hat.
-
-Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an WarEra-Merkmale koppeln:
-Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit oder einer Partei, Level,
-Militärrang oder Zahl der Firmen ab einem Schwellwert. Eine Regel hat eine bis zehn solcher Bedingungen, die alle
-erfüllt sein müssen (UND), etwa
-„Staatsbürgerschaft Germany und Level ab 10“; mehrere Regeln für dieselbe Rolle gelten als ODER. Eine Rolle mit
-mindestens einer Regel verwaltet BITS: Wer keine ihrer Regeln erfüllt, verliert sie, auch wenn sie von Hand vergeben
-wurde. Das Backend berechnet die Soll-Rollen und publiziert ein `RoleSyncEvent`, der Bot setzt es mit Grund im
-Audit-Log um. Abgeglichen wird beim Verknüpfen für den Nutzer (und den zuvor verknüpften Discord-Account), nach jeder
-Regeländerung für alle mit den WarEra-Daten des letzten Abgleichs und stündlich für alle mit frischen Daten, eine
-WarEra-Abfrage pro Sekunde; die Firmen kosten je Nutzer eine weitere Abfrage und werden nur geladen, solange eine
-Regel sie braucht. Regierungen und Parteien kommen aus dem Cache und sind bis zu 10 Minuten alt. Kann ein Nutzer,
-seine Firmen, eine Regierung oder die Parteien eines Landes nicht geladen werden, bleiben die betroffenen Rollen
-unverändert, außer eine andere Bedingung derselben Regel ist sicher nicht erfüllt. Der Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und bei jeder Änderung; Regeln für
-gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
-Server-Members-Intent und die Berechtigung „Rollen verwalten“.
-
-Bevor eine Regel angelegt oder gelöscht wird, zeigt das Dashboard, wem die Änderung die Rolle gibt und wem sie sie
-nimmt, aufklappbar mit Namen (`POST /web/admin/role-sync/rules/preview`, `GET …/rules/{id}/deletion-preview`).
-Das Backend wertet dafür die geänderten Regeln wie der folgende Abgleich aus, mit den WarEra-Daten des letzten
-Abgleichs und den Rollen, die der Bot mit der Mitgliederliste meldet, und speichert nichts. Mitglieder ohne WarEra-Daten
-aus dem letzten Abgleich zählen als „unbekannt“. Nach einem Neustart des Backends gibt es die Vorschau erst mit der
-nächsten Mitgliederliste und ist bis zum nächsten stündlichen Abgleich ungenau; das Dashboard sagt das dazu.
-
-Mit `/nickname an` oder dem Button „Nickname übernehmen“ nach der Verknüpfung entscheidet ein Mitglied selbst, dass
-BITS seinen Nickname auf den WarEra-Namen setzt; das geht auch vor dem Verknüpfen. Der Bot gleicht ihn bei jedem
-Abgleich an, also auch nach einer Umbenennung in WarEra spätestens nach einer Stunde, und nennt „BITS: WarEra-Name“ als
-Grund im Audit-Log. Beim Lösen der Verknüpfung oder wenn ein anderer Discord-Account den WarEra-Account übernimmt,
-entfernt er den Nickname wieder, sofern er noch dem WarEra-Namen entspricht. Mit `/nickname aus` hört BITS auf, der
-Nickname bleibt, wie er ist; Mitglieder ohne Opt-in fasst BITS nie an. Kann ein Nutzer nicht geladen werden, bleibt
-sein Nickname ebenfalls. Dafür braucht der Bot die Berechtigung „Nicknames verwalten“. Den Server-Besitzer und
-Mitglieder über seiner Rolle kann er nicht umbenennen; das landet als übersprungene Änderung im System-Log.
-
-Mit `/rollen` sieht ein verknüpftes Mitglied, nur für sich, zu jeder Rolle, die BITS verwaltet, ob es sie
-erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10“. Das Backend wertet die Regeln über
-`POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen Daten des Nutzers, und ändert
-keine Rollen; Abweichungen gleicht der nächste Abgleich an. Verwaiste Regeln tauchen nicht auf.
-
-Mit `/abstimmung starten frage rolle kanal [ende] [schwelle] [stimme]` startet jemand eine
-Ja/Nein/Enthaltung-Abstimmung, ebenso im Dashboard unter „Abstimmungen“. Das Ende ist eine Dauer wie `48h` (Standard),
-`3d` oder `90m` oder `offen`. Mit `schwelle` (1–99 %) endet sie vorzeitig, sobald mehr als so viel Prozent aller
-Stimmberechtigten mit `stimme` gestimmt haben (Ja oder Nein, Standard Ja); `50` heißt mehr als die Hälfte. Es gilt,
-was zuerst eintritt. Der Bot
-postet die Frage mit drei Buttons im Kanal und pingt die Rolle. Abstimmen darf, wer die Rolle und einen verknüpften
-WarEra-Account hat; die Antwort sieht nur der Abstimmende, und bis zum Ende kann er seine Stimme ändern. Die
-Nachricht zeigt nur, wie viele abgestimmt haben. Zum Ende, vorzeitig mit `/abstimmung beenden`, meldet der Bot die
-aktuellen Mitglieder der Rolle; Stimmen von Mitgliedern, die die Rolle nicht mehr haben, zählen nicht. Das Backend
-ordnet die Stimmen über WarEra den Parteien im Land der Staatsbürgerschaft zu (die Parteien aus dem Cache, bis zu 10
-Minuten alt), wer in keiner ist, gilt als
-„Parteilos“. Der Bot postet das Ergebnis als Grafik und Text im Kanal, mit den Namen derer, die nicht abgestimmt
-haben. Danach löscht BITS, wer wie abgestimmt hat. `/abstimmung abbrechen` beendet eine Abstimmung ohne Auswertung.
-Starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins auf der Seite „Abstimmungen“ freigeben. Damit
-der Bot nur Kanäle anbietet, in denen er posten kann, meldet er seine Textkanäle per `PUT /api/discord-channels`.
-
-Diplomatie mit anderen Ländern läuft in privaten Botschafts-Threads, einer pro Land. Auf der Dashboard-Seite
-„Botschaften“ ordnen Admins einem Land einen privaten Thread zu, den sie vorher selbst in Discord angelegt haben; das
-Land unter „Verwaltung“ bekommt keinen. Dort wählen sie auch die Ämter, die jemanden zum Botschafter machen (Standard:
-Präsident, Vizepräsident, Außenminister), die Botschafter-Rolle und Gastgeber-Rollen wie die eigene Regierung, und sie
-fügen Mitglieder von Hand hinzu. In jedem Thread sollen genau die verknüpften Mitglieder mit einem der Ämter in dessen
-Land sein, die von Hand Hinzugefügten und die Mitglieder der Gastgeber-Rollen; alle anderen entfernt der Bot, außer wer
-im Kanal Threads verwalten darf. Botschafter und von Hand Hinzugefügte bekommen die Botschafter-Rolle, die den Kanal
-sichtbar macht, und verlieren sie, sobald sie in keinem Thread mehr sind; Gastgeber-Rollen bekommen sie nicht. Das
-Backend lädt dafür nur die Regierungen der zugeordneten Länder (aus dem Cache, bis zu 10 Minuten alt) und publiziert ein
-`EmbassySyncEvent`, nach jeder Verknüpfung, nach jeder Änderung auf der Seite und stündlich. Der Bot setzt es um,
-entarchiviert einen Thread nur, wenn sich etwas ändert, und meldet per `POST /api/embassies/syncs/{id}`, wer jetzt in
-den Threads ist; das zeigt die Seite mit Grund. Ist eine Regierung nicht ladbar, entfernt der Abgleich aus deren Thread
-niemanden. Damit Admins Threads auswählen können, meldet der Bot die privaten Threads per `PUT /api/discord-threads`.
-Dafür braucht der Bot im Botschafts-Kanal die Rechte „Threads verwalten“ und „Nachrichten in Threads senden“, und die
-Botschafter-Rolle muss den Kanal sehen dürfen; diese Kanalrechte richten Admins selbst ein. Darf die Botschafter-Rolle
-oder eine Gastgeber-Rolle den Kanal nicht sehen, lehnt das Dashboard die Zuordnung und die Einstellungen ab, ebenso ein
-Mitglied, das ihn auch mit der Botschafter-Rolle nicht sehen darf.
-
-Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
-verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür
-meldet der Bot die Mitglieder mit ihren Rollen per `PUT /api/discord-members`, sobald alle geladen sind, beim Start,
-stündlich und einige Sekunden nach Rollenänderungen, dazu jeden Beitritt und Austritt. Das Backend hält die Liste nur im Speicher und löscht die Verknüpfungen aller, die
-darin fehlen. Würde eine Liste mehr als die Hälfte und mindestens 10 Verknüpfungen auf einmal löschen, verweigert
-es sie als vermutlich fehlerhaft und vermerkt das im System-Log.
-
-Im Dashboard melden sich Mitglieder des Discord-Servers mit Discord an (OAuth2, Scopes
-`identify guilds guilds.members.read`); seine Rollen auf dem Server liest das Backend dabei, damit das Dashboard
-weiß, wer Abstimmungen verwalten darf. Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt,
-bekommt die Rolle `ADMIN` und sieht den Verwaltungsbereich, alle anderen `USER`. Zusätzlich gibt es optional einen
-Admin-Account mit Benutzername und Passwort aus der Umgebung (`BITS_ADMIN_USERNAME`, `BITS_ADMIN_PASSWORD_HASH`), der
-ohne Discord funktioniert. Pro IP werden in 15 Minuten höchstens 5 Anmeldeversuche geprüft, über alle IPs höchstens 50; danach
-ist er bis zum Ende des Zeitfensters gesperrt. Der Hash braucht BCrypt-Kosten von mindestens 10. Die Sitzung ist
-ein JWT im Cookie, gilt 8 Stunden, für `ADMIN` 1 Stunde, und wird nicht verlängert. Rollen werden nur beim Login
-geprüft. Der Logout sperrt die Sitzung auch für Kopien des Cookies.
-
-Unter „Mein Account“ sieht jedes Mitglied, das sich mit Discord anmeldet, seine Verknüpfung, den letzten Abgleich
-aller Mitglieder und die verwalteten Rollen mit Begründung wie bei `/rollen` (`/web/account`). Es kann dort die
-Verknüpfung lösen, was wie `/unverify` wirkt, und als JSON herunterladen, was BITS zu seiner Discord-ID speichert.
-Die Discord-ID kommt immer aus der Sitzung, nie aus dem Request; der Admin-Account ohne Discord hat die Seite nicht.
+Was BITS kann und wie Mitglieder, Abstimmungsleiter und Admins es benutzen, beschreibt das Handbuch im Dashboard
+unter `/docs`, lokal http://localhost:5173/docs. Es ist ohne Login lesbar. Die Texte stehen in
+[`frontend/src/features/manual/manual.ts`](frontend/src/features/manual/manual.ts) und ändern sich zusammen mit dem
+Verhalten, das sie beschreiben.
 
 ## Datenschutz
 
