@@ -2,9 +2,12 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
+import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraGovernment
+import eu.luftiger.bits.warera.WareraParty
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
@@ -27,15 +30,25 @@ class RuleInputs(
     }
 
     /**
-     * One call per country that office conditions refer to. A country whose government cannot be loaded is left out and
-     * reported to [onUnavailable] with its ID and name.
+     * The data beyond the users' own that [rules] need, each only if a condition needs it: one call per country that
+     * office or party conditions refer to. What cannot be loaded is left out and reported to [onUnavailable].
      */
-    fun governments(
+    fun ruleData(
         rules: List<RoleRule>,
-        onUnavailable: (countryId: String, countryName: String?) -> Unit = { _, _ -> },
+        onUnavailable: (SystemProblem) -> Unit = {},
+    ): RuleData {
+        val conditions = rules.flatMap { it.conditions }
+        return RuleData(
+            governments = governments(conditions, onUnavailable),
+            parties = parties(conditions, onUnavailable),
+        )
+    }
+
+    private fun governments(
+        conditions: List<RuleCondition>,
+        onUnavailable: (SystemProblem) -> Unit,
     ): Map<String, WareraGovernment> =
-        rules
-            .flatMap { it.conditions }
+        conditions
             .filter { it.type == ConditionType.GOVERNMENT_OFFICE && it.countryId != null }
             .distinctBy { it.countryId }
             .mapNotNull { condition ->
@@ -44,8 +57,33 @@ class RuleInputs(
                     countryId to wareraClient.getGovernment(countryId)
                 } catch (e: WareraApiException) {
                     log.warn("Government of country {} could not be loaded, its office conditions are undecided", countryId, e)
-                    onUnavailable(countryId, condition.targetName)
+                    onUnavailable(SystemProblem.GovernmentUnavailable(countryId, condition.targetName))
+                    null
+                }
+            }.toMap()
+
+    private fun parties(
+        conditions: List<RuleCondition>,
+        onUnavailable: (SystemProblem) -> Unit,
+    ): Map<String, List<WareraParty>> =
+        conditions
+            .filter { it.type == ConditionType.PARTY && it.countryId != null }
+            .groupBy { requireNotNull(it.countryId) }
+            .mapNotNull { (countryId, partyConditions) ->
+                try {
+                    countryId to wareraClient.getParties(countryId)
+                } catch (e: WareraApiException) {
+                    log.warn("Parties of country {} could not be loaded, their party conditions are undecided", countryId, e)
+                    onUnavailable(SystemProblem.PartiesUnavailable(partyConditions.mapNotNull { it.targetName }.distinct()))
                     null
                 }
             }.toMap()
 }
+
+/** What [RuleInputs.ruleData] loaded; what is missing could not be loaded or is not needed. */
+class RuleData(
+    /** Governments by country ID. */
+    val governments: Map<String, WareraGovernment> = emptyMap(),
+    /** Parties by country ID. */
+    val parties: Map<String, List<WareraParty>> = emptyMap(),
+)

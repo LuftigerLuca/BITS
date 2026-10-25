@@ -73,6 +73,8 @@ export type ConditionType =
   | 'MILITARY_UNIT'
   | 'LEVEL'
   | 'MILITARY_RANK'
+  | 'COMPANIES'
+  | 'PARTY'
 
 export type GovernmentOffice =
   | 'PRESIDENT'
@@ -110,6 +112,7 @@ export interface CreateCondition {
   office?: GovernmentOffice
   muId?: string
   threshold?: number
+  partyId?: string
 }
 
 export interface Option {
@@ -177,6 +180,10 @@ export async function deleteRoleRule(id: number): Promise<void> {
 
 export async function getCountries(): Promise<Option[]> {
   return (await request(`${ROLE_SYNC}/countries`)).json()
+}
+
+export async function getParties(countryId: string): Promise<Option[]> {
+  return (await request(`${ROLE_SYNC}/countries/${encodeURIComponent(countryId)}/parties`)).json()
 }
 
 export async function searchMilitaryUnits(query: string): Promise<Option[]> {
@@ -259,6 +266,7 @@ export type LogEntryType =
   | 'ACCOUNT_REMOVED'
   | 'WARERA_USERS_UNAVAILABLE'
   | 'GOVERNMENT_UNAVAILABLE'
+  | 'PARTIES_UNAVAILABLE'
   | 'ROLE_NOT_ASSIGNABLE'
   | 'SYNC_ABORTED'
   | 'EVENT_UNDELIVERED'

@@ -5,7 +5,6 @@ import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
-import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraUser
 
 /**
@@ -16,16 +15,21 @@ import eu.luftiger.bits.warera.WareraUser
 class RuleEvaluator(
     /** Rules of the roles BITS manages, i.e. only those whose role exists and is assignable. */
     rules: List<RoleRule>,
-    /** Governments by country ID; a country whose government could not be loaded is missing. */
-    private val governments: Map<String, WareraGovernment>,
+    private val data: RuleData,
 ) {
     private val rulesByRole = rules.groupBy { it.roleId }
 
-    /** Target roles of a linked member, or `null` if the member gets and keeps nothing. [user] is `null` if it could not be loaded. */
-    fun evaluate(user: WareraUser?): MemberRoles? {
+    /**
+     * Target roles of a linked member, or `null` if the member gets and keeps nothing. [user] is `null` if it could not be
+     * loaded, [companyCount] if the companies were not or could not be loaded.
+     */
+    fun evaluate(
+        user: WareraUser?,
+        companyCount: Int? = null,
+    ): MemberRoles? {
         val grants = mutableListOf<RoleGrant>()
         val keep = mutableListOf<String>()
-        check(user).forEach { role ->
+        check(user, companyCount).forEach { role ->
             when (role.outcome) {
                 RoleOutcome.MET -> grants += RoleGrant(role.roleId, "BITS: ${requireNotNull(role.metBy).label}")
                 RoleOutcome.UNDECIDED -> keep += role.roleId
@@ -36,24 +40,34 @@ class RuleEvaluator(
     }
 
     /** How each rule of each managed role turns out for [user], in the order of the rules; [evaluate] decides on this. */
-    fun check(user: WareraUser?): List<RoleCheck> =
+    fun check(
+        user: WareraUser?,
+        companyCount: Int? = null,
+    ): List<RoleCheck> =
         rulesByRole.map { (roleId, rules) ->
-            RoleCheck(roleId, rules.map { rule -> RuleCheck(rule, rule.conditions.map { ConditionCheck(it, matches(it, user)) }) })
+            RoleCheck(
+                roleId,
+                rules.map { rule -> RuleCheck(rule, rule.conditions.map { ConditionCheck(it, matches(it, user, companyCount)) }) },
+            )
         }
 
     /** `null` if the data to decide is missing. */
     private fun matches(
         condition: RuleCondition,
         user: WareraUser?,
+        companyCount: Int?,
     ): Boolean? {
         if (user == null) return null
         return when (condition.type) {
             ConditionType.CITIZENSHIP -> user.country == condition.countryId
             ConditionType.GOVERNMENT_OFFICE ->
-                governments[condition.countryId]?.let { requireNotNull(condition.office).isHeldBy(it, user.id) }
+                data.governments[condition.countryId]?.let { requireNotNull(condition.office).isHeldBy(it, user.id) }
             ConditionType.MILITARY_UNIT -> user.mu == condition.muId
             ConditionType.LEVEL -> user.leveling.level >= requireNotNull(condition.threshold)
             ConditionType.MILITARY_RANK -> user.militaryRank >= requireNotNull(condition.threshold)
+            ConditionType.COMPANIES -> companyCount?.let { it >= requireNotNull(condition.threshold) }
+            ConditionType.PARTY ->
+                data.parties[condition.countryId]?.let { parties -> parties.any { it.id == condition.partyId && user.id in it.members } }
         }
     }
 }

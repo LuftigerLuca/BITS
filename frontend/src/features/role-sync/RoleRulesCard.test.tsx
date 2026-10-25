@@ -42,6 +42,7 @@ function renderCard(
     'GET /web/admin/role-sync/roles': () => json([citizen, veteran]),
     'GET /web/admin/role-sync/rules': () => json(rules),
     'GET /web/admin/role-sync/countries': () => json([{ id: 'de', name: 'Germany' }]),
+    'GET /web/admin/role-sync/countries/de/parties': () => json([{ id: 'p1', name: 'Zentrum' }]),
     'POST /web/admin/role-sync/rules': (init) => onCreate(JSON.parse(String(init?.body))),
     'POST /web/admin/role-sync/rules/preview': () => json(rulePreview),
     'GET /web/admin/role-sync/rules/1/deletion-preview': () => json(rulePreview),
@@ -156,6 +157,47 @@ describe('rule form', () => {
         ],
       },
     ])
+  })
+
+  it('asks for the country and then a party of it for party rules', async () => {
+    const created: unknown[] = []
+    renderCard([], (body) => {
+      created.push(body)
+      return json(rule(9, veteran, 'Mitglied der Partei Zentrum'), 201)
+    })
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Veteran')
+    await choose('Art', 'Partei')
+    expect(screen.getByLabelText('Partei')).toHaveTextContent('Erst Land wählen')
+    await choose('Land', 'Germany')
+    expect(submit()).toBeDisabled()
+    await choose('Partei', 'Zentrum')
+    await userEvent.click(submit())
+
+    await confirm('Regel anlegen')
+    await expect.poll(() => created).toEqual([
+      { roleId: 'r-veteran', conditions: [{ type: 'PARTY', countryId: 'de', partyId: 'p1' }] },
+    ])
+  })
+
+  it('takes a number of companies', async () => {
+    const created: unknown[] = []
+    renderCard([], (body) => {
+      created.push(body)
+      return json(rule(9, veteran, 'Besitz von mindestens 2 Firmen'), 201)
+    })
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Veteran')
+    await choose('Art', 'Firmenbesitz')
+    const threshold = screen.getByLabelText('Firmen ab')
+    await userEvent.clear(threshold)
+    await userEvent.type(threshold, '2')
+    await userEvent.click(submit())
+
+    await confirm('Regel anlegen')
+    await expect.poll(() => created).toEqual([{ roleId: 'r-veteran', conditions: [{ type: 'COMPANIES', threshold: 2 }] }])
   })
 
   it('does not take the same condition twice', async () => {
