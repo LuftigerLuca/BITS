@@ -37,7 +37,7 @@ describe('guards', () => {
       'GET /web/admin/role-sync/rules': () => json([]),
     })
 
-    renderApp('/admin')
+    renderApp('/admin/roles')
 
     expect(await screen.findByText('Noch keine Regeln angelegt.')).toBeInTheDocument()
   })
