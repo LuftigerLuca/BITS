@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot
 import eu.luftiger.bits.bot.accounts.JdaDirectMessages
 import eu.luftiger.bits.bot.accounts.RelinkNotifier
 import eu.luftiger.bits.bot.backend.KtorBackendClient
+import eu.luftiger.bits.bot.commands.NicknameCommand
 import eu.luftiger.bits.bot.commands.PingCommand
 import eu.luftiger.bits.bot.commands.ProfileCommand
 import eu.luftiger.bits.bot.commands.RolesCommand
@@ -66,6 +67,7 @@ fun main() {
                 PingCommand(backend, scope),
                 verifyCommand,
                 UnverifyCommand(backend, scope),
+                NicknameCommand(backend, scope),
                 ProfileCommand(backend, scope),
                 RolesCommand(backend, scope),
                 roleReporter,
@@ -76,8 +78,14 @@ fun main() {
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
     guild
         .updateCommands()
-        .addCommands(PingCommand.data, VerifyCommand.data, UnverifyCommand.data, ProfileCommand.data, RolesCommand.data)
-        .queue()
+        .addCommands(
+            PingCommand.data,
+            VerifyCommand.data,
+            UnverifyCommand.data,
+            NicknameCommand.data,
+            ProfileCommand.data,
+            RolesCommand.data,
+        ).queue()
     roleReporter.reportPeriodically(guild)
     memberReporter.reportPeriodically(guild)
 

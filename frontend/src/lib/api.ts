@@ -138,23 +138,6 @@ export async function searchMilitaryUnits(query: string): Promise<Option[]> {
   return (await request(`${ROLE_SYNC}/military-units?${new URLSearchParams({ query })}`)).json()
 }
 
-export interface NicknameSetting {
-  enabled: boolean
-}
-
-export async function getNicknameSetting(): Promise<NicknameSetting> {
-  return (await request(`${ROLE_SYNC}/nicknames`)).json()
-}
-
-export async function setNicknameSetting(enabled: boolean): Promise<NicknameSetting> {
-  const response = await request(`${ROLE_SYNC}/nicknames`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled }),
-  })
-  return response.json()
-}
-
 const AUDIT_LOG = '/web/admin/audit-log'
 
 export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED' | 'OVERVIEW_COUNTRY_SET' | 'NICKNAME_SETTING_CHANGED'

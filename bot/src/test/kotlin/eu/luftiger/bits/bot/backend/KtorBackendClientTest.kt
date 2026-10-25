@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.RoleExplanationResponse
@@ -62,6 +63,23 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
             assertEquals(UnlinkAccountResponse(wareraUsername = "Luftiger"), client.unlinkAccount("42"))
+        }
+
+    @Test
+    fun `nickname preference posts the user and the choice`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals("http://backend:8080/api/nickname-preferences", request.url.toString())
+                    assertEquals("""{"discordUserId":"42","enabled":true}""", request.body.toByteArray().decodeToString())
+                    respond(
+                        """{"enabled":true,"wareraUsername":"Luftiger"}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(NicknamePreferenceResponse(true, "Luftiger"), client.setNicknamePreference("42", true))
         }
 
     @Test

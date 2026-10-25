@@ -207,8 +207,9 @@ class VerificationService(
         } == true
 
     /**
-     * Deletes the link and any open code of the user, everything BITS keeps about a Discord account. The role sync
-     * then takes the managed roles away, since an account without link meets no rule.
+     * Deletes the link and any open code of the user, everything BITS keeps about a Discord account but the nickname
+     * opt-in, which the member turns off with `/nickname`. The role sync then takes the managed roles away, since an
+     * account without link meets no rule.
      */
     fun unlink(discordUserId: String): UnlinkAccountResponse =
         transactionTemplate.execute {

@@ -94,7 +94,7 @@ class RoleSyncTest {
     fun reset() {
         awaitBackgroundWork()
         jdbc.execute(
-            "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, nickname_setting, audit_entry",
+            "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, nickname_opt_in",
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
@@ -109,9 +109,9 @@ class RoleSyncTest {
 
     /** Other tests share the database and expect no syncs without rules. */
     @AfterTest
-    fun turnOffNicknames() {
+    fun deleteNicknameOptIns() {
         awaitBackgroundWork()
-        jdbc.execute("TRUNCATE nickname_setting")
+        jdbc.execute("TRUNCATE nickname_opt_in")
     }
 
     @Test
@@ -223,6 +223,7 @@ class RoleSyncTest {
                 members = mapOf("1" to MemberRoles(listOf(RoleGrant("r-citizen", "BITS: Staatsbürgerschaft Germany")))),
                 occurredAt = clock.millis(),
                 confirmedRoleIds = listOf("r-citizen"),
+                nicknames = emptyMap(),
             ),
             // The ID of the run in the system log, see SystemLogTest.
             (awaitEvents(1).single() as RoleSyncEvent).copy(syncId = null),
@@ -279,67 +280,84 @@ class RoleSyncTest {
     }
 
     @Test
-    fun `nicknames are off until an admin turns them on, which only admins may`() {
-        val user = session(SessionUser.discord("42", "Luca", "https://avatar", Role.USER))
-
-        mockMvc.get("/web/admin/role-sync/nicknames") { cookie(admin) }.andExpect { jsonPath("$.enabled") { value(false) } }
-        mockMvc.get("/web/admin/role-sync/nicknames") { cookie(user) }.andExpect { status { isForbidden() } }
-        setNicknames(true, user).andExpect { status { isForbidden() } }
-    }
-
-    @Test
-    fun `turning nicknames on syncs everybody with their WarEra names, even without rules`() {
-        // A user no sync has seen yet, so the sync with cached data has to look them up.
-        warera.users["w4"] = WareraUser("w4", "Fourth", country = "de")
+    fun `opting in syncs the linked member with their WarEra name, even without rules`() {
         link("1", "w1")
-        link("4", "w4")
-        warera.failingUsers += "w4"
+        link("2", "w2")
 
-        setNicknames(true).andExpect { jsonPath("$.enabled") { value(true) } }
+        optIn("1", true).andExpect {
+            jsonPath("$.enabled") { value(true) }
+            jsonPath("$.wareraUsername") { value("Luftiger") }
+        }
 
         val event = awaitEvents(1).single() as RoleSyncEvent
+        assertEquals(listOf("1"), event.discordUserIds)
         assertEquals(emptyList(), event.managedRoleIds)
-        // Without WarEra data, the nickname stays as it is.
         assertEquals(mapOf("1" to "Luftiger"), event.nicknames)
-        assertEquals(
-            listOf("Nicknames aus WarEra-Namen eingeschaltet"),
-            jdbc.queryForList("SELECT description FROM audit_entry WHERE action = 'NICKNAME_SETTING_CHANGED'", String::class.java),
-        )
+        // Members who did not opt in keep their nickname.
+        syncTrigger.hourly()
+        assertEquals(mapOf("1" to "Luftiger"), (awaitEvents(2).last() as RoleSyncEvent).nicknames)
     }
 
     @Test
-    fun `nicknames follow a rename with the hourly sync and stop when turned off`() {
+    fun `an opt-in before linking takes effect with the link and outlasts unlinking`() {
+        optIn("2", true).andExpect { jsonPath("$.wareraUsername") { value(null) } }
+        awaitEvents(0)
+
+        verify("2", "Other")
+        assertEquals(mapOf("2" to "Other"), (awaitEvents(1).last() as RoleSyncEvent).nicknames)
+
+        unlink("2")
+        val unlinked = awaitEvents(2).last() as RoleSyncEvent
+        assertEquals(emptyMap(), unlinked.nicknames)
+        assertEquals(mapOf("2" to "Other"), unlinked.nicknameResets)
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM nickname_opt_in", Int::class.java))
+    }
+
+    @Test
+    fun `nicknames follow a rename with the hourly sync, and opting out leaves them alone`() {
         link("1", "w1")
-        setNicknames(true)
+        optIn("1", true)
         awaitEvents(1)
-        // Turning it on again changes nothing.
-        setNicknames(true)
+        // Opting in again changes nothing.
+        optIn("1", true)
         awaitEvents(1)
 
         warera.users["w1"] = warera.users.getValue("w1").copy(username = "Umbenannt")
         syncTrigger.hourly()
         assertEquals(mapOf("1" to "Umbenannt"), (awaitEvents(2).last() as RoleSyncEvent).nicknames)
 
-        setNicknames(false)
+        optIn("1", false).andExpect { jsonPath("$.enabled") { value(false) } }
         createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
-        assertEquals(null, (awaitEvents(3).last() as RoleSyncEvent).nicknames)
+        assertEquals(emptyMap(), (awaitEvents(3).last() as RoleSyncEvent).nicknames)
     }
 
     @Test
-    fun `members who lose their link get the WarEra name to clear`() {
+    fun `members who opted in and lose their link to another account get the name to clear`() {
         link("1", "w1")
-        setNicknames(true)
+        optIn("1", true)
         awaitEvents(1)
 
         verify("2", "Luftiger")
-        val relinked = awaitEvents(2).last() as RoleSyncEvent
-        assertEquals(mapOf("2" to "Luftiger"), relinked.nicknames)
-        assertEquals(mapOf("1" to "Luftiger"), relinked.nicknameResets)
 
-        unlink("2")
-        val unlinked = awaitEvents(3).last() as RoleSyncEvent
-        assertEquals(emptyMap(), unlinked.nicknames)
-        assertEquals(mapOf("2" to "Luftiger"), unlinked.nicknameResets)
+        val relinked = awaitEvents(2).last() as RoleSyncEvent
+        assertEquals(emptyMap(), relinked.nicknames)
+        assertEquals(mapOf("1" to "Luftiger"), relinked.nicknameResets)
+    }
+
+    @Test
+    fun `leaving the guild deletes the opt-in`() {
+        link("1", "w1")
+        optIn("1", true)
+        awaitEvents(1)
+
+        mockMvc
+            .post("/api/discord-members/left") {
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"discordUserId":"1","memberName":"Luca"}"""
+            }.andExpect { status { isNoContent() } }
+
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM nickname_opt_in", Int::class.java))
     }
 
     @Test
@@ -571,13 +589,13 @@ class RoleSyncTest {
             content = body
         }
 
-    private fun setNicknames(
+    private fun optIn(
+        discordUserId: String,
         enabled: Boolean,
-        cookie: Cookie = admin,
-    ) = mockMvc.put("/web/admin/role-sync/nicknames") {
-        cookie(cookie)
+    ) = mockMvc.post("/api/nickname-preferences") {
+        header("Authorization", "Bearer test-service-token-at-least-32-chars")
         contentType = MediaType.APPLICATION_JSON
-        content = """{"enabled":$enabled}"""
+        content = """{"discordUserId":"$discordUserId","enabled":$enabled}"""
     }
 
     private fun unlink(discordUserId: String) =

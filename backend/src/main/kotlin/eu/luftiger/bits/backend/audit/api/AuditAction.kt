@@ -13,5 +13,7 @@ enum class AuditAction {
     ROLE_RULE_CREATED,
     ROLE_RULE_DELETED,
     OVERVIEW_COUNTRY_SET,
+
+    /** No longer recorded since members opt in themselves; kept for existing entries. */
     NICKNAME_SETTING_CHANGED,
 }

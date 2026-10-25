@@ -50,13 +50,14 @@ Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und be
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
 
-Optional setzt BITS den Nickname verknüpfter Mitglieder auf ihren WarEra-Namen; Admins schalten das unter
-„Verwaltung“ ein. Der Bot gleicht ihn bei jedem Abgleich an, also auch nach einer Umbenennung in WarEra spätestens nach
-einer Stunde, und nennt „BITS: WarEra-Name“ als Grund im Audit-Log. Beim Lösen der Verknüpfung oder wenn ein anderer
-Discord-Account den WarEra-Account übernimmt, entfernt er den Nickname wieder, sofern er noch dem WarEra-Namen
-entspricht. Kann ein Nutzer nicht geladen werden, bleibt sein Nickname, wie er ist; ausgeschaltet ändert BITS keine
-Nicknames. Dafür braucht der Bot die Berechtigung „Nicknames verwalten“. Den Server-Besitzer und Mitglieder über seiner
-Rolle kann er nicht umbenennen; das landet als übersprungene Änderung im System-Log.
+Mit `/nickname an` oder dem Button „Nickname übernehmen“ nach der Verknüpfung entscheidet ein Mitglied selbst, dass
+BITS seinen Nickname auf den WarEra-Namen setzt; das geht auch vor dem Verknüpfen. Der Bot gleicht ihn bei jedem
+Abgleich an, also auch nach einer Umbenennung in WarEra spätestens nach einer Stunde, und nennt „BITS: WarEra-Name“ als
+Grund im Audit-Log. Beim Lösen der Verknüpfung oder wenn ein anderer Discord-Account den WarEra-Account übernimmt,
+entfernt er den Nickname wieder, sofern er noch dem WarEra-Namen entspricht. Mit `/nickname aus` hört BITS auf, der
+Nickname bleibt, wie er ist; Mitglieder ohne Opt-in fasst BITS nie an. Kann ein Nutzer nicht geladen werden, bleibt
+sein Nickname ebenfalls. Dafür braucht der Bot die Berechtigung „Nicknames verwalten“. Den Server-Besitzer und
+Mitglieder über seiner Rolle kann er nicht umbenennen; das landet als übersprungene Änderung im System-Log.
 
 Mit `/rollen` sieht ein verknüpftes Mitglied, nur für sich, zu jeder Rolle, die BITS verwaltet, ob es sie
 erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10“. Das Backend wertet die Regeln über
@@ -86,6 +87,7 @@ BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
 | Daten                                            | Wo                         | Wozu                                | Wie lange                                                                   |
 |--------------------------------------------------|----------------------------|-------------------------------------|-----------------------------------------------------------------------------|
 | Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profil` | bis `/unverify`, zum Verlassen des Servers oder zu einer neuen Verknüpfung  |
+| Discord-ID, Zeitpunkt                            | `nickname_opt_in`          | Nickname aus WarEra                 | bis `/nickname aus` oder zum Verlassen des Servers                          |
 | Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links      | bis zur nächsten Meldung des Bots oder zum Neustart                         |
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung                | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |

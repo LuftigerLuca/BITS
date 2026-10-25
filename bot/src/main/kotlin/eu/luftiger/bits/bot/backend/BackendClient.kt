@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.RoleExplanationResponse
@@ -29,6 +30,12 @@ interface BackendClient {
 
     /** Deletes the link and any open code of the user. */
     suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse
+
+    /** Stores whether the role sync sets the member's nickname to their WarEra name. */
+    suspend fun setNicknamePreference(
+        discordUserId: String,
+        enabled: Boolean,
+    ): NicknamePreferenceResponse
 
     /** @throws WareraUnavailableException if the backend cannot reach the WarEra API */
     suspend fun profile(discordUserId: String): ProfileResponse

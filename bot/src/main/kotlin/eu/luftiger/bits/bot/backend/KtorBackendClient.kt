@@ -7,6 +7,8 @@ import eu.luftiger.bits.shared.DiscordMemberChange
 import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.DiscordRolesReport
+import eu.luftiger.bits.shared.NicknamePreferenceRequest
+import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileRequest
@@ -80,6 +82,11 @@ class KtorBackendClient(
 
     override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse =
         post("api/verifications/unlink", UnlinkAccountRequest(discordUserId))
+
+    override suspend fun setNicknamePreference(
+        discordUserId: String,
+        enabled: Boolean,
+    ): NicknamePreferenceResponse = post("api/nickname-preferences", NicknamePreferenceRequest(discordUserId, enabled))
 
     override suspend fun profile(discordUserId: String): ProfileResponse = post("api/profiles", ProfileRequest(discordUserId))
 
