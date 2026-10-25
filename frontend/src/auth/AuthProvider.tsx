@@ -16,35 +16,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null | undefined>(undefined)
   const [unavailable, setUnavailable] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
+  // Set together with the user rather than in an effect after the render, so a 401 that arrives before the
+  // effect would have run still counts as an expired session.
   const loggedIn = useRef(false)
-  useEffect(() => {
-    loggedIn.current = Boolean(user)
-  }, [user])
+  const applyUser = useCallback((next: Me | null) => {
+    loggedIn.current = next !== null
+    setUser(next)
+  }, [])
 
   const refresh = useCallback(
     () =>
       currentUser().then(
         (current) => {
-          setUser(current)
+          applyUser(current)
           setUnavailable(false)
         },
         // Without an answer, a user who was logged in stays logged in; only a 401 ends the session.
         () => setUnavailable(true),
       ),
-    [],
+    [applyUser],
   )
 
   const logout = useCallback(async () => {
     await logoutRequest()
     setSessionExpired(false)
-    setUser(null)
-  }, [])
+    applyUser(null)
+  }, [applyUser])
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
       // A visitor who was never logged in gets a 401 as well, but no session ran out for them.
       if (loggedIn.current) setSessionExpired(true)
-      setUser(null)
+      applyUser(null)
     })
     refresh()
     // The session expires after 8 hours without refresh; checking again when the tab comes back to the
@@ -54,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [refresh])
+  }, [refresh, applyUser])
 
   const state = useMemo<AuthState>(
     () => ({ user, unavailable, sessionExpired, refresh, logout }),
