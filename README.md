@@ -200,3 +200,8 @@ docker compose up postgres redis
 ./gradlew :backend:bootRun      # braucht die Backend-Variablen aus .env.example
 cd frontend && npm run dev      # http://localhost:5173, leitet /auth und /web an das Backend weiter
 ```
+
+## Lizenz
+
+BITS steht unter der [GNU Affero General Public License v3.0](LICENSE) oder, nach Wahl, einer späteren Version
+(`AGPL-3.0-or-later`).
