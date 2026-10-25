@@ -20,7 +20,7 @@ class SystemLogReporterTest {
             var failures = 2
             coEvery { backend.reportRoleSync(7, report) } answers { if (failures-- > 0) error("backend down") }
 
-            SystemLogReporter(backend, backgroundScope).reportRoleSync(7, report)
+            SystemLogReporter(backend, backgroundScope, mockk()).reportRoleSync(7, report)
             // advanceUntilIdle does not wait for the background scope.
             advanceTimeBy(600_000)
 
@@ -33,7 +33,7 @@ class SystemLogReporterTest {
             val undelivered = UndeliveredEventReport("1-0", "ping", 5)
             coEvery { backend.reportUndeliveredEvent(undelivered) } throws IllegalStateException("backend down")
 
-            SystemLogReporter(backend, backgroundScope).reportUndeliveredEvent(undelivered)
+            SystemLogReporter(backend, backgroundScope, mockk()).reportUndeliveredEvent(undelivered)
             advanceTimeBy(24 * 3_600_000L)
 
             coVerify(exactly = SystemLogReporter.MAX_ATTEMPTS) { backend.reportUndeliveredEvent(undelivered) }

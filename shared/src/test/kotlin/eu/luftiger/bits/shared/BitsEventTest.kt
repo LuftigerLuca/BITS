@@ -57,6 +57,22 @@ class BitsEventTest {
     }
 
     @Test
+    fun `embassy sync survives a round trip with its type`() {
+        val event =
+            EmbassySyncEvent(
+                syncId = 3,
+                threads = listOf(EmbassyThreadTarget("t1", "c1", "Polen", mapOf("1" to "Außenminister von Polen"), complete = false)),
+                hostRoleIds = listOf("r-gov"),
+                ambassadorRoleId = "r-amb",
+                ambassadors = mapOf("1" to "BITS: Außenminister von Polen"),
+                occurredAt = 5,
+            )
+
+        assertEquals(event, decodeEvent(event.encode()))
+        assertTrue(event.encode().contains("\"type\":\"embassy_sync\""))
+    }
+
+    @Test
     fun `fields added by a newer sender are ignored`() {
         val payload = """{"type":"ping","discordUserId":"123","occurredAt":5,"addedLater":{"any":"thing"}}"""
 

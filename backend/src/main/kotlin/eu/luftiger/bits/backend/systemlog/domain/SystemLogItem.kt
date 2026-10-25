@@ -10,7 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import org.hibernate.annotations.Immutable
 
-/** A role or nickname change of a sync run, or a member an error is about; belongs to the entry [entryId]. */
+/** A role, nickname or thread change of a sync run, or a member an error is about; belongs to the entry [entryId]. */
 @Entity
 @Immutable
 @Table(name = "system_log_item")
@@ -43,4 +43,6 @@ enum class ItemOutcome {
     FAILED,
     NICKNAME_SET,
     NICKNAME_RESET,
+    THREAD_ADDED,
+    THREAD_REMOVED,
 }

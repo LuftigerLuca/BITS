@@ -188,6 +188,11 @@ export type AuditAction =
   | 'VOTE_MANAGER_ROLES_CHANGED'
   | 'VOTE_RESULT_BACKGROUND_CHANGED'
   | 'VOTE_PARTY_COLORS_CHANGED'
+  | 'EMBASSY_THREAD_ASSIGNED'
+  | 'EMBASSY_THREAD_UNASSIGNED'
+  | 'EMBASSY_MEMBER_ADDED'
+  | 'EMBASSY_MEMBER_REMOVED'
+  | 'EMBASSY_SETTINGS_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
@@ -240,6 +245,7 @@ export type LogCategory = 'SYNC' | 'ACCOUNT' | 'ERROR'
 
 export type LogEntryType =
   | 'SYNC_RUN'
+  | 'EMBASSY_SYNC_RUN'
   | 'ACCOUNT_LINKED'
   | 'ACCOUNT_RELINKED'
   | 'ACCOUNT_REMOVED'
@@ -251,13 +257,22 @@ export type LogEntryType =
   | 'OUTBOX_STUCK'
   | 'MEMBER_REPORT_REFUSED'
   | 'VOTE_EVALUATION_DELAYED'
+  | 'EMBASSY_THREAD_UNAVAILABLE'
 
 export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE' | 'SETTING_CHANGE'
 
 /** `NO_RESPONSE`: still `PENDING` 15 minutes after the sync. */
 export type SyncRunStatus = 'PENDING' | 'APPLIED' | 'STALE' | 'NO_RULES' | 'NO_RESPONSE'
 
-export type ItemOutcome = 'GRANTED' | 'REMOVED' | 'SKIPPED' | 'FAILED' | 'NICKNAME_SET' | 'NICKNAME_RESET'
+export type ItemOutcome =
+  | 'GRANTED'
+  | 'REMOVED'
+  | 'SKIPPED'
+  | 'FAILED'
+  | 'NICKNAME_SET'
+  | 'NICKNAME_RESET'
+  | 'THREAD_ADDED'
+  | 'THREAD_REMOVED'
 
 /** A member or role by its Discord ID; `name` is `null` if BITS never saw it. */
 export interface NamedRef {
@@ -268,9 +283,9 @@ export interface NamedRef {
 export interface SyncRun {
   trigger: SyncTrigger | null
   status: SyncRunStatus
-  /** Linked accounts when the sync started. */
+  /** Linked accounts when the sync started; embassy threads for `EMBASSY_SYNC_RUN`. */
   linkedCount: number | null
-  /** The counts are `null` until the bot reports back. */
+  /** Synced members, threads for `EMBASSY_SYNC_RUN`; the counts are `null` until the bot reports back. */
   memberCount: number | null
   staleMemberCount: number | null
   granted: number | null
@@ -344,6 +359,92 @@ export async function getSystemLogItems(
 /** Every role that appears in the system log. */
 export async function getSystemLogRoles(): Promise<NamedRef[]> {
   return (await request(`${SYSTEM_LOG}/roles`)).json()
+}
+
+const EMBASSIES = '/web/admin/embassies'
+
+export interface EmbassySettings {
+  /** Whose holders belong in the thread of their country. */
+  offices: GovernmentOffice[]
+  /** `null` for none: BITS then gives and takes no role. */
+  ambassadorRoleId: string | null
+  /** Their members belong in every thread, without getting the ambassador role. */
+  hostRoleIds: string[]
+}
+
+export interface MemberOption {
+  discordUserId: string
+  /** `null` if the bot has not reported the member. */
+  name: string | null
+}
+
+export interface EmbassyThread {
+  threadId: string
+  threadName: string
+  /** `null` if the bot no longer reports the thread. */
+  channelName: string | null
+  countryId: string
+  countryName: string
+  /** Whether the bot no longer reports the thread, e.g. because it was deleted. */
+  missing: boolean
+  /** Who is in the thread and why, as of the last sync; empty until the bot reported one. */
+  members: { discordUserId: string; name: string; reason: string }[]
+  /** Added by an admin; they stay regardless of any office. */
+  manualMembers: MemberOption[]
+}
+
+export interface Embassies {
+  /** The country under "Verwaltung", which gets no thread. */
+  ownCountryId: string | null
+  settings: EmbassySettings
+  /** Highest first. */
+  roles: { id: string; name: string; color: number | null }[]
+  /** By country name. */
+  threads: EmbassyThread[]
+  /** Private threads without a country yet. */
+  availableThreads: { id: string; name: string; channelName: string; archived: boolean; manageable: boolean }[]
+}
+
+export async function getEmbassies(): Promise<Embassies> {
+  return (await request(EMBASSIES)).json()
+}
+
+export async function setEmbassySettings(settings: EmbassySettings): Promise<void> {
+  await request(`${EMBASSIES}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  })
+}
+
+/** 409 if the thread or the country has one already, 503 if WarEra cannot be reached. */
+export async function assignEmbassyThread(threadId: string, countryId: string): Promise<void> {
+  await request(`${EMBASSIES}/threads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ threadId, countryId }),
+  })
+}
+
+export async function unassignEmbassyThread(threadId: string): Promise<void> {
+  await request(`${EMBASSIES}/threads/${threadId}`, { method: 'DELETE' })
+}
+
+export async function addEmbassyMember(threadId: string, discordUserId: string): Promise<void> {
+  await request(`${EMBASSIES}/threads/${threadId}/members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ discordUserId }),
+  })
+}
+
+export async function removeEmbassyMember(threadId: string, discordUserId: string): Promise<void> {
+  await request(`${EMBASSIES}/threads/${threadId}/members/${discordUserId}`, { method: 'DELETE' })
+}
+
+/** Members of the Discord by name or ID, at most 20. */
+export async function searchEmbassyMembers(query: string): Promise<MemberOption[]> {
+  return (await request(`${EMBASSIES}/member-search?${new URLSearchParams({ query })}`)).json()
 }
 
 const OVERVIEW = '/web/admin/overview'

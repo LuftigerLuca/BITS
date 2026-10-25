@@ -11,6 +11,7 @@ them are in [CLAUDE.md](../../CLAUDE.md) and [CONTRIBUTING.md](../../CONTRIBUTIN
 | [0004](0004-stateless-sessions.md)       | Dashboard sessions are signed tokens in a cookie          |
 | [0005](0005-single-instance.md)          | One guild, one backend, one bot                           |
 | [0006](0006-anonymous-votes.md)          | Votes are evaluated anonymously, the bot names the voters |
+| [0007](0007-embassy-threads.md)          | Embassy threads are synced as a whole, the bot adds hosts |
 
 How BITS behaves when one of its parts or services is down is described in [failure-modes.md](../failure-modes.md).
 

@@ -20,6 +20,26 @@ interface SystemLog {
     /** Records a sync run that publishes nothing, since no rule can be run. */
     fun recordSyncWithoutRules(trigger: SyncTrigger)
 
+    /**
+     * Records an embassy sync of [threadCount] threads that is about to publish its event. Returns the ID that goes into
+     * the event as `syncId`, under which the bot reports what it changed.
+     */
+    fun recordEmbassySyncRun(
+        trigger: SyncTrigger,
+        threadCount: Int,
+    ): Long
+
+    /**
+     * Stores what the bot changed for the embassy sync [syncId]. Returns `false` if it was stored already, e.g. because
+     * the bot sent the report again, and changes nothing then.
+     *
+     * @throws NoSuchElementException if there is no such embassy sync, e.g. because it was deleted already
+     */
+    fun recordEmbassySyncResult(
+        syncId: Long,
+        result: EmbassySyncResult,
+    ): Boolean
+
     fun recordAccountLinked(link: AccountLinkRecord)
 
     fun recordAccountRemoved(removal: AccountRemovalRecord)

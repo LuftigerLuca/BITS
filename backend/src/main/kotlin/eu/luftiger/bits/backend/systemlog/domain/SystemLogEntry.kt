@@ -84,6 +84,9 @@ enum class EntryKind(
     val category: Category,
 ) {
     SYNC_RUN(Category.SYNC),
+
+    /** A sync of the embassy threads; the counts are thread and ambassador role changes. */
+    EMBASSY_SYNC_RUN(Category.SYNC),
     ACCOUNT_LINKED(Category.ACCOUNT),
 
     /** A WarEra account moved from one Discord account to another. */
@@ -107,6 +110,9 @@ enum class EntryKind(
 
     /** The result of a vote could not be worked out yet. */
     VOTE_EVALUATION_DELAYED(Category.ERROR),
+
+    /** An embassy thread is gone, or the bot may not manage it. */
+    EMBASSY_THREAD_UNAVAILABLE(Category.ERROR),
     ;
 
     enum class Category {

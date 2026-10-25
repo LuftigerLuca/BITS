@@ -17,8 +17,8 @@ export const TRIGGERS: Record<SyncTrigger, string> = {
   HOURLY: 'stündlich',
   RULE_CHANGE: 'nach Regeländerung',
   ACCOUNT_CHANGE: 'nach Verknüpfung',
-  // No longer used; older runs still carry it.
-  SETTING_CHANGE: 'nach Einschalten der Nicknames',
+  // Older runs of the role sync carry it for turning on nicknames, embassy syncs for a change on their page.
+  SETTING_CHANGE: 'nach Einstellungsänderung',
 }
 
 export const STATUS: Record<SyncRunStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
@@ -36,6 +36,8 @@ export const OUTCOMES: Record<ItemOutcome, string> = {
   FAILED: 'Fehlgeschlagen',
   NICKNAME_SET: 'Nickname gesetzt',
   NICKNAME_RESET: 'Nickname entfernt',
+  THREAD_ADDED: 'In Thread aufgenommen',
+  THREAD_REMOVED: 'Aus Thread entfernt',
 }
 
 export function name(ref: NamedRef): string {
@@ -45,6 +47,18 @@ export function name(ref: NamedRef): string {
 /** One line on what happened, in German. */
 export function describe(entry: SystemLogEntry): string {
   const sync = entry.sync
+  if (sync && entry.type === 'EMBASSY_SYNC_RUN') {
+    const title = sync.trigger ? `Botschafts-Sync ${TRIGGERS[sync.trigger]}` : 'Botschafts-Sync'
+    if (sync.memberCount === null) return sync.linkedCount === null ? title : `${title}: ${sync.linkedCount} Threads`
+    const counts = [
+      `${sync.memberCount} von ${sync.linkedCount} Threads`,
+      `${sync.granted} hinzugefügt`,
+      `${sync.removed} entfernt`,
+      `${sync.skipped} übersprungen`,
+      `${sync.failed} fehlgeschlagen`,
+    ]
+    return `${title}: ${counts.join(' · ')}`
+  }
   if (sync) {
     const title = sync.trigger ? `Sync ${TRIGGERS[sync.trigger]}` : 'Sync'
     if (sync.memberCount === null) {

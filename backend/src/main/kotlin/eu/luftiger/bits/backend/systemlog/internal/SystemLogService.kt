@@ -2,6 +2,9 @@ package eu.luftiger.bits.backend.systemlog.internal
 
 import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
 import eu.luftiger.bits.backend.systemlog.api.AccountRemovalRecord
+import eu.luftiger.bits.backend.systemlog.api.EmbassyChangeOutcome
+import eu.luftiger.bits.backend.systemlog.api.EmbassySyncResult
+import eu.luftiger.bits.backend.systemlog.api.EmbassyThreadCause
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -51,6 +54,51 @@ class SystemLogService(
     @Transactional
     override fun recordSyncWithoutRules(trigger: SyncTrigger) {
         entries.save(SystemLogEntry(clock.instant(), EntryKind.SYNC_RUN, syncTrigger = trigger, syncStatus = SyncStatus.NO_RULES))
+    }
+
+    @Transactional
+    override fun recordEmbassySyncRun(
+        trigger: SyncTrigger,
+        threadCount: Int,
+    ): Long =
+        requireNotNull(
+            entries
+                .save(
+                    SystemLogEntry(
+                        clock.instant(),
+                        EntryKind.EMBASSY_SYNC_RUN,
+                        syncTrigger = trigger,
+                        syncStatus = SyncStatus.PENDING,
+                        linkedCount = threadCount,
+                    ),
+                ).id,
+        )
+
+    /** The counts reuse those of the role sync: thread additions count as granted, thread removals as removed. */
+    @Transactional
+    override fun recordEmbassySyncResult(
+        syncId: Long,
+        result: EmbassySyncResult,
+    ): Boolean {
+        val entry =
+            entries.findByIdOrNull(syncId)?.takeIf { it.kind == EntryKind.EMBASSY_SYNC_RUN }
+                ?: throw NoSuchElementException("No embassy sync $syncId")
+        if (entry.reportedAt != null) return false
+        items.saveAll(
+            result.changes.map {
+                SystemLogItem(syncId, it.discordUserId, it.memberName, it.roleId, it.roleName, outcome(it.outcome), it.reason)
+            },
+        )
+        val counts = result.changes.groupingBy { it.outcome }.eachCount()
+        entry.memberCount = result.syncedThreadCount
+        entry.staleMemberCount = 0
+        entry.grantedCount = (counts[EmbassyChangeOutcome.THREAD_ADDED] ?: 0) + (counts[EmbassyChangeOutcome.ROLE_GRANTED] ?: 0)
+        entry.removedCount = (counts[EmbassyChangeOutcome.THREAD_REMOVED] ?: 0) + (counts[EmbassyChangeOutcome.ROLE_REMOVED] ?: 0)
+        entry.skippedCount = counts[EmbassyChangeOutcome.SKIPPED] ?: 0
+        entry.failedCount = counts[EmbassyChangeOutcome.FAILED] ?: 0
+        entry.syncStatus = SyncStatus.APPLIED
+        entry.reportedAt = clock.instant()
+        return true
     }
 
     @Transactional
@@ -115,6 +163,31 @@ class SystemLogService(
                         message =
                             "Die Regierung von ${problem.countryName ?: problem.countryId} konnte nicht geladen werden. " +
                                 "Regeln für Regierungsämter dieses Landes wurden übersprungen.",
+                    ),
+                )
+            is SystemProblem.EmbassyGovernmentUnavailable ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.GOVERNMENT_UNAVAILABLE,
+                        message =
+                            "Die Regierung von ${problem.countryName} konnte nicht geladen werden. Aus ihrem Botschafts-Thread " +
+                                "wurde niemand wegen des Amts entfernt.",
+                    ),
+                )
+            is SystemProblem.EmbassyThreadUnavailable ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.EMBASSY_THREAD_UNAVAILABLE,
+                        message =
+                            "Der Botschafts-Thread ${problem.threadName} (${problem.countryName}) wurde nicht abgeglichen: " +
+                                when (problem.cause) {
+                                    EmbassyThreadCause.MISSING -> "Er wurde gelöscht, oder der Bot sieht ihn nicht."
+                                    EmbassyThreadCause.NO_PERMISSION ->
+                                        "Dem Bot fehlen im Kanal die Rechte „Threads verwalten“ oder „Nachrichten in Threads senden“."
+                                    EmbassyThreadCause.FAILED -> "Discord hat die Anfrage abgelehnt."
+                                },
                     ),
                 )
             is SystemProblem.RoleNotAssignable ->
@@ -272,6 +345,16 @@ class SystemLogService(
             RoleChangeOutcome.REMOVED -> ItemOutcome.REMOVED
             RoleChangeOutcome.SKIPPED -> ItemOutcome.SKIPPED
             RoleChangeOutcome.FAILED -> ItemOutcome.FAILED
+        }
+
+    private fun outcome(outcome: EmbassyChangeOutcome) =
+        when (outcome) {
+            EmbassyChangeOutcome.THREAD_ADDED -> ItemOutcome.THREAD_ADDED
+            EmbassyChangeOutcome.THREAD_REMOVED -> ItemOutcome.THREAD_REMOVED
+            EmbassyChangeOutcome.ROLE_GRANTED -> ItemOutcome.GRANTED
+            EmbassyChangeOutcome.ROLE_REMOVED -> ItemOutcome.REMOVED
+            EmbassyChangeOutcome.SKIPPED -> ItemOutcome.SKIPPED
+            EmbassyChangeOutcome.FAILED -> ItemOutcome.FAILED
         }
 
     private fun outcome(outcome: NicknameChangeOutcome) =

@@ -14,6 +14,7 @@ data class DataExport(
     val openVerification: ExportedVerification?,
     val nicknameOptedInAt: String?,
     val pings: List<String>,
+    val embassies: ExportedEmbassies,
     val systemLog: ExportedSystemLog,
     /** What the member changed as admin in the dashboard. */
     val auditLog: List<ExportedAuditEntry>,
@@ -32,6 +33,30 @@ data class ExportedVerification(
     val wareraUsername: String,
     val code: String,
     val expiresAt: String,
+)
+
+@Serializable
+data class ExportedEmbassies(
+    /** Embassy threads an admin added the member to by hand. */
+    val addedByHand: List<ExportedManualMembership>,
+    /** Embassy threads the bot last reported the member in, with why. */
+    val reportedIn: List<ExportedThreadMembership>,
+)
+
+@Serializable
+data class ExportedManualMembership(
+    val countryName: String,
+    val threadName: String,
+    val memberName: String?,
+    val addedAt: String,
+)
+
+@Serializable
+data class ExportedThreadMembership(
+    val countryName: String,
+    val threadName: String,
+    val memberName: String,
+    val reason: String,
 )
 
 @Serializable

@@ -11,6 +11,11 @@ export const ACTIONS: Record<AuditAction, string> = {
   VOTE_MANAGER_ROLES_CHANGED: 'Rollen für Abstimmungen geändert',
   VOTE_RESULT_BACKGROUND_CHANGED: 'Hintergrund der Auswertung geändert',
   VOTE_PARTY_COLORS_CHANGED: 'Parteifarben geändert',
+  EMBASSY_THREAD_ASSIGNED: 'Botschafts-Thread zugeordnet',
+  EMBASSY_THREAD_UNASSIGNED: 'Botschafts-Thread aufgehoben',
+  EMBASSY_MEMBER_ADDED: 'Mitglied zur Botschaft hinzugefügt',
+  EMBASSY_MEMBER_REMOVED: 'Mitglied aus Botschaft entfernt',
+  EMBASSY_SETTINGS_CHANGED: 'Botschafts-Einstellungen geändert',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

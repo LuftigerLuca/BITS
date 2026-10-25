@@ -26,6 +26,15 @@ down, it ends only with the next report or at its end date. If the
 vote's channel was deleted, the result is only in the dashboard. Without WarEra, admins cannot list the parties to pick their
 colours; result images are still drawn with the colours saved, and the preview uses invented parties.
 
+The embassy sync follows the role sync. Without WarEra, a thread whose government cannot be loaded loses nobody,
+its members keep the ambassador role, and the system log records it once per sync; members added by hand and the
+members of the host roles are still added. Without the bot, the syncs wait in the stream and the dashboard shows the
+members of the last report. A thread that was deleted, or in whose channel the bot may not manage threads, is recorded
+in the system log and skipped, and a change Discord refuses is logged and skipped, for a member who may not see the
+channel with that reason; the other threads are synced, and
+the next sync tries again, at the latest after an hour. Without the backend, the bot keeps reporting its private threads
+with backoff, so new threads show up for picking once it is back.
+
 Admins see most of this in the system log of the dashboard: members and governments whose WarEra data is missing,
 role and nickname changes Discord refused or the bot could not make, events moved to `bits:events:dead`, and events that wait more than 10 minutes for Redis.
 A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or

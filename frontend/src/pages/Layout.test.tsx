@@ -65,7 +65,7 @@ describe('layout', () => {
     expect(current.map((link) => link.textContent)).toEqual(['Audit-Log'])
   })
 
-  it('shows admins the admin group with the admin area, the roles and both logs', async () => {
+  it('shows admins the admin group with the admin area, the roles, the embassies and both logs', async () => {
     stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json({}) })
 
     renderApp('/')
@@ -77,6 +77,7 @@ describe('layout', () => {
       ['Mein Account', '/account'],
       ['Verwaltung', '/admin'],
       ['Rollen', '/admin/roles'],
+      ['Botschaften', '/admin/embassies'],
       ['Audit-Log', '/admin/audit-log'],
       ['System-Log', '/admin/system-log'],
     ])
