@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Me, Overview } from '@/lib/api'
@@ -17,7 +17,15 @@ function stub(overview: Overview, setCountry: (init?: RequestInit) => Response) 
     'GET /web/admin/role-sync/countries': () => json(countries),
     'GET /web/admin/overview': () => json(overview),
     'PUT /web/admin/overview/country': setCountry,
+    'GET /web/votes/options': () => json({ roles: [], channels: [] }),
+    'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
   })
+}
+
+/** The admin page has more cards with a save button. */
+function saveButton() {
+  const card = screen.getByText('Startseite').closest('[data-slot=card]') as HTMLElement
+  return within(card).getByRole('button', { name: 'Speichern' })
 }
 
 async function chooseCountry(name: string) {
@@ -42,9 +50,9 @@ describe('country of the start page', () => {
     renderApp('/admin')
 
     expect(await screen.findByText('Germany', { selector: '[data-slot=select-value]' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    expect(saveButton()).toBeDisabled()
     await chooseCountry('France')
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await userEvent.click(saveButton())
 
     await vi.waitFor(() => expect(current).toBe('fr'))
     // Loaded again after saving, so the start page shows the new country.
@@ -59,7 +67,7 @@ describe('country of the start page', () => {
 
     await screen.findByText('Land wählen')
     await chooseCountry('Germany')
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await userEvent.click(saveButton())
 
     expect(await screen.findByText('WarEra ist gerade nicht erreichbar. Bitte versuche es später erneut.')).toBeInTheDocument()
   })

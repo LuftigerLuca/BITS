@@ -303,7 +303,7 @@ class VoteTest {
 
         mockMvc.get("/web/votes/access") { cookie(user) }.andExpect {
             jsonPath("$.canManage") { value(true) }
-            jsonPath("$.canConfigure") { value(false) }
+            jsonPath("$.canConfigure") { doesNotExist() }
         }
         val options = mockMvc.get("/web/votes/options") { cookie(user) }
         assertEquals(listOf("r-congress", "r-speaker"), options.read<List<String>>("$.roles[*].id"))
