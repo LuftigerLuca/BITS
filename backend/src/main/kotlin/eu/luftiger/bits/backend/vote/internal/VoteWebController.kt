@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.vote.internal
 
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
+import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Vote
 import eu.luftiger.bits.backend.vote.domain.VoteStatus
 import kotlinx.serialization.Serializable
@@ -83,7 +84,10 @@ class VoteWebController(
     ): VoteResponse {
         val manager = manager(session)
         val endsAt = request.endsAt?.let(Instant::ofEpochMilli)
-        return when (val outcome = voteService.start(manager, request.question, request.roleId, request.channelId, endsAt)) {
+        return when (
+            val outcome =
+                voteService.start(manager, request.question, request.roleId, request.channelId, endsAt, request.threshold?.toThreshold())
+        ) {
             is StartOutcome.Started -> {
                 log.info("Vote {} started by {}", outcome.vote.id, session.subject)
                 outcome.vote.toResponse(voted = 0)
@@ -149,6 +153,8 @@ class VoteWebController(
         startedAt = startedAt.toEpochMilli(),
         startedBy = startedByName,
         endsAt = endsAt?.toEpochMilli(),
+        threshold = thresholdPercent?.let { VoteThresholdBody(it, ThresholdChoice.of(requireNotNull(thresholdChoice))) },
+        endedByThreshold = endedByThreshold(),
         closedAt = closedAt?.toEpochMilli(),
         closedBy = closedByName,
         status = VoteStatusResponse.of(status),
@@ -204,6 +210,10 @@ data class VoteResponse(
     val startedAt: Long,
     val startedBy: String,
     val endsAt: Long?,
+    /** At which the vote ends early, `null` if it does not. */
+    val threshold: VoteThresholdBody?,
+    /** Whether it ended because it reached [threshold]. */
+    val endedByThreshold: Boolean,
     val closedAt: Long?,
     /** `null` if it ended on its own. */
     val closedBy: String?,
@@ -265,7 +275,41 @@ data class CreateVoteRequest(
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote without end. */
     val endsAt: Long?,
+    /** Ends the vote early, whichever comes first with [endsAt]; `null` if it does not. */
+    val threshold: VoteThresholdBody? = null,
 )
+
+/** The vote ends early once more than [percent] (1 to 99) of the eligible members chose [choice]. */
+@Serializable
+data class VoteThresholdBody(
+    val percent: Int,
+    val choice: ThresholdChoice,
+) {
+    fun toThreshold() = Threshold(percent, choice.toChoice())
+}
+
+/** The options a threshold can be for; abstaining decides nothing. */
+@Serializable
+enum class ThresholdChoice {
+    YES,
+    NO,
+    ;
+
+    fun toChoice() =
+        when (this) {
+            YES -> Choice.YES
+            NO -> Choice.NO
+        }
+
+    companion object {
+        fun of(choice: Choice) =
+            when (choice) {
+                Choice.YES -> YES
+                Choice.NO -> NO
+                Choice.ABSTAIN -> error("A threshold is for Yes or No only")
+            }
+    }
+}
 
 @Serializable
 data class ManagerRolesRequest(

@@ -1,10 +1,17 @@
-import { ApiError, type VoteStatus } from '@/lib/api'
+import { ApiError, type ThresholdChoice, type VoteStatus, type VoteThreshold } from '@/lib/api'
 
 export const STATUS: Record<VoteStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
   OPEN: { label: 'Läuft', variant: 'secondary' },
   COUNTING: { label: 'Wird ausgewertet', variant: 'outline' },
   EVALUATED: { label: 'Ausgewertet', variant: 'secondary' },
   CANCELLED: { label: 'Abgebrochen', variant: 'outline' },
+}
+
+export const THRESHOLD_CHOICE: Record<ThresholdChoice, string> = { YES: 'Ja', NO: 'Nein' }
+
+/** E.g. "mehr als 50 % mit Ja". */
+export function thresholdText(threshold: VoteThreshold): string {
+  return `mehr als ${threshold.percent} % mit ${THRESHOLD_CHOICE[threshold.choice]}`
 }
 
 /** What the end field offers first, like the bot's default. */

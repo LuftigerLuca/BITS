@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { voteResultImageUrl, type Vote } from '@/lib/api'
-import { STATUS, errorMessage, formatTime, participation } from './labels'
+import { STATUS, errorMessage, formatTime, participation, thresholdText } from './labels'
 import { useCloseVote, useVotes } from './queries'
 
 /** The running votes with their participation, to end or cancel early. */
@@ -64,7 +64,14 @@ export function OpenVotesCard() {
                     <p>{vote.roleName ?? 'Unbekannte Rolle'}</p>
                     <p className="text-xs text-muted-foreground">#{vote.channelName ?? 'unbekannt'}</p>
                   </TableCell>
-                  <TableCell>{vote.endsAt === null ? 'offen' : formatTime(vote.endsAt)}</TableCell>
+                  <TableCell>
+                    <p>{vote.endsAt === null ? 'offen' : formatTime(vote.endsAt)}</p>
+                    {vote.threshold !== null && (
+                      <p className="text-xs text-muted-foreground">
+                        Endet automatisch bei {thresholdText(vote.threshold)}
+                      </p>
+                    )}
+                  </TableCell>
                   <TableCell>{participation(vote.voted, vote.eligible)}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
@@ -175,6 +182,12 @@ export function VoteArchiveCard() {
   )
 }
 
+function closedText(vote: Vote): string {
+  if (vote.closedBy) return `beendet von ${vote.closedBy}`
+  if (vote.endedByThreshold && vote.threshold) return `automatisch beendet bei ${thresholdText(vote.threshold)}`
+  return 'beendet'
+}
+
 function ArchivedVote({ vote }: { vote: Vote }) {
   const status = STATUS[vote.status]
   return (
@@ -188,7 +201,7 @@ function ArchivedVote({ vote }: { vote: Vote }) {
             {vote.closedAt !== null && (
               <>
                 {' '}
-                · {vote.closedBy ? `beendet von ${vote.closedBy}` : 'beendet'}, {formatTime(vote.closedAt)}
+                · {closedText(vote)}, {formatTime(vote.closedAt)}
               </>
             )}
           </p>

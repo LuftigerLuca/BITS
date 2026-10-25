@@ -23,6 +23,7 @@ import eu.luftiger.bits.shared.VoteDto
 import eu.luftiger.bits.shared.VoteMessageReport
 import eu.luftiger.bits.shared.VoteResultDto
 import eu.luftiger.bits.shared.VoteState
+import eu.luftiger.bits.shared.VoteThreshold
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -61,6 +62,7 @@ class VoteBotController(
                     request.roleId,
                     request.channelId,
                     request.endsAt?.let(Instant::ofEpochMilli),
+                    request.threshold?.let { Threshold(it.percent, it.choice.toChoice()) },
                 )
         ) {
             is StartOutcome.Started -> StartVoteResponse.Started(requireNotNull(outcome.vote.id))
@@ -175,6 +177,8 @@ class VoteBotController(
             roleId = roleId,
             channelId = channelId,
             endsAt = endsAt?.toEpochMilli(),
+            threshold = thresholdPercent?.let { VoteThreshold(it, requireNotNull(thresholdChoice).toVoteChoice()) },
+            endedByThreshold = endedByThreshold(),
             state =
                 when (status) {
                     VoteStatus.OPEN -> VoteState.OPEN

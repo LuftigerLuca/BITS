@@ -6,11 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DEFAULT_DURATION_MILLIS, errorMessage, toLocalInput } from './labels'
+import type { ThresholdChoice } from '@/lib/api'
+import { DEFAULT_DURATION_MILLIS, THRESHOLD_CHOICE, errorMessage, toLocalInput } from './labels'
 import { useCreateVote, useVoteOptions } from './queries'
 
 /** Like the backend's limit. */
 const MAX_QUESTION_LENGTH = 500
+
+const THRESHOLD_ITEMS = (['YES', 'NO'] as const).map((value) => ({ value, label: THRESHOLD_CHOICE[value] }))
 
 /** Starts a vote; the bot posts it in the channel and pings the role. */
 export function StartVoteForm() {
@@ -21,16 +24,24 @@ export function StartVoteForm() {
   const [channelId, setChannelId] = useState<string | null>(null)
   const [openEnd, setOpenEnd] = useState(false)
   const [endsAt, setEndsAt] = useState(() => toLocalInput(Date.now() + DEFAULT_DURATION_MILLIS))
+  /** Empty for a vote that does not end by a threshold. */
+  const [percent, setPercent] = useState('')
+  const [thresholdChoice, setThresholdChoice] = useState<ThresholdChoice>('YES')
 
   const end = openEnd ? null : new Date(endsAt).getTime()
   // An end in the past is left to the backend, which knows the time of the request.
-  const valid = question.trim() !== '' && roleId !== null && channelId !== null && (end === null || !Number.isNaN(end))
+  const thresholdPercent = percent.trim() === '' ? null : Number(percent)
+  const percentValid =
+    thresholdPercent === null || (Number.isInteger(thresholdPercent) && thresholdPercent >= 1 && thresholdPercent <= 99)
+  const threshold = thresholdPercent === null ? null : { percent: thresholdPercent, choice: thresholdChoice }
+  const valid =
+    question.trim() !== '' && roleId !== null && channelId !== null && (end === null || !Number.isNaN(end)) && percentValid
 
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!valid) return
     createVote.mutate(
-      { question: question.trim(), roleId, channelId, endsAt: end },
+      { question: question.trim(), roleId, channelId, endsAt: end, threshold },
       { onSuccess: () => setQuestion('') },
     )
   }
@@ -117,6 +128,49 @@ export function StartVoteForm() {
                   />
                   Ohne Enddatum, bis jemand sie beendet
                 </label>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="vote-threshold">Automatisch beenden bei mehr als (%)</Label>
+                    <Input
+                      id="vote-threshold"
+                      type="number"
+                      min={1}
+                      max={99}
+                      placeholder="z. B. 50"
+                      value={percent}
+                      aria-invalid={!percentValid}
+                      aria-describedby="vote-threshold-hint"
+                      onChange={(event) => setPercent(event.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="vote-threshold-choice">mit der Stimme</Label>
+                    <Select
+                      items={THRESHOLD_ITEMS}
+                      value={thresholdChoice}
+                      disabled={thresholdPercent === null}
+                      onValueChange={(value) => value && setThresholdChoice(value)}
+                    >
+                      <SelectTrigger id="vote-threshold-choice" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {THRESHOLD_ITEMS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p id="vote-threshold-hint" className="text-xs text-muted-foreground">
+                  Optional, 1 bis 99. Sie endet, sobald mehr als so viel Prozent aller Stimmberechtigten mit dieser
+                  Stimme gestimmt haben oder das Ende erreicht ist, je nachdem, was zuerst eintritt; 50 heißt mehr als
+                  die Hälfte.
+                </p>
               </div>
             </div>
             <Button type="submit" className="self-start" disabled={createVote.isPending || !valid}>

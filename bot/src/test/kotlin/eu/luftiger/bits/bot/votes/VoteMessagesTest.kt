@@ -4,6 +4,7 @@ import eu.luftiger.bits.shared.ParticipationResponse
 import eu.luftiger.bits.shared.VoteChoice
 import eu.luftiger.bits.shared.VoteDto
 import eu.luftiger.bits.shared.VoteState
+import eu.luftiger.bits.shared.VoteThreshold
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,7 +12,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VoteMessagesTest {
-    private val vote = VoteDto(7, "Neue *Steuern*?", "r-congress", "c-votes", endsAt = 1_767_268_800_000, VoteState.OPEN, "m1")
+    private val vote =
+        VoteDto(7, "Neue *Steuern*?", "r-congress", "c-votes", endsAt = 1_767_268_800_000, state = VoteState.OPEN, messageId = "m1")
 
     @Test
     fun `durations are read in minutes, hours and days, or as open`() {
@@ -53,6 +55,38 @@ class VoteMessagesTest {
         assertEquals("3 von 7 haben abgestimmt", open.fields.single { it.name == "Beteiligung" }.value)
         assertEquals("<t:1767268800:f> (<t:1767268800:R>)", open.fields.single { it.name == "Ende" }.value)
         assertTrue(VoteMessages.components(vote.copy(state = VoteState.COUNTING)).isEmpty())
+    }
+
+    @Test
+    fun `a vote with a threshold says when it ends early, also without end date`() {
+        val threshold = VoteThreshold(50, VoteChoice.YES)
+        val withDate = VoteMessages.embed(vote.copy(threshold = threshold), ParticipationResponse(3, 7))
+        val withoutDate = VoteMessages.embed(vote.copy(endsAt = null, threshold = threshold), ParticipationResponse(3, 7))
+
+        assertEquals(
+            "<t:1767268800:f> (<t:1767268800:R>)\nEndet automatisch früher, sobald mehr als 50 % aller Stimmberechtigten mit Ja stimmen",
+            withDate.fields.single { it.name == "Ende" }.value,
+        )
+        assertEquals(
+            "Endet automatisch, sobald mehr als 50 % aller Stimmberechtigten mit Ja stimmen, sonst wenn sie jemand beendet",
+            withoutDate.fields.single { it.name == "Ende" }.value,
+        )
+    }
+
+    @Test
+    fun `a vote ended by its threshold says it ended automatically`() {
+        val ended =
+            VoteMessages.embed(
+                vote.copy(state = VoteState.COUNTING, threshold = VoteThreshold(66, VoteChoice.NO), endedByThreshold = true),
+                ParticipationResponse(5, 7),
+            )
+
+        assertEquals("Abstimmung beendet", ended.title)
+        assertEquals(
+            "automatisch beendet, da mehr als 66 % aller Stimmberechtigten mit Nein gestimmt haben; die Auswertung erscheint " +
+                "in diesem Kanal",
+            ended.fields.single { it.name == "Ende" }.value,
+        )
     }
 
     @Test

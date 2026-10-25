@@ -24,6 +24,8 @@ const vote: Vote = {
   startedAt: Date.UTC(2026, 9, 20, 12),
   startedBy: 'Luca',
   endsAt: Date.UTC(2026, 9, 22, 12),
+  threshold: null,
+  endedByThreshold: false,
   closedAt: null,
   closedBy: null,
   status: 'OPEN',
@@ -96,7 +98,50 @@ describe('votes page', () => {
 
     const toast = await expectToast('success', 'Abstimmung gestartet')
     expect(toast).toHaveTextContent('Sie erscheint gleich im Kanal.')
-    expect(created).toEqual([{ question: 'Krieg erklären?', roleId: 'r-congress', channelId: 'c-votes', endsAt: null }])
+    expect(created).toEqual([
+      { question: 'Krieg erklären?', roleId: 'r-congress', channelId: 'c-votes', endsAt: null, threshold: null },
+    ])
+  })
+
+  it('starts a vote that ends at a threshold of 1 to 99 percent for Yes or No', async () => {
+    const created: unknown[] = []
+    stubVotes(member, undefined, {
+      'POST /web/votes': (init?: RequestInit) => {
+        created.push(JSON.parse(String(init?.body)))
+        return json(vote, 201)
+      },
+    })
+    renderApp('/votes')
+
+    await userEvent.type(await screen.findByLabelText('Frage'), 'Krieg erklären?')
+    await choose('Stimmberechtigte Rolle', 'Kongress')
+    await choose('Kanal', '#abstimmungen (Politik)')
+    const percent = screen.getByLabelText('Automatisch beenden bei mehr als (%)')
+    await userEvent.type(percent, '100')
+    expect(screen.getByRole('button', { name: 'Abstimmung starten' })).toBeDisabled()
+
+    await userEvent.clear(percent)
+    await userEvent.type(percent, '50')
+    await choose('mit der Stimme', 'Nein')
+    await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
+
+    await expect.poll(() => created).toHaveLength(1)
+    expect(created[0]).toMatchObject({ threshold: { percent: 50, choice: 'NO' } })
+  })
+
+  it('shows the threshold a vote ends at, and that it ended by it', async () => {
+    stubVotes(member, undefined, {
+      'GET /web/votes': () =>
+        json({
+          open: [{ ...vote, threshold: { percent: 50, choice: 'YES' } }],
+          closed: [{ ...evaluated, closedBy: null, threshold: { percent: 66, choice: 'NO' }, endedByThreshold: true }],
+        }),
+    })
+    renderApp('/votes')
+
+    expect(await screen.findByText('Endet automatisch bei mehr als 50 % mit Ja')).toBeInTheDocument()
+    const archived = screen.getByRole('article', { name: 'Steuern senken?' })
+    expect(within(archived).getByText(/automatisch beendet bei mehr als 66 % mit Nein/)).toBeInTheDocument()
   })
 
   it('ends a vote only after asking', async () => {

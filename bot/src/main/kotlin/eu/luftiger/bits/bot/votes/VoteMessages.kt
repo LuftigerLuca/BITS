@@ -33,8 +33,29 @@ object VoteMessages {
             }
         val end =
             when (vote.state) {
-                VoteState.OPEN -> vote.endsAt?.let { "<t:${it / 1000}:f> (<t:${it / 1000}:R>)" } ?: "offen, bis sie jemand beendet"
-                VoteState.COUNTING, VoteState.EVALUATED -> "beendet, die Auswertung erscheint in diesem Kanal"
+                VoteState.OPEN -> {
+                    val date = vote.endsAt?.let { "<t:${it / 1000}:f> (<t:${it / 1000}:R>)" }
+                    val threshold =
+                        vote.threshold?.let {
+                            "sobald mehr als ${it.percent} % aller Stimmberechtigten mit ${label(
+                                it.choice,
+                            )} stimmen"
+                        }
+                    when {
+                        threshold == null -> date ?: "offen, bis sie jemand beendet"
+                        date == null -> "Endet automatisch, $threshold, sonst wenn sie jemand beendet"
+                        else -> "$date\nEndet automatisch früher, $threshold"
+                    }
+                }
+                VoteState.COUNTING, VoteState.EVALUATED -> {
+                    val threshold = vote.threshold
+                    if (vote.endedByThreshold && threshold != null) {
+                        "automatisch beendet, da mehr als ${threshold.percent} % aller Stimmberechtigten mit " +
+                            "${label(threshold.choice)} gestimmt haben; die Auswertung erscheint in diesem Kanal"
+                    } else {
+                        "beendet, die Auswertung erscheint in diesem Kanal"
+                    }
+                }
                 VoteState.CANCELLED -> "abgebrochen, es gibt keine Auswertung"
             }
         return EmbedBuilder()
