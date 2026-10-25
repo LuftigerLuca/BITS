@@ -3,15 +3,12 @@ package eu.luftiger.bits.backend.rolesync.internal
 import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.event.api.EventPublisher
-import eu.luftiger.bits.backend.rolesync.domain.ConditionType
-import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
-import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraUser
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -32,8 +29,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Service
 class RoleSyncService(
-    private val ruleRepository: RoleRuleRepository,
-    private val roleRepository: DiscordRoleRepository,
+    private val ruleInputs: RuleInputs,
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
@@ -87,12 +83,16 @@ class RoleSyncService(
         trigger: SyncTrigger,
         confirmedRoleIds: List<String> = emptyList(),
     ) {
-        val rules = activeRules()
+        val rules = ruleInputs.activeRules()
         if (rules.isEmpty()) {
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
-        val evaluator = RuleEvaluator(rules, governments(rules))
+        val governments =
+            ruleInputs.governments(rules) { countryId, countryName ->
+                systemLog.recordProblem(SystemProblem.GovernmentUnavailable(countryId, countryName))
+            }
+        val evaluator = RuleEvaluator(rules, governments)
         var lookups = 0
         val unavailable = mutableListOf<String>()
         val members =
@@ -119,28 +119,6 @@ class RoleSyncService(
         }
         log.info("Role sync published for {} members, {} linked", discordUserIds?.size ?: "all", links.size)
     }
-
-    /** Rules whose role exists and can be given by the bot; orphaned rules are not run. */
-    private fun activeRules(): List<RoleRule> {
-        val assignable = roleRepository.findAll().filter { it.assignable }.mapTo(HashSet()) { it.id }
-        return ruleRepository.findAll().filter { it.roleId in assignable }
-    }
-
-    /** One call per country that office rules refer to. A country whose government cannot be loaded is left out. */
-    private fun governments(rules: List<RoleRule>): Map<String, WareraGovernment> =
-        rules
-            .filter { it.type == ConditionType.GOVERNMENT_OFFICE && it.countryId != null }
-            .distinctBy { it.countryId }
-            .mapNotNull { rule ->
-                val countryId = requireNotNull(rule.countryId)
-                try {
-                    countryId to wareraClient.getGovernment(countryId)
-                } catch (e: WareraApiException) {
-                    log.warn("Government of country {} could not be loaded, its office rules are skipped", countryId, e)
-                    systemLog.recordProblem(SystemProblem.GovernmentUnavailable(countryId, rule.targetName))
-                    null
-                }
-            }.toMap()
 
     private fun loadUser(
         wareraUserId: String,

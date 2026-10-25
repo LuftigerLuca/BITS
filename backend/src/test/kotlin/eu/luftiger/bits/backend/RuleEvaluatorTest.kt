@@ -3,6 +3,7 @@ package eu.luftiger.bits.backend
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.internal.RoleOutcome
 import eu.luftiger.bits.backend.rolesync.internal.RuleEvaluator
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
@@ -72,6 +73,30 @@ class RuleEvaluatorTest {
             listOf("president"),
             evaluator.evaluate(WareraUser(id = "u1", username = "A", leveling = WareraUser.Leveling(99)))!!.grants.map { it.roleId },
         )
+    }
+
+    @Test
+    fun `checks of the rules agree with the target roles of the sync`() {
+        val evaluator = RuleEvaluator(listOf(german, president, congress, marine, level, rank), mapOf("de" to governments.getValue("de")))
+        val users =
+            listOf(
+                WareraUser(id = "u1", username = "A", country = "de", mu = "m1", militaryRank = 10, leveling = WareraUser.Leveling(20)),
+                WareraUser(id = "u2", username = "B", country = "fr", militaryRank = 50),
+                WareraUser(id = "u3", username = "C"),
+                null,
+            )
+
+        users.forEach { user ->
+            val checks = evaluator.check(user)
+            val roles = evaluator.evaluate(user) ?: MemberRoles(emptyList())
+            assertEquals(
+                roles.grants,
+                checks.filter { it.outcome == RoleOutcome.MET }.map { RoleGrant(it.roleId, "BITS: ${it.metBy!!.label}") },
+            )
+            assertEquals(roles.keepRoleIds, checks.filter { it.outcome == RoleOutcome.UNDECIDED }.map { it.roleId })
+        }
+        // Without the French government, congress is undecided for everybody, unless the user is missing altogether.
+        assertEquals(RoleOutcome.UNDECIDED, evaluator.check(users[1]).single { it.roleId == "congress" }.outcome)
     }
 
     private fun rule(

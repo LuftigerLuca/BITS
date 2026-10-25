@@ -24,16 +24,19 @@ class RuleEvaluator(
     fun evaluate(user: WareraUser?): MemberRoles? {
         val grants = mutableListOf<RoleGrant>()
         val keep = mutableListOf<String>()
-        rulesByRole.forEach { (roleId, rules) ->
-            val results = rules.map { it to matches(it, user) }
-            val met = results.firstOrNull { it.second == true }
-            when {
-                met != null -> grants += RoleGrant(roleId, "BITS: ${met.first.label}")
-                results.any { it.second == null } -> keep += roleId
+        check(user).forEach { role ->
+            when (role.outcome) {
+                RoleOutcome.MET -> grants += RoleGrant(role.roleId, "BITS: ${requireNotNull(role.metBy).label}")
+                RoleOutcome.UNDECIDED -> keep += role.roleId
+                RoleOutcome.NOT_MET -> Unit
             }
         }
         return if (grants.isEmpty() && keep.isEmpty()) null else MemberRoles(grants, keep)
     }
+
+    /** How each rule of each managed role turns out for [user], in the order of the rules; [evaluate] decides on this. */
+    fun check(user: WareraUser?): List<RoleCheck> =
+        rulesByRole.map { (roleId, rules) -> RoleCheck(roleId, rules.map { RuleCheck(it, matches(it, user)) }) }
 
     /** `null` if the data to decide is missing. */
     private fun matches(
@@ -63,4 +66,33 @@ class RuleEvaluator(
             GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS -> government.minOfForeignAffairs == userId
             GovernmentOffice.CONGRESS -> userId in government.congressMembers
         }
+}
+
+/** [met] is `null` if the data to decide is missing. */
+class RuleCheck(
+    val rule: RoleRule,
+    val met: Boolean?,
+)
+
+class RoleCheck(
+    val roleId: String,
+    val rules: List<RuleCheck>,
+) {
+    /** The first rule that is met; the sync names it as the reason. */
+    val metBy: RoleRule? = rules.firstOrNull { it.met == true }?.rule
+
+    val outcome: RoleOutcome =
+        when {
+            metBy != null -> RoleOutcome.MET
+            rules.any { it.met == null } -> RoleOutcome.UNDECIDED
+            else -> RoleOutcome.NOT_MET
+        }
+}
+
+enum class RoleOutcome {
+    MET,
+    NOT_MET,
+
+    /** No rule is met and the data for at least one is missing; the member keeps the role as it is. */
+    UNDECIDED,
 }

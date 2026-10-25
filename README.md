@@ -45,6 +45,11 @@ Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und be
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
 
+Mit `/rollen` sieht ein verknüpftes Mitglied, nur für sich, zu jeder Rolle, die BITS verwaltet, ob es sie
+erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10“. Das Backend wertet die Regeln über
+`POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen WarEra-Daten, und ändert
+keine Rollen; Abweichungen gleicht der nächste Abgleich an. Verwaiste Regeln tauchen nicht auf.
+
 Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
 verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür
 meldet der Bot die Mitglieder per `PUT /api/discord-members`, sobald alle geladen sind, beim Start und stündlich,

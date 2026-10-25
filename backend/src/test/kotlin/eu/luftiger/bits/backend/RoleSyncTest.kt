@@ -7,11 +7,16 @@ import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsEvent
+import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.ManagedRoleExplanation
+import eu.luftiger.bits.shared.ManagedRoleOutcome
 import eu.luftiger.bits.shared.MemberRoles
+import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
+import eu.luftiger.bits.shared.RuleExplanation
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
@@ -339,6 +344,101 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `role explanation names the rule that is met and what is missing`() {
+        link("1", "w1")
+        link("2", "w2")
+        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        createRule("""{"roleId":"r-minister","type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}""")
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","type":"MILITARY_RANK","threshold":50}""")
+        awaitEvents(4)
+
+        assertEquals(
+            RoleExplanationResponse.Explained(
+                wareraUsername = "Other",
+                roles =
+                    listOf(
+                        ManagedRoleExplanation(
+                            "r-citizen",
+                            ManagedRoleOutcome.NOT_MET,
+                            listOf(RuleExplanation("Staatsbürgerschaft Germany", false, "keine Staatsbürgerschaft Germany")),
+                        ),
+                        ManagedRoleExplanation(
+                            "r-minister",
+                            ManagedRoleOutcome.MET,
+                            listOf(RuleExplanation("Präsident in Germany", true, null)),
+                        ),
+                        ManagedRoleExplanation(
+                            "r-veteran",
+                            ManagedRoleOutcome.NOT_MET,
+                            listOf(
+                                RuleExplanation("Level ab 10", false, "Level 3 von 10"),
+                                RuleExplanation("Militärrang ab 50", false, "Militärrang 0 von 50"),
+                            ),
+                        ),
+                    ),
+            ),
+            explain("2"),
+        )
+    }
+
+    @Test
+    fun `role explanation agrees with the sync, also when a government is missing`() {
+        link("1", "w1")
+        link("2", "w2")
+        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        createRule("""{"roleId":"r-minister","type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}""")
+        createRule("""{"roleId":"r-veteran","type":"MILITARY_RANK","threshold":40}""")
+        awaitEvents(3)
+
+        listOf(false, true).forEachIndexed { index, governmentDown ->
+            warera.governmentDown = governmentDown
+            val explanations = listOf("1", "2").associateWith { (explain(it) as RoleExplanationResponse.Explained).roles }
+            syncService.syncMembers(listOf("1", "2"))
+            val sync = awaitEvents(4 + index).last() as RoleSyncEvent
+
+            explanations.forEach { (discordUserId, roles) ->
+                val member = sync.members[discordUserId] ?: MemberRoles(emptyList())
+                assertEquals(
+                    member.grants.mapTo(HashSet()) { it.roleId },
+                    roles.filter { it.outcome == ManagedRoleOutcome.MET }.mapTo(HashSet()) { it.roleId },
+                )
+                assertEquals(
+                    member.keepRoleIds.toSet(),
+                    roles.filter { it.outcome == ManagedRoleOutcome.UNDECIDED }.mapTo(HashSet()) { it.roleId },
+                )
+            }
+        }
+        // The missing government leaves the office role undecided for the member who is not the president.
+        val minister = (explain("1") as RoleExplanationResponse.Explained).roles.single { it.roleId == "r-minister" }
+        assertEquals(ManagedRoleOutcome.UNDECIDED, minister.outcome)
+        assertEquals("Regierung von Germany gerade nicht abrufbar", minister.rules.single().detail)
+    }
+
+    @Test
+    fun `role explanation leaves out orphaned rules, changes nothing and points unlinked members to verify`() {
+        link("1", "w1")
+        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        reportRoles("""{"id":"r-veteran","name":"Veteran","color":null,"position":1,"assignable":true}""")
+        awaitEvents(2)
+
+        assertEquals(listOf("r-veteran"), (explain("1") as RoleExplanationResponse.Explained).roles.map { it.roleId })
+        assertEquals(RoleExplanationResponse.NotLinked, explain("9"))
+        awaitEvents(2)
+    }
+
+    @Test
+    fun `role explanation is a 503 if the user cannot be loaded`() {
+        link("1", "w1")
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        warera.failingUsers += "w1"
+
+        explainRequest("1").andExpect { status { isServiceUnavailable() } }
+        explainRequest("not-an-id").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun `countries and military units can be picked`() {
         assertEquals(listOf("France", "Germany"), mockMvc.get("/web/admin/role-sync/countries") { cookie(admin) }.read("$[*].name"))
         mockMvc
@@ -368,6 +468,21 @@ class RoleSyncTest {
                 content = """{"roles":[${roles.joinToString(",")}]}"""
             }.andExpect { status { isNoContent() } }
     }
+
+    private fun explain(discordUserId: String): RoleExplanationResponse =
+        BitsJson.decodeFromString(
+            explainRequest(discordUserId)
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response.contentAsString,
+        )
+
+    private fun explainRequest(discordUserId: String) =
+        mockMvc.post("/api/role-explanations") {
+            header("Authorization", "Bearer test-service-token-at-least-32-chars")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"discordUserId":"$discordUserId"}"""
+        }
 
     private fun createRule(
         body: String,
