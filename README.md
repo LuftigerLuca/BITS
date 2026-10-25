@@ -42,16 +42,18 @@ bis zu 10 Minuten alt. Kann WarEra Partei, Regierung oder Firmen gerade nicht li
 verfügbar“. Hinweise, etwa auf eine fehlende Verknüpfung, sieht nur, wer den Command aufgerufen hat.
 
 Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an WarEra-Merkmale koppeln:
-Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit, Level oder Militärrang ab
-einem Schwellwert. Eine Regel hat eine bis zehn solcher Bedingungen, die alle erfüllt sein müssen (UND), etwa
+Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit oder einer Partei, Level,
+Militärrang oder Zahl der Firmen ab einem Schwellwert. Eine Regel hat eine bis zehn solcher Bedingungen, die alle
+erfüllt sein müssen (UND), etwa
 „Staatsbürgerschaft Germany und Level ab 10“; mehrere Regeln für dieselbe Rolle gelten als ODER. Eine Rolle mit
 mindestens einer Regel verwaltet BITS: Wer keine ihrer Regeln erfüllt, verliert sie, auch wenn sie von Hand vergeben
 wurde. Das Backend berechnet die Soll-Rollen und publiziert ein `RoleSyncEvent`, der Bot setzt es mit Grund im
 Audit-Log um. Abgeglichen wird beim Verknüpfen für den Nutzer (und den zuvor verknüpften Discord-Account), nach jeder
 Regeländerung für alle mit den WarEra-Daten des letzten Abgleichs und stündlich für alle mit frischen Daten, eine
-WarEra-Abfrage pro Sekunde; die Regierungen kommen dabei aus dem Cache und sind bis zu 10 Minuten alt. Kann ein Nutzer
-oder eine Regierung nicht geladen werden, bleiben die betroffenen Rollen unverändert, außer eine andere Bedingung
-derselben Regel ist sicher nicht erfüllt. Der Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und bei jeder Änderung; Regeln für
+WarEra-Abfrage pro Sekunde; die Firmen kosten je Nutzer eine weitere Abfrage und werden nur geladen, solange eine
+Regel sie braucht. Regierungen und Parteien kommen aus dem Cache und sind bis zu 10 Minuten alt. Kann ein Nutzer,
+seine Firmen, eine Regierung oder die Parteien eines Landes nicht geladen werden, bleiben die betroffenen Rollen
+unverändert, außer eine andere Bedingung derselben Regel ist sicher nicht erfüllt. Der Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und bei jeder Änderung; Regeln für
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
 

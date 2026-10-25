@@ -6,6 +6,8 @@ export const CONDITION_TYPES: Record<ConditionType, string> = {
   MILITARY_UNIT: 'Military Unit',
   LEVEL: 'Level',
   MILITARY_RANK: 'Militärrang',
+  COMPANIES: 'Firmenbesitz',
+  PARTY: 'Partei',
 }
 
 export const OFFICES: Record<GovernmentOffice, string> = {

@@ -96,6 +96,9 @@ enum class EntryKind(
     ACCOUNT_REMOVED(Category.ACCOUNT),
     WARERA_USERS_UNAVAILABLE(Category.ERROR),
     GOVERNMENT_UNAVAILABLE(Category.ERROR),
+
+    /** The parties of a country could not be loaded for a sync. */
+    PARTIES_UNAVAILABLE(Category.ERROR),
     ROLE_NOT_ASSIGNABLE(Category.ERROR),
     SYNC_ABORTED(Category.ERROR),
 

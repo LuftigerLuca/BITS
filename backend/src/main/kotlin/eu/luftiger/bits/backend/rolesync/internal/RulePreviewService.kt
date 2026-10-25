@@ -11,8 +11,8 @@ import org.springframework.web.server.ResponseStatusException
 
 /**
  * Shows an admin whom a rule change gives the role and from whom it takes it, before it is saved. It judges like the
- * sync that follows the change: with the [RuleEvaluator], the WarEra data of the last sync and fresh governments,
- * against the roles the members hold now as the bot reported them. A rule change only changes its own role, and the bot
+ * sync that follows the change: with the [RuleEvaluator], the WarEra data of the last sync and fresh governments
+ * and parties, against the roles the members hold now as the bot reported them. A rule change only changes its own role, and the bot
  * takes it from as many members as it takes, so that is all the sync would change for it.
  *
  * It saves, records and publishes nothing.
@@ -61,7 +61,7 @@ class RulePreviewService(
                 unknown = emptyList(),
             )
         }
-        val evaluator = RuleEvaluator(rules, ruleInputs.governments(rules))
+        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules))
         val links = accountLinks.findAll().associate { it.discordUserId to it.wareraUserId }
         val users = syncService.lastLoadedUsers()
         val gains = mutableListOf<GuildMember>()
@@ -75,7 +75,8 @@ class RulePreviewService(
                     wareraUserId == null -> RoleOutcome.NOT_MET
                     // The sync would load the user first.
                     wareraUserId !in users -> RoleOutcome.UNDECIDED
-                    else -> evaluator.check(users[wareraUserId]).single().outcome
+                    // Companies the sync would load first are undecided, unless another condition fails.
+                    else -> users.getValue(wareraUserId).let { evaluator.check(it.user, it.companyCount).single().outcome }
                 }
             val holds = roleId in member.roleIds
             when (outcome) {

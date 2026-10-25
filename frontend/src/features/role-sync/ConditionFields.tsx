@@ -7,6 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { searchMilitaryUnits, type ConditionType, type GovernmentOffice, type Option } from '@/lib/api'
 import { needsCountry, type ConditionDraft } from './conditionDraft'
 import { CONDITION_TYPES, OFFICES, errorMessage } from './labels'
+import { useParties } from './queries'
+
+const THRESHOLD_LABELS = { LEVEL: 'Level ab', MILITARY_RANK: 'Militärrang ab', COMPANIES: 'Firmen ab' } as const
 
 /** The fields of one condition of a new rule, in a group named `name`. */
 export function ConditionFields({
@@ -32,6 +35,7 @@ export function ConditionFields({
   const { type } = draft
   const id = (field: string) => `condition-${draft.key}-${field}`
   const update = (changes: Partial<ConditionDraft>) => onChange({ ...draft, ...changes })
+  const parties = useParties(type === 'PARTY' ? draft.countryId : null)
 
   async function searchMu() {
     onSearchError(null)
@@ -53,6 +57,16 @@ export function ConditionFields({
     label,
   }))
   const muItems = muResults.map((mu) => ({ value: mu.id, label: mu.name }))
+  const partyItems = (parties.data ?? []).map((party) => ({ value: party.id, label: party.name }))
+  const partyPlaceholder = !draft.countryId
+    ? 'Erst Land wählen'
+    : parties.isError
+      ? 'Parteien nicht ladbar'
+      : parties.isPending
+        ? 'Parteien werden geladen …'
+        : partyItems.length === 0
+          ? 'Keine Parteien'
+          : 'Partei wählen'
 
   return (
     // The legend floats so it sits inside the border; it must stay the first child to name the group.
@@ -96,7 +110,7 @@ export function ConditionFields({
             <Select
               items={countryItems}
               value={draft.countryId}
-              onValueChange={(countryId) => update({ countryId })}
+              onValueChange={(countryId) => update({ countryId, partyId: null })}
               disabled={countriesPending}
             >
               <SelectTrigger id={id('country')} className="w-full">
@@ -176,9 +190,31 @@ export function ConditionFields({
             </div>
           </>
         )}
-        {(type === 'LEVEL' || type === 'MILITARY_RANK') && (
+        {type === 'PARTY' && (
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={id('threshold')}>{type === 'LEVEL' ? 'Level ab' : 'Militärrang ab'}</Label>
+            <Label htmlFor={id('party')}>Partei</Label>
+            <Select
+              items={partyItems}
+              value={draft.partyId}
+              onValueChange={(partyId) => update({ partyId })}
+              disabled={partyItems.length === 0}
+            >
+              <SelectTrigger id={id('party')} className="w-full">
+                <SelectValue placeholder={partyPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {partyItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {(type === 'LEVEL' || type === 'MILITARY_RANK' || type === 'COMPANIES') && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={id('threshold')}>{THRESHOLD_LABELS[type]}</Label>
             <Input
               id={id('threshold')}
               type="number"

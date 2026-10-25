@@ -18,6 +18,12 @@ sealed interface SystemProblem {
         val countryName: String?,
     ) : SystemProblem
 
+    /** The parties of a country could not be loaded in a sync; the rules for [partyNames] were not run. */
+    @NamedInterface("api")
+    data class PartiesUnavailable(
+        val partyNames: List<String>,
+    ) : SystemProblem
+
     /**
      * The government of a country with an embassy thread could not be loaded; nobody was removed from the thread
      * because of their office. Recorded once per sync.

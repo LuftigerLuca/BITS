@@ -362,9 +362,10 @@ class RoleSyncTest {
             office: String? = null,
             threshold: Int? = null,
             targetName: String? = null,
+            partyId: String? = null,
         ) = jdbc.update(
-            "INSERT INTO role_rule_condition (rule_id, position, type, country_id, office, threshold, target_name) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO role_rule_condition (rule_id, position, type, country_id, office, threshold, target_name, party_id) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             ruleId,
             position++,
             type,
@@ -372,6 +373,7 @@ class RoleSyncTest {
             office,
             threshold,
             targetName,
+            partyId,
         )
 
         listOf(
@@ -382,7 +384,12 @@ class RoleSyncTest {
             { insert("LEVEL", threshold = 0) },
             { insert("LEVEL", threshold = 5, countryId = "de") },
             { insert("UNKNOWN", threshold = 5) },
+            { insert("COMPANIES", threshold = 0) },
+            { insert("PARTY", countryId = "de", targetName = "Partei") },
+            { insert("CITIZENSHIP", countryId = "de", targetName = "Germany", partyId = "p1") },
         ).forEach { assertFailsWith<DataIntegrityViolationException> { it() } }
+        assertEquals(1, insert("PARTY", countryId = "de", targetName = "Partei", partyId = "p1"))
+        assertEquals(1, insert("PARTY", countryId = "de", targetName = "Andere", partyId = "p2"))
         assertEquals(1, insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany"))
         assertFailsWith<DataIntegrityViolationException> {
             insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany")
@@ -575,6 +582,126 @@ class RoleSyncTest {
         awaitEvents(3)
         // The second refresh was skipped, and the sync after the first one used the data it loaded.
         assertEquals(1, warera.lookups.count { it == "w1" })
+    }
+
+    @Test
+    fun `admin creates company and party rules`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei"), WareraParty("p2", "Andere"))
+
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":1}]}""")
+            .andExpect { jsonPath("$.label") { value("Besitz von mindestens 1 Firma") } }
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":3}]}""")
+            .andExpect { jsonPath("$.label") { value("Besitz von mindestens 3 Firmen") } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p1"}]}""")
+            .andExpect { jsonPath("$.label") { value("Mitglied der Partei Partei") } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p2"}]}""")
+            .andExpect { status { isCreated() } }
+
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":0}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de"}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p9"}]}""")
+            .andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"xx","partyId":"p1"}]}""")
+            .andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p1"}]}""")
+            .andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun `parties of a country can be picked`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Zentrum"), WareraParty("p2", "Allianz"))
+
+        assertEquals(
+            listOf("Allianz", "Zentrum"),
+            mockMvc.get("/web/admin/role-sync/countries/de/parties") { cookie(admin) }.read("$[*].name"),
+        )
+        mockMvc.get("/web/admin/role-sync/countries/xx/parties") { cookie(admin) }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `companies are loaded only while a company rule exists, and like the users reused by rule changes`() {
+        link("1", "w1")
+        link("2", "w2")
+        // Verification looks at the companies too.
+        warera.companyLookups.clear()
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        awaitEvents(1)
+        syncTrigger.hourly()
+        awaitEvents(2)
+        assertEquals(emptyList(), warera.companyLookups)
+
+        warera.companyCounts["w2"] = 2
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"COMPANIES","threshold":2}]}""")
+        assertEquals(setOf("r-citizen"), grantedRoles(awaitEvents(3).last(), "2"))
+        assertEquals(setOf("r-veteran"), grantedRoles(awaitEvents(3).last(), "1"))
+        assertEquals(listOf("w1", "w2"), warera.companyLookups.sorted())
+
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"COMPANIES","threshold":1}]}""")
+        awaitEvents(4)
+        assertEquals(2, warera.companyLookups.size)
+
+        warera.companyCounts["w2"] = 1
+        syncTrigger.hourly()
+        assertEquals(setOf("r-minister"), grantedRoles(awaitEvents(5).last(), "2"))
+        assertEquals(4, warera.companyLookups.size)
+    }
+
+    @Test
+    fun `party rules follow the members of the party`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w2")))
+        link("1", "w1")
+        link("2", "w2")
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p1"}]}""")
+        awaitBackgroundWork()
+
+        val first = roleSyncEvents().size
+        syncTrigger.hourly()
+        val synced = awaitEvents(first + 1).last() as RoleSyncEvent
+        assertEquals(null, synced.members["1"])
+        assertEquals(MemberRoles(listOf(RoleGrant("r-minister", "BITS: Mitglied der Partei Partei"))), synced.members["2"])
+
+        warera.partiesDown = true
+        val before = roleSyncEvents().size
+        syncTrigger.hourly()
+        val down = awaitEvents(before + 1).last() as RoleSyncEvent
+        assertEquals(MemberRoles(grants = emptyList(), keepRoleIds = listOf("r-minister")), down.members["1"])
+        assertEquals(
+            listOf("PARTIES_UNAVAILABLE"),
+            jdbc.queryForList("SELECT DISTINCT kind FROM system_log_entry WHERE kind = 'PARTIES_UNAVAILABLE'", String::class.java),
+        )
+    }
+
+    @Test
+    fun `role explanation names the companies and party that are missing`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei"))
+        link("2", "w2")
+        createRule(
+            """{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":3},""" +
+                """{"type":"PARTY","countryId":"de","partyId":"p1"}]}""",
+        )
+        awaitBackgroundWork()
+
+        assertEquals(
+            "1 von 3 Firmen und nicht Mitglied der Partei Partei",
+            (explain("2") as RoleExplanationResponse.Explained)
+                .roles
+                .single()
+                .rules
+                .single()
+                .detail,
+        )
+
+        warera.companiesDown = true
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w2")))
+        assertEquals(
+            "Firmen gerade nicht abrufbar",
+            (explain("2") as RoleExplanationResponse.Explained)
+                .roles
+                .single()
+                .rules
+                .single()
+                .detail,
+        )
     }
 
     @Test
@@ -974,6 +1101,11 @@ class RoleSyncTest {
         val governments = mutableMapOf<String, WareraGovernment>()
         var partiesDown = false
         var companiesDown = false
+
+        /** Companies per WarEra user ID; without an entry, a user owns one, the one they verified with. */
+        val companyCounts = mutableMapOf<String, Int>()
+        val companyLookups = CopyOnWriteArrayList<String>()
+
         var down = false
         var companyName = ""
 
@@ -998,6 +1130,8 @@ class RoleSyncTest {
             parties.clear()
             governments.clear()
             partyLookups.clear()
+            companyCounts.clear()
+            companyLookups.clear()
             deletedUsers.clear()
             governmentDown = false
             partiesDown = false
@@ -1034,8 +1168,9 @@ class RoleSyncTest {
 
         override fun getCompanyIds(userId: String) =
             available {
+                companyLookups += userId
                 if (companiesDown) throw WareraApiException("down")
-                listOf("c-$userId")
+                List(companyCounts[userId] ?: 1) { "c-$userId" }
             }
 
         override fun getCompany(companyId: String) =

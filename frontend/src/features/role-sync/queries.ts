@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createRoleRule,
   deleteRoleRule,
+  getParties,
   getRoleRules,
   getRoles,
   previewCreateRoleRule,
@@ -20,6 +21,16 @@ export function useRoles() {
 
 export function useRoleRules() {
   return useQuery({ queryKey: [...ROLE_SYNC, 'rules'], queryFn: getRoleRules })
+}
+
+/** The parties of [countryId], for party conditions; they change rarely, so they are kept for the visit. */
+export function useParties(countryId: string | null) {
+  return useQuery({
+    queryKey: [...ROLE_SYNC, 'parties', countryId],
+    queryFn: () => getParties(countryId!),
+    enabled: countryId !== null,
+    staleTime: Infinity,
+  })
 }
 
 export function useCreateRoleRule() {

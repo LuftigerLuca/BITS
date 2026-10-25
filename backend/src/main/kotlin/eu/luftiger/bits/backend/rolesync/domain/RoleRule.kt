@@ -60,7 +60,7 @@ class RuleCondition(
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
     val type: ConditionType,
-    /** For [ConditionType.CITIZENSHIP] and [ConditionType.GOVERNMENT_OFFICE]. */
+    /** For [ConditionType.CITIZENSHIP], [ConditionType.GOVERNMENT_OFFICE] and [ConditionType.PARTY]. */
     @Column(name = "country_id")
     val countryId: String? = null,
     @Enumerated(EnumType.STRING)
@@ -68,12 +68,18 @@ class RuleCondition(
     val office: GovernmentOffice? = null,
     @Column(name = "mu_id")
     val muId: String? = null,
-    /** Lowest level or military rank for [ConditionType.LEVEL] and [ConditionType.MILITARY_RANK]. */
+    /**
+     * Lowest level, military rank or number of companies for [ConditionType.LEVEL], [ConditionType.MILITARY_RANK] and
+     * [ConditionType.COMPANIES].
+     */
     @Column(name = "threshold")
     val threshold: Int? = null,
-    /** Name of the country or military unit at the time the rule was created. */
+    /** Name of the country, military unit or party at the time the rule was created. */
     @Column(name = "target_name")
     val targetName: String? = null,
+    /** For [ConditionType.PARTY], a party of the country [countryId]. */
+    @Column(name = "party_id")
+    val partyId: String? = null,
 ) {
     /** German description, e.g. "Level ab 10". */
     val label: String
@@ -84,17 +90,23 @@ class RuleCondition(
                 ConditionType.MILITARY_UNIT -> "Mitglied der MU $targetName"
                 ConditionType.LEVEL -> "Level ab $threshold"
                 ConditionType.MILITARY_RANK -> "Militärrang ab $threshold"
+                ConditionType.COMPANIES -> "Besitz von mindestens $threshold ${if (threshold == 1) "Firma" else "Firmen"}"
+                ConditionType.PARTY -> "Mitglied der Partei $targetName"
             }
 
-    /** What makes two conditions the same; the name of the target is left out, since it may change in WarEra. */
+    /**
+     * What makes two conditions the same; the name of the target is left out, since it may change in WarEra. The party
+     * comes last and only if set, so the keys of the conditions from before it stay as they are.
+     */
     val key: String
         get() =
-            listOf(
+            listOfNotNull(
                 type.name,
                 countryId.orEmpty(),
                 office?.name.orEmpty(),
                 muId.orEmpty(),
                 threshold?.toString().orEmpty(),
+                partyId,
             ).joinToString("|")
 }
 
@@ -104,4 +116,9 @@ enum class ConditionType {
     MILITARY_UNIT,
     LEVEL,
     MILITARY_RANK,
+
+    /** Owns at least [RuleCondition.threshold] companies. */
+    COMPANIES,
+
+    PARTY,
 }

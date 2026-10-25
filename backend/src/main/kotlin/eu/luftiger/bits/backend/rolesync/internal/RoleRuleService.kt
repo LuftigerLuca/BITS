@@ -141,7 +141,15 @@ class RoleRuleService(
                     }
                 RuleCondition(type, muId = mu.id, targetName = mu.name)
             }
-            ConditionType.LEVEL, ConditionType.MILITARY_RANK -> {
+            ConditionType.PARTY -> {
+                val countryId = countryId(request)
+                val partyId = request.partyId?.takeIf { it.isNotBlank() } ?: throw badRequest("Party missing")
+                knownCountry(countryId, countryName)
+                val party =
+                    wareraClient.getParties(countryId).firstOrNull { it.id == partyId } ?: throw badRequest("Unknown party $partyId")
+                RuleCondition(type, countryId = countryId, partyId = party.id, targetName = party.name)
+            }
+            ConditionType.LEVEL, ConditionType.MILITARY_RANK, ConditionType.COMPANIES -> {
                 val threshold = request.threshold?.takeIf { it >= 1 } ?: throw badRequest("Threshold must be at least 1")
                 RuleCondition(type, threshold = threshold)
             }
@@ -168,6 +176,12 @@ class RoleRuleService(
     }
 
     fun countries(): List<OptionResponse> = wareraClient.getAllCountries().map { OptionResponse(it.id, it.name) }.sortedBy { it.name }
+
+    /** The parties of a known country, by name. */
+    fun parties(countryId: String): List<OptionResponse> {
+        if (wareraClient.getAllCountries().none { it.id == countryId }) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return wareraClient.getParties(countryId).map { OptionResponse(it.id, it.name) }.sortedBy { it.name }
+    }
 
     /** WarEra's search returns the best few matches; each needs its own call for the name. */
     fun searchMilitaryUnits(query: String): List<OptionResponse> {

@@ -7,14 +7,16 @@ import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RuleExplanation
+import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 /**
  * Explains to a member which managed roles they meet and why, for `/rollen`. It judges with the [RuleEvaluator] of the
- * role sync, but always with a fresh WarEra user (the governments may be cached for a few minutes), and changes
- * nothing: the next sync brings the roles in line.
+ * role sync, but always with a fresh WarEra user and companies (the governments and parties may be cached for a few
+ * minutes), and changes nothing: the next sync brings the roles in line.
  */
 @Service
 class RoleExplanationService(
@@ -23,16 +25,27 @@ class RoleExplanationService(
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     /** @throws eu.luftiger.bits.warera.WareraApiException if the user cannot be loaded */
     fun explain(discordUserId: String): RoleExplanationResponse {
         val link = accountLinks.findByDiscordUserId(discordUserId) ?: return RoleExplanationResponse.NotLinked
         val rules = ruleInputs.activeRules()
         if (rules.isEmpty()) return RoleExplanationResponse.Explained(link.wareraUsername, emptyList())
         val user = wareraClient.getUser(link.wareraUserId)
+        val companyCount =
+            if (rules.any { rule ->
+                    rule.conditions.any { it.type == ConditionType.COMPANIES }
+                }
+            ) {
+                companyCount(user.id)
+            } else {
+                null
+            }
         val positions = roleRepository.findAll().associate { it.id to it.position }
         val roles =
-            RuleEvaluator(rules, ruleInputs.governments(rules))
-                .check(user)
+            RuleEvaluator(rules, ruleInputs.ruleData(rules))
+                .check(user, companyCount)
                 .sortedByDescending { positions[it.roleId] }
                 .map { role ->
                     ManagedRoleExplanation(
@@ -43,7 +56,7 @@ class RoleExplanationService(
                                 RoleOutcome.NOT_MET -> ManagedRoleOutcome.NOT_MET
                                 RoleOutcome.UNDECIDED -> ManagedRoleOutcome.UNDECIDED
                             },
-                        rules = role.rules.map { RuleExplanation(it.rule.label, it.met, detail(it, user)) },
+                        rules = role.rules.map { RuleExplanation(it.rule.label, it.met, detail(it, user, companyCount)) },
                     )
                 }
         return RoleExplanationResponse.Explained(user.username, roles)
@@ -56,18 +69,39 @@ class RoleExplanationService(
     private fun detail(
         check: RuleCheck,
         user: WareraUser,
+        companyCount: Int?,
     ): String? {
         val decisive = check.conditions.filter { it.met == check.met }
         return when (check.met) {
             true -> null
-            null -> decisive.joinToString(" und ") { "Regierung von ${it.condition.targetName} gerade nicht abrufbar" }
-            false -> decisive.joinToString(" und ") { missing(it.condition, user) }
+            null -> decisive.joinToString(" und ") { unavailable(it.condition) }
+            false -> decisive.joinToString(" und ") { missing(it.condition, user, companyCount) }
         }
     }
+
+    /** `null` if the companies cannot be loaded; their conditions are then undecided. */
+    private fun companyCount(wareraUserId: String): Int? =
+        try {
+            wareraClient.getCompanyIds(wareraUserId).size
+        } catch (e: WareraApiException) {
+            log.warn("Companies of WarEra user {} could not be loaded for /rollen", wareraUserId, e)
+            null
+        }
+
+    private fun unavailable(condition: RuleCondition): String =
+        when (condition.type) {
+            ConditionType.GOVERNMENT_OFFICE -> "Regierung von ${condition.targetName} gerade nicht abrufbar"
+            ConditionType.COMPANIES -> "Firmen gerade nicht abrufbar"
+            ConditionType.PARTY -> "Partei ${condition.targetName} gerade nicht abrufbar"
+            // Decided by the user alone, who was loaded.
+            ConditionType.CITIZENSHIP, ConditionType.MILITARY_UNIT, ConditionType.LEVEL, ConditionType.MILITARY_RANK ->
+                "gerade nicht prüfbar"
+        }
 
     private fun missing(
         condition: RuleCondition,
         user: WareraUser,
+        companyCount: Int?,
     ): String =
         when (condition.type) {
             ConditionType.CITIZENSHIP -> "keine Staatsbürgerschaft ${condition.targetName}"
@@ -75,6 +109,8 @@ class RoleExplanationService(
             ConditionType.MILITARY_UNIT -> "nicht Mitglied der MU ${condition.targetName}"
             ConditionType.LEVEL -> "Level ${user.leveling.level} von ${threshold(condition)}"
             ConditionType.MILITARY_RANK -> "Militärrang ${user.militaryRank} von ${threshold(condition)}"
+            ConditionType.COMPANIES -> "$companyCount von ${threshold(condition)} Firmen"
+            ConditionType.PARTY -> "nicht Mitglied der Partei ${condition.targetName}"
         }
 
     private fun threshold(condition: RuleCondition) = requireNotNull(condition.threshold)

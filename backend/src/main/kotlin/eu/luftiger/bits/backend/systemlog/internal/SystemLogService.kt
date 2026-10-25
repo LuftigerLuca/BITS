@@ -165,6 +165,16 @@ class SystemLogService(
                                 "Regeln für Regierungsämter dieses Landes wurden übersprungen.",
                     ),
                 )
+            is SystemProblem.PartiesUnavailable ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.PARTIES_UNAVAILABLE,
+                        message =
+                            "Die Parteien eines Landes konnten nicht geladen werden. Regeln für " +
+                                "${problem.partyNames.joinToString(", ")} wurden übersprungen.",
+                    ),
+                )
             is SystemProblem.EmbassyGovernmentUnavailable ->
                 entries.save(
                     SystemLogEntry(

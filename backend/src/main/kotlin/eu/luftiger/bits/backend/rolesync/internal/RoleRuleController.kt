@@ -74,6 +74,11 @@ class RoleRuleController(
     @GetMapping("/countries")
     fun countries(): List<OptionResponse> = ruleService.countries()
 
+    @GetMapping("/countries/{countryId}/parties")
+    fun parties(
+        @PathVariable countryId: String,
+    ): List<OptionResponse> = ruleService.parties(countryId)
+
     @GetMapping("/military-units")
     fun militaryUnits(
         @RequestParam query: String,
@@ -162,6 +167,7 @@ data class ConditionRequest(
     val office: Office? = null,
     val muId: String? = null,
     val threshold: Int? = null,
+    val partyId: String? = null,
 )
 
 /**
@@ -175,6 +181,8 @@ enum class RuleType {
     MILITARY_UNIT,
     LEVEL,
     MILITARY_RANK,
+    COMPANIES,
+    PARTY,
 }
 
 val RuleType.condition: ConditionType
@@ -185,6 +193,8 @@ val RuleType.condition: ConditionType
             RuleType.MILITARY_UNIT -> ConditionType.MILITARY_UNIT
             RuleType.LEVEL -> ConditionType.LEVEL
             RuleType.MILITARY_RANK -> ConditionType.MILITARY_RANK
+            RuleType.COMPANIES -> ConditionType.COMPANIES
+            RuleType.PARTY -> ConditionType.PARTY
         }
 
 /** Like [RuleType], the API's names for [GovernmentOffice]. */

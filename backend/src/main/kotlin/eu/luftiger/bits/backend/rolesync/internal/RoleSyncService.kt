@@ -4,6 +4,8 @@ import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.account.api.NicknameOptIns
 import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.rolesync.domain.ConditionType
+import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -27,7 +29,10 @@ import java.util.concurrent.ConcurrentHashMap
  * see [RoleSyncTrigger].
  *
  * Every sync is a run in the [SystemLog], written together with its event; members whose WarEra data is missing and
- * governments that cannot be loaded are recorded there as problems of the run.
+ * governments or parties that cannot be loaded are recorded there as problems of the run.
+ *
+ * The companies of a user cost a call of their own, so they are loaded only while a rule has a company condition. All
+ * calls per user are paced by [RoleSyncProperties.userLookupInterval].
  *
  * The event also carries the WarEra names the bot sets as nicknames of members who opted in, and for those who lost
  * their link the name to clear again. With opt-ins, a sync runs even without rules.
@@ -50,12 +55,7 @@ class RoleSyncService(
      * Result of the last lookup per WarEra user ID. A rule change only changes how the data is judged, so it reuses this
      * instead of loading every user again.
      */
-    private val users = ConcurrentHashMap<String, Lookup>()
-
-    /** `null` if the user could not be loaded; the member then keeps the roles as they are. */
-    private class Lookup(
-        val user: WareraUser?,
-    )
+    private val users = ConcurrentHashMap<String, LoadedUser>()
 
     @Volatile
     private var loadedAll = false
@@ -70,13 +70,15 @@ class RoleSyncService(
      * The WarEra data a rule change would be judged with now, by WarEra user ID. A user who is missing would be loaded
      * by that sync first; a `null` value could not be loaded.
      */
-    fun lastLoadedUsers(): Map<String, WareraUser?> = users.mapValues { it.value.user }
+    fun lastLoadedUsers(): Map<String, LoadedUser> = HashMap(users)
 
     /** Loads the WarEra data of every linked user again, without syncing; [syncAll] uses it afterwards. */
     fun refreshUsers() {
         val links = accountLinks.findAll()
+        val withCompanies = needsCompanies(ruleInputs.activeRules())
         users.keys.retainAll(links.mapTo(HashSet()) { it.wareraUserId })
-        links.forEachIndexed { index, link -> loadUser(link.wareraUserId, pauseBefore = index > 0) }
+        val pace = Pace()
+        links.forEach { link -> load(link.wareraUserId, withCompanies, pace) }
         loadedAll = true
         log.info("WarEra data of {} linked users refreshed", links.size)
     }
@@ -124,24 +126,25 @@ class RoleSyncService(
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
-        val governments =
-            ruleInputs.governments(rules) { countryId, countryName ->
-                systemLog.recordProblem(SystemProblem.GovernmentUnavailable(countryId, countryName))
-            }
-        val evaluator = RuleEvaluator(rules, governments)
-        var lookups = 0
+        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, systemLog::recordProblem))
+        val withCompanies = needsCompanies(rules)
+        val pace = Pace()
         val unavailable = mutableListOf<String>()
         val members = HashMap<String, MemberRoles>()
         val nicknames = HashMap<String, String>()
         links.forEach { link ->
             val cached = users[link.wareraUserId]?.takeUnless { refresh }
-            val user = if (cached != null) cached.user else loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
-            if (user == null) {
-                unavailable += link.discordUserId
-            } else if (link.discordUserId in optedIn) {
-                nicknames[link.discordUserId] = user.username
-            }
-            evaluator.evaluate(user)?.let { members[link.discordUserId] = it }
+            val loaded =
+                when {
+                    cached == null -> load(link.wareraUserId, withCompanies, pace)
+                    // A company rule was added since the user was loaded.
+                    withCompanies && cached.user != null && !cached.companiesLoaded -> loadCompanies(cached, pace)
+                    else -> cached
+                }
+            val user = loaded.user
+            if (user == null || (withCompanies && loaded.companyCount == null)) unavailable += link.discordUserId
+            if (user != null && link.discordUserId in optedIn) nicknames[link.discordUserId] = user.username
+            evaluator.evaluate(user, loaded.companyCount)?.let { members[link.discordUserId] = it }
         }
         if (discordUserIds == null) loadedAll = true
         if (unavailable.isNotEmpty()) systemLog.recordProblem(SystemProblem.WareraUsersUnavailable(unavailable))
@@ -178,11 +181,15 @@ class RoleSyncService(
         val wareraUsername: String?,
     )
 
-    private fun loadUser(
+    private fun needsCompanies(rules: List<RoleRule>) = rules.any { rule -> rule.conditions.any { it.type == ConditionType.COMPANIES } }
+
+    /** The user, and with [withCompanies] their companies too. */
+    private fun load(
         wareraUserId: String,
-        pauseBefore: Boolean,
-    ): WareraUser? {
-        if (pauseBefore && !properties.userLookupInterval.isZero) Thread.sleep(properties.userLookupInterval)
+        withCompanies: Boolean,
+        pace: Pace,
+    ): LoadedUser {
+        pace.next()
         val user =
             try {
                 wareraClient.getUser(wareraUserId)
@@ -190,7 +197,44 @@ class RoleSyncService(
                 log.warn("WarEra user {} could not be loaded, their roles stay as they are", wareraUserId, e)
                 null
             }
-        users[wareraUserId] = Lookup(user)
-        return user
+        val loaded = LoadedUser(wareraUserId, user)
+        users[wareraUserId] = loaded
+        return if (withCompanies && user != null) loadCompanies(loaded, pace) else loaded
+    }
+
+    private fun loadCompanies(
+        loaded: LoadedUser,
+        pace: Pace,
+    ): LoadedUser {
+        pace.next()
+        val count =
+            try {
+                wareraClient.getCompanyIds(loaded.wareraUserId).size
+            } catch (e: WareraApiException) {
+                log.warn("Companies of WarEra user {} could not be loaded, their company conditions are undecided", loaded.wareraUserId, e)
+                null
+            }
+        return LoadedUser(loaded.wareraUserId, loaded.user, count, companiesLoaded = true).also { users[loaded.wareraUserId] = it }
+    }
+
+    /** Pauses before every WarEra call of a sync but the first. */
+    private inner class Pace {
+        private var first = true
+
+        fun next() {
+            if (!first && !properties.userLookupInterval.isZero) Thread.sleep(properties.userLookupInterval)
+            first = false
+        }
     }
 }
+
+/** The WarEra data of a user as a sync loaded it last. */
+class LoadedUser(
+    val wareraUserId: String,
+    /** `null` if the user could not be loaded; the member then keeps the roles as they are. */
+    val user: WareraUser?,
+    /** `null` if not loaded, see [companiesLoaded], or if the companies could not be loaded. */
+    val companyCount: Int? = null,
+    /** Whether the companies were loaded with the user, which happens only while a rule needs them. */
+    val companiesLoaded: Boolean = false,
+)
