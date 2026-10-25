@@ -4,15 +4,20 @@ import com.jayway.jsonpath.JsonPath
 import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
+import eu.luftiger.bits.backend.members.internal.GuildMemberService
+import eu.luftiger.bits.backend.rolesync.internal.PreviewMember
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
+import eu.luftiger.bits.backend.rolesync.internal.RulePreviewResponse
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
 import eu.luftiger.bits.shared.MemberRoles
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
@@ -89,6 +94,9 @@ class RoleSyncTest {
     @Autowired
     lateinit var clock: MutableClock
 
+    @Autowired
+    lateinit var memberService: GuildMemberService
+
     private val admin by lazy { session(SessionUser.admin("admin")) }
 
     @BeforeTest
@@ -98,6 +106,7 @@ class RoleSyncTest {
             "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, nickname_opt_in",
         )
         redisTemplate.delete(EventStream.KEY)
+        memberService.forget()
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
         reportRoles(
@@ -121,6 +130,109 @@ class RoleSyncTest {
 
         mockMvc.get("/web/admin/role-sync/rules") { cookie(user) }.andExpect { status { isForbidden() } }
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""", user).andExpect { status { isForbidden() } }
+        previewRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""", user).andExpect { status { isForbidden() } }
+        mockMvc.get("/web/admin/role-sync/rules/1/deletion-preview") { cookie(user) }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `preview of a new rule agrees with the sync that follows`() {
+        warera.users["w4"] = WareraUser("w4", "Failing", leveling = WareraUser.Leveling(50))
+        warera.users["w5"] = WareraUser("w5", "Late", leveling = WareraUser.Leveling(1))
+        link("1", "w1")
+        link("2", "w2")
+        link("4", "w4")
+        warera.failingUsers += "w4"
+        syncTrigger.hourly()
+        awaitBackgroundWork()
+        // Linked after the hourly refresh, so the sync loads them first.
+        link("5", "w5")
+        val holders =
+            mapOf(
+                "1" to emptyList(),
+                "2" to listOf("r-veteran"),
+                // Given by hand, without a link.
+                "3" to listOf("r-veteran", "r-citizen"),
+                "4" to listOf("r-veteran"),
+                "5" to emptyList(),
+            )
+        reportMembers(holders)
+
+        val preview = preview("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+
+        assertEquals(true, preview.managed)
+        assertEquals(true, preview.membersReported)
+        assertEquals(true, preview.usersLoaded)
+        assertEquals(listOf(PreviewMember("1", "Member 1")), preview.gains)
+        assertEquals(listOf("2", "3"), preview.losses.map { it.discordUserId })
+        assertEquals(listOf("4", "5"), preview.unknown.map { it.discordUserId })
+
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        val event = awaitEvents(1).single() as RoleSyncEvent
+        val (gains, losses) = changesOf(event, holders, "r-veteran")
+        assertEquals(preview.gains.map { it.discordUserId }.toSet(), gains)
+        assertEquals(preview.losses.map { it.discordUserId }.toSet(), losses)
+    }
+
+    @Test
+    fun `preview of a deletion counts the members of the rules that are left`() {
+        link("1", "w1")
+        link("2", "w2")
+        val citizen = ruleId(createRule("""{"roleId":"r-veteran","type":"CITIZENSHIP","countryId":"de"}"""))
+        val level = ruleId(createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":2}"""))
+        awaitEvents(2)
+        reportMembers(mapOf("1" to listOf("r-veteran"), "2" to listOf("r-veteran")))
+
+        val withoutLevel = deletionPreview(level)
+        assertEquals(true, withoutLevel.managed)
+        assertEquals(listOf("2"), withoutLevel.losses.map { it.discordUserId })
+        assertEquals(emptyList(), withoutLevel.gains)
+
+        mockMvc.delete("/web/admin/role-sync/rules/$citizen") { cookie(admin) }
+        awaitEvents(3)
+        // The last rule: BITS no longer manages the role, so nobody loses it.
+        val withoutAny = deletionPreview(level)
+        assertEquals(false, withoutAny.managed)
+        assertEquals(emptyList(), withoutAny.losses)
+        mockMvc.get("/web/admin/role-sync/rules/999999/deletion-preview") { cookie(admin) }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `preview saves, records and publishes nothing`() {
+        link("1", "w1")
+        reportMembers(mapOf("1" to emptyList()))
+        val audits = jdbc.queryForObject("SELECT COUNT(*) FROM audit_entry", Int::class.java)
+
+        preview("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        previewRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":0}""").andExpect { status { isBadRequest() } }
+
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
+        assertEquals(audits, jdbc.queryForObject("SELECT COUNT(*) FROM audit_entry", Int::class.java))
+        awaitEvents(0)
+    }
+
+    @Test
+    fun `preview sends empty lists, which the dashboard reads`() {
+        link("1", "w1")
+        reportMembers(mapOf("1" to listOf("r-veteran")))
+
+        previewRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""").andExpect {
+            jsonPath("$.gains") { isArray() }
+            jsonPath("$.losses") { isArray() }
+            jsonPath("$.unknown") { isArray() }
+        }
+        // Without the members of the bot, the lists are empty as well.
+        memberService.forget()
+        previewRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""").andExpect { jsonPath("$.gains") { isArray() } }
+    }
+
+    @Test
+    fun `preview without the members of the bot says so`() {
+        link("1", "w1")
+
+        val preview = preview("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+
+        assertEquals(false, preview.membersReported)
+        assertEquals(emptyList(), preview.gains + preview.losses + preview.unknown)
     }
 
     @Test
@@ -579,6 +691,63 @@ class RoleSyncTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"discordUserId":"$discordUserId"}"""
         }
+
+    private fun previewRule(
+        body: String,
+        session: Cookie = admin,
+    ): ResultActionsDsl =
+        mockMvc.post("/web/admin/role-sync/rules/preview") {
+            cookie(session)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }
+
+    private fun preview(body: String): RulePreviewResponse =
+        BitsJson.decodeFromString(
+            previewRule(body)
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response.contentAsString,
+        )
+
+    private fun deletionPreview(id: Long): RulePreviewResponse =
+        BitsJson.decodeFromString(
+            mockMvc
+                .get("/web/admin/role-sync/rules/$id/deletion-preview") { cookie(admin) }
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response.contentAsString,
+        )
+
+    /** Every member of [holders], with the roles they hold. */
+    private fun reportMembers(holders: Map<String, List<String>>) {
+        val members = holders.map { (id, roleIds) -> ReportedMember(id, "Member $id", roleIds) }
+        mockMvc
+            .put("/api/discord-members") {
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                contentType = MediaType.APPLICATION_JSON
+                content = BitsJson.encodeToString(DiscordMembersReport(holders.keys.toList(), members))
+            }.andExpect { status { isNoContent() } }
+    }
+
+    /** Who gets and who loses [roleId] when the bot applies [event] to [holders], as its `roleChanges` decides. */
+    private fun changesOf(
+        event: RoleSyncEvent,
+        holders: Map<String, List<String>>,
+        roleId: String,
+    ): Pair<Set<String>, Set<String>> {
+        val gains = HashSet<String>()
+        val losses = HashSet<String>()
+        holders.forEach { (id, roleIds) ->
+            val target = event.members[id]
+            val granted = target?.grants.orEmpty().any { it.roleId == roleId }
+            val kept = roleId in target?.keepRoleIds.orEmpty()
+            val holds = roleId in roleIds
+            if (granted && !holds) gains += id
+            if (!granted && !kept && holds && roleId in event.managedRoleIds) losses += id
+        }
+        return gains to losses
+    }
 
     private fun createRule(
         body: String,

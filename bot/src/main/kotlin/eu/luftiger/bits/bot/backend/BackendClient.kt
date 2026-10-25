@@ -6,6 +6,7 @@ import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -51,7 +52,7 @@ interface BackendClient {
     suspend fun reportChannels(channels: List<DiscordChannelDto>)
 
     /** Replaces the members of the guild known to the backend, which deletes the links of everybody missing. */
-    suspend fun reportMembers(discordUserIds: List<String>)
+    suspend fun reportMembers(members: List<ReportedMember>)
 
     suspend fun reportMemberJoined(discordUserId: String)
 

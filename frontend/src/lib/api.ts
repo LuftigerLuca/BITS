@@ -107,6 +107,28 @@ export interface Option {
   name: string
 }
 
+export interface PreviewMember {
+  discordUserId: string
+  /** `null` for a member who joined after the bot's last member list. */
+  name: string | null
+}
+
+/** Whom a rule change gives its role and from whom it takes it; nothing is saved. */
+export interface RulePreview {
+  roleId: string
+  roleName: string | null
+  /** `false` if no rule is left for the role: BITS no longer manages it, and nobody gets or loses it. */
+  managed: boolean
+  /** `false` until the bot has reported the members with their roles since the backend started; there is no preview. */
+  membersReported: boolean
+  /** `false` until the WarEra data of all linked members was loaded since the backend started. */
+  usersLoaded: boolean
+  gains: PreviewMember[]
+  losses: PreviewMember[]
+  /** Members whose WarEra data is missing; the sync keeps their role or loads their data first. */
+  unknown: PreviewMember[]
+}
+
 const ROLE_SYNC = '/web/admin/role-sync'
 
 export async function getRoles(): Promise<DiscordRole[]> {
@@ -124,6 +146,19 @@ export async function createRoleRule(rule: CreateRoleRule): Promise<RoleRule> {
     body: JSON.stringify(rule),
   })
   return response.json()
+}
+
+export async function previewCreateRoleRule(rule: CreateRoleRule): Promise<RulePreview> {
+  const response = await request(`${ROLE_SYNC}/rules/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(rule),
+  })
+  return response.json()
+}
+
+export async function previewDeleteRoleRule(id: number): Promise<RulePreview> {
+  return (await request(`${ROLE_SYNC}/rules/${id}/deletion-preview`)).json()
 }
 
 export async function deleteRoleRule(id: number): Promise<void> {

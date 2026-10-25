@@ -4,6 +4,7 @@ import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.account.api.AccountRemoval
 import eu.luftiger.bits.backend.account.api.dto.DepartedMember
 import eu.luftiger.bits.backend.members.api.GuildMembers
+import eu.luftiger.bits.backend.members.api.dto.GuildMember
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import org.slf4j.LoggerFactory
@@ -27,12 +28,21 @@ class GuildMemberService(
 
     @Volatile
     private var members: Set<String>? = null
+
+    @Volatile
+    private var roles: Map<String, GuildMember>? = null
     private var refusing = false
 
     override fun discordUserIds(): Set<String>? = members
 
+    override fun members(): Collection<GuildMember>? = roles?.values
+
+    /** [withRoles] is empty from a bot that does not report roles yet. */
     @Synchronized
-    fun replaceAll(discordUserIds: Set<String>) {
+    fun replaceAll(
+        discordUserIds: Set<String>,
+        withRoles: List<GuildMember> = emptyList(),
+    ) {
         val linked = accountLinks.findAll().map { it.discordUserId }
         val departed = linked.filter { it !in discordUserIds }
         if (departed.size >= MIN_REFUSED_REMOVALS && departed.size * 2 > linked.size) {
@@ -44,12 +54,14 @@ class GuildMemberService(
         refusing = false
         if (departed.isNotEmpty()) accountRemoval.removeDeparted(departed.map { DepartedMember(it) })
         members = discordUserIds
+        roles = if (withRoles.isEmpty() && discordUserIds.isNotEmpty()) null else withRoles.associateBy { it.discordUserId }
         log.info("Member list of {} members received, {} links of departed members deleted", discordUserIds.size, departed.size)
     }
 
     @Synchronized
     fun joined(discordUserId: String) {
         members = members?.plus(discordUserId)
+        roles = roles?.plus(discordUserId to GuildMember(discordUserId, name = null, roleIds = emptySet()))
     }
 
     /** Deletes the link right away, without the check of [replaceAll]: a single departure is no sign of a broken list. */
@@ -59,6 +71,7 @@ class GuildMemberService(
         discordName: String?,
     ) {
         members = members?.minus(discordUserId)
+        roles = roles?.minus(discordUserId)
         accountRemoval.removeDeparted(listOf(DepartedMember(discordUserId, discordName)))
     }
 
@@ -66,6 +79,7 @@ class GuildMemberService(
     @Synchronized
     internal fun forget() {
         members = null
+        roles = null
         refusing = false
     }
 

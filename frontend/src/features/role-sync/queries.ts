@@ -4,6 +4,8 @@ import {
   deleteRoleRule,
   getRoleRules,
   getRoles,
+  previewCreateRoleRule,
+  previewDeleteRoleRule,
   type CreateRoleRule,
 } from '@/lib/api'
 
@@ -31,5 +33,30 @@ export function useDeleteRoleRule() {
   return useMutation({
     mutationFn: (id: number) => deleteRoleRule(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ROLE_SYNC }),
+  })
+}
+
+/**
+ * What creating [rule] would change, loaded while the confirmation is open. Always fresh: the members' roles and the
+ * WarEra data change all the time.
+ */
+export function useCreatePreview(rule: CreateRoleRule | null) {
+  return useQuery({
+    queryKey: [...ROLE_SYNC, 'preview', 'create', rule],
+    queryFn: () => previewCreateRoleRule(rule!),
+    enabled: rule !== null,
+    staleTime: 0,
+    gcTime: 0,
+  })
+}
+
+/** Like [useCreatePreview], for deleting the rule [id]. */
+export function useDeletionPreview(id: number | null) {
+  return useQuery({
+    queryKey: [...ROLE_SYNC, 'preview', 'delete', id],
+    queryFn: () => previewDeleteRoleRule(id!),
+    enabled: id !== null,
+    staleTime: 0,
+    gcTime: 0,
   })
 }

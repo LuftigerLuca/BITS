@@ -25,6 +25,7 @@ import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileRequest
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationRequest
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
@@ -128,10 +129,10 @@ class KtorBackendClient(
         }
     }
 
-    override suspend fun reportMembers(discordUserIds: List<String>) {
+    override suspend fun reportMembers(members: List<ReportedMember>) {
         http.put("api/discord-members") {
             contentType(ContentType.Application.Json)
-            setBody(DiscordMembersReport(discordUserIds))
+            setBody(DiscordMembersReport(members.map { it.discordUserId }, members))
         }
     }
 

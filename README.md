@@ -50,6 +50,13 @@ Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und be
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
 
+Bevor eine Regel angelegt oder gelöscht wird, zeigt das Dashboard, wem die Änderung die Rolle gibt und wem sie sie
+nimmt, aufklappbar mit Namen (`POST /web/admin/role-sync/rules/preview`, `GET …/rules/{id}/deletion-preview`).
+Das Backend wertet dafür die geänderten Regeln wie der folgende Abgleich aus, mit den WarEra-Daten des letzten
+Abgleichs und den Rollen, die der Bot mit der Mitgliederliste meldet, und speichert nichts. Mitglieder ohne WarEra-Daten
+aus dem letzten Abgleich zählen als „unbekannt“. Nach einem Neustart des Backends gibt es die Vorschau erst mit der
+nächsten Mitgliederliste und ist bis zum nächsten stündlichen Abgleich ungenau; das Dashboard sagt das dazu.
+
 Mit `/nickname an` oder dem Button „Nickname übernehmen“ nach der Verknüpfung entscheidet ein Mitglied selbst, dass
 BITS seinen Nickname auf den WarEra-Namen setzt; das geht auch vor dem Verknüpfen. Der Bot gleicht ihn bei jedem
 Abgleich an, also auch nach einer Umbenennung in WarEra spätestens nach einer Stunde, und nennt „BITS: WarEra-Name“ als
@@ -78,8 +85,8 @@ der Bot nur Kanäle anbietet, in denen er posten kann, meldet er seine Textkanä
 
 Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
 verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür
-meldet der Bot die Mitglieder per `PUT /api/discord-members`, sobald alle geladen sind, beim Start und stündlich,
-dazu jeden Beitritt und Austritt. Das Backend hält die Liste nur im Speicher und löscht die Verknüpfungen aller, die
+meldet der Bot die Mitglieder mit ihren Rollen per `PUT /api/discord-members`, sobald alle geladen sind, beim Start,
+stündlich und einige Sekunden nach Rollenänderungen, dazu jeden Beitritt und Austritt. Das Backend hält die Liste nur im Speicher und löscht die Verknüpfungen aller, die
 darin fehlen. Würde eine Liste mehr als die Hälfte und mindestens 10 Verknüpfungen auf einmal löschen, verweigert
 es sie als vermutlich fehlerhaft und vermerkt das im System-Log.
 

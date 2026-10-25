@@ -7,6 +7,7 @@ import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -215,7 +216,7 @@ class RoleReporterTest {
 
         override suspend fun reportChannels(channels: List<DiscordChannelDto>) = TODO()
 
-        override suspend fun reportMembers(discordUserIds: List<String>) = TODO()
+        override suspend fun reportMembers(members: List<ReportedMember>) = TODO()
 
         override suspend fun reportMemberJoined(discordUserId: String) = TODO()
 

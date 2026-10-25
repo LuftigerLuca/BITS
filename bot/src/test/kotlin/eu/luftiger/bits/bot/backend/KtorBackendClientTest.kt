@@ -6,6 +6,7 @@ import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.UnlinkAccountResponse
@@ -214,13 +215,18 @@ class KtorBackendClientTest {
                 }
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
-            client.reportMembers(listOf("1", "2"))
+            client.reportMembers(listOf(ReportedMember("1", "Luca", listOf("r1")), ReportedMember("2", "Mia", emptyList())))
             client.reportMemberJoined("3")
             client.reportMemberLeft("1", "Luca")
 
             assertEquals(
                 listOf(
-                    Triple(HttpMethod.Put, "/api/discord-members", """{"discordUserIds":["1","2"]}"""),
+                    Triple(
+                        HttpMethod.Put,
+                        "/api/discord-members",
+                        """{"discordUserIds":["1","2"],"members":[{"discordUserId":"1","name":"Luca","roleIds":["r1"]},""" +
+                            """{"discordUserId":"2","name":"Mia","roleIds":[]}]}""",
+                    ),
                     Triple(HttpMethod.Post, "/api/discord-members/joined", """{"discordUserId":"3"}"""),
                     Triple(HttpMethod.Post, "/api/discord-members/left", """{"discordUserId":"1","memberName":"Luca"}"""),
                 ),
