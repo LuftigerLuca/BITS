@@ -11,7 +11,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VoteMessagesTest {
-    private val vote = VoteDto(7, "Neue *Steuern*?", "r-congress", "c-votes", endsAt = 1_767_268_800_000, VoteState.OPEN, "m1")
+    private val vote =
+        VoteDto(7, "Neue *Steuern*?", "r-congress", "c-votes", endsAt = 1_767_268_800_000, state = VoteState.OPEN, messageId = "m1")
 
     @Test
     fun `durations are read in minutes, hours and days, or as open`() {
@@ -53,6 +54,36 @@ class VoteMessagesTest {
         assertEquals("3 von 7 haben abgestimmt", open.fields.single { it.name == "Beteiligung" }.value)
         assertEquals("<t:1767268800:f> (<t:1767268800:R>)", open.fields.single { it.name == "Ende" }.value)
         assertTrue(VoteMessages.components(vote.copy(state = VoteState.COUNTING)).isEmpty())
+    }
+
+    @Test
+    fun `a vote that ends at a participation says so, also without end date`() {
+        val withDate = VoteMessages.embed(vote.copy(autoClosePercent = 60), ParticipationResponse(3, 7))
+        val withoutDate = VoteMessages.embed(vote.copy(endsAt = null, autoClosePercent = 60), ParticipationResponse(3, 7))
+
+        assertEquals(
+            "<t:1767268800:f> (<t:1767268800:R>)\nEndet automatisch bei 60 % Beteiligung, falls die früher erreicht ist",
+            withDate.fields.single { it.name == "Ende" }.value,
+        )
+        assertEquals(
+            "Endet automatisch bei 60 % Beteiligung, sonst wenn sie jemand beendet",
+            withoutDate.fields.single { it.name == "Ende" }.value,
+        )
+    }
+
+    @Test
+    fun `a vote ended by its participation says it ended automatically`() {
+        val ended =
+            VoteMessages.embed(
+                vote.copy(state = VoteState.COUNTING, autoClosePercent = 60, endedByParticipation = true),
+                ParticipationResponse(5, 7),
+            )
+
+        assertEquals("Abstimmung beendet", ended.title)
+        assertEquals(
+            "automatisch beendet bei 60 % Beteiligung, die Auswertung erscheint in diesem Kanal",
+            ended.fields.single { it.name == "Ende" }.value,
+        )
     }
 
     @Test

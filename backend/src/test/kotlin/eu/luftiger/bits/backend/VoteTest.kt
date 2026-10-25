@@ -316,25 +316,30 @@ class VoteTest {
     @Test
     fun `managers start, end and look up votes in the dashboard`() {
         link("1", "w1")
+        link("2", "w2")
         val admin = session(SessionUser.discord("8", "Admin", "https://avatar", Role.ADMIN))
         val id =
             mockMvc
                 .post("/web/votes") {
                     cookie(admin)
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"question":"Neue Steuern?","roleId":"r-congress","channelId":"c-votes","endsAt":null}"""
+                    content =
+                        """{"question":"Neue Steuern?","roleId":"r-congress","channelId":"c-votes","endsAt":null,"autoClosePercent":75}"""
                 }.andExpect {
                     status { isCreated() }
                     jsonPath("$.status") { value("OPEN") }
                     jsonPath("$.endsAt") { value(null) }
+                    jsonPath("$.autoClosePercent") { value(75) }
                 }.read<Number>("$.id")
                 .toLong()
         cast(id, "1", VoteChoice.ABSTAIN)
-        participation(id, "1")
+        // 1 of 2 stays below the 75 %.
+        participation(id, "1", "2")
 
         mockMvc.get("/web/votes") { cookie(admin) }.andExpect {
+            jsonPath("$.open[0].autoClosePercent") { value(75) }
             jsonPath("$.open[0].voted") { value(1) }
-            jsonPath("$.open[0].eligible") { value(1) }
+            jsonPath("$.open[0].eligible") { value(2) }
             jsonPath("$.open[0].roleName") { value("Kongress") }
         }
         mockMvc.post("/web/votes/$id/end") { cookie(admin) }.andExpect { status { isNoContent() } }
@@ -374,6 +379,98 @@ class VoteTest {
     }
 
     @Test
+    fun `a vote ends on its own once the participation reaches the percentage, abstentions included`() {
+        (1..4).forEach { link("$it", "w$it") }
+        val voteId = startByAdmin(autoClosePercent = 60)
+
+        cast(voteId, "1", VoteChoice.YES)
+        cast(voteId, "2", VoteChoice.ABSTAIN)
+        // 2 of 4 are 50 %.
+        assertEquals(ParticipationResponse(voted = 2, eligible = 4), participation(voteId, "1", "2", "3", "4"))
+        assertEquals(VoteState.OPEN, vote(voteId).state)
+
+        cast(voteId, "3", VoteChoice.NO)
+        assertEquals(ParticipationResponse(voted = 3, eligible = 4), participation(voteId, "1", "2", "3", "4"))
+
+        jdbc.awaitOutbox()
+        val vote = vote(voteId)
+        assertEquals(VoteState.COUNTING, vote.state)
+        assertTrue(vote.endedByParticipation)
+        assertEquals(listOf(voteId), streamEvents().filterIsInstance<VoteClosedEvent>().map { it.voteId })
+        assertEquals(null, jdbc.queryForObject("SELECT closed_by_name FROM vote", String::class.java))
+        assertEquals(CastVoteResponse.Closed, cast(voteId, "4", VoteChoice.YES))
+        // Only the start is audited, like an end at the end date.
+        assertEquals(
+            listOf("„Neue Steuern?“ (@Kongress, #abstimmungen), bis 03.01.2026, 13:00 Uhr, endet automatisch bei 60 % Beteiligung"),
+            jdbc.queryForList("SELECT description FROM audit_entry", String::class.java),
+        )
+    }
+
+    @Test
+    fun `a vote ends exactly at the percentage, also without end date`() {
+        (1..4).forEach { link("$it", "w$it") }
+        val voteId = startByAdmin(autoClosePercent = 50, endsAt = null)
+
+        cast(voteId, "1", VoteChoice.YES)
+        cast(voteId, "2", VoteChoice.NO)
+        participation(voteId, "1", "2", "3", "4")
+
+        assertEquals(VoteState.COUNTING, vote(voteId).state)
+    }
+
+    @Test
+    fun `a vote without eligible members does not end by participation`() {
+        val voteId = startByAdmin(autoClosePercent = 1)
+
+        assertEquals(ParticipationResponse(voted = 0, eligible = 0), participation(voteId, "1", "2"))
+
+        assertEquals(VoteState.OPEN, vote(voteId).state)
+    }
+
+    @Test
+    fun `the end date still ends a vote whose participation stays below the percentage`() {
+        (1..2).forEach { link("$it", "w$it") }
+        val voteId = startByAdmin(autoClosePercent = 100)
+        cast(voteId, "1", VoteChoice.YES)
+        participation(voteId, "1", "2")
+
+        clock.advance(Duration.ofHours(48))
+        jobs.run()
+
+        val vote = vote(voteId)
+        assertEquals(VoteState.COUNTING, vote.state)
+        assertEquals(false, vote.endedByParticipation)
+    }
+
+    @Test
+    fun `a vote ended by hand is not closed again by the participation`() {
+        (1..2).forEach { link("$it", "w$it") }
+        val voteId = startByAdmin(autoClosePercent = 50)
+        cast(voteId, "1", VoteChoice.YES)
+        endByAdmin(voteId)
+
+        participation(voteId, "1", "2")
+
+        jdbc.awaitOutbox()
+        assertEquals(listOf(voteId), streamEvents().filterIsInstance<VoteClosedEvent>().map { it.voteId })
+        assertEquals(false, vote(voteId).endedByParticipation)
+    }
+
+    @Test
+    fun `the participation must be 1 to 100 percent`() {
+        val admin = actor("8", administrator = true)
+        startRequest(admin, autoClosePercent = 0).andExpect { status { isBadRequest() } }
+        startRequest(admin, autoClosePercent = 101).andExpect { status { isBadRequest() } }
+        mockMvc
+            .post("/web/votes") {
+                cookie(session(SessionUser.admin("admin")))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"question":"Neue Steuern?","roleId":"r-congress","channelId":"c-votes","endsAt":null,"autoClosePercent":0}"""
+            }.andExpect { status { isBadRequest() } }
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM vote", Int::class.java))
+    }
+
+    @Test
     fun `the bot's API needs the service token`() {
         mockMvc.get("/api/votes/open").andExpect { status { isUnauthorized() } }
     }
@@ -393,15 +490,25 @@ class VoteTest {
     private fun start(
         actor: String,
         channelId: String = "c-votes",
-    ): StartVoteResponse = decode(startRequest(actor, channelId))
+        endsAt: Instant? = clock.now.plus(Duration.ofHours(48)),
+        autoClosePercent: Int? = null,
+    ): StartVoteResponse = decode(startRequest(actor, channelId, endsAt, autoClosePercent))
 
     private fun startRequest(
         actor: String,
         channelId: String = "c-votes",
-        endsAt: Instant = clock.now.plus(Duration.ofHours(48)),
+        endsAt: Instant? = clock.now.plus(Duration.ofHours(48)),
+        autoClosePercent: Int? = null,
     ) = api("/api/votes") {
-        """{"actor":$actor,"question":"Neue Steuern?","roleId":"r-congress","channelId":"$channelId","endsAt":${endsAt.toEpochMilli()}}"""
+        """{"actor":$actor,"question":"Neue Steuern?","roleId":"r-congress","channelId":"$channelId",""" +
+            """"endsAt":${endsAt?.toEpochMilli()},"autoClosePercent":$autoClosePercent}"""
     }
+
+    private fun startByAdmin(
+        autoClosePercent: Int,
+        endsAt: Instant? = clock.now.plus(Duration.ofHours(48)),
+    ): Long =
+        (start(actor("8", administrator = true), endsAt = endsAt, autoClosePercent = autoClosePercent) as StartVoteResponse.Started).voteId
 
     private fun close(
         voteId: Long,

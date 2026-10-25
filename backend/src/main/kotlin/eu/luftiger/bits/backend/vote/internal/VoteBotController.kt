@@ -61,6 +61,7 @@ class VoteBotController(
                     request.roleId,
                     request.channelId,
                     request.endsAt?.let(Instant::ofEpochMilli),
+                    request.autoClosePercent,
                 )
         ) {
             is StartOutcome.Started -> StartVoteResponse.Started(requireNotNull(outcome.vote.id))
@@ -175,6 +176,8 @@ class VoteBotController(
             roleId = roleId,
             channelId = channelId,
             endsAt = endsAt?.toEpochMilli(),
+            autoClosePercent = autoClosePercent,
+            endedByParticipation = endedByParticipation(),
             state =
                 when (status) {
                     VoteStatus.OPEN -> VoteState.OPEN

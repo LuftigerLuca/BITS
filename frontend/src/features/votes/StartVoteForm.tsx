@@ -25,12 +25,17 @@ export function StartVoteForm() {
   const [channelId, setChannelId] = useState<string | null>(null)
   const [openEnd, setOpenEnd] = useState(false)
   const [endsAt, setEndsAt] = useState(() => toLocalInput(Date.now() + DEFAULT_DURATION_MILLIS))
+  /** Empty for a vote that does not end by participation. */
+  const [percent, setPercent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [started, setStarted] = useState(false)
 
   const end = openEnd ? null : new Date(endsAt).getTime()
   // An end in the past is left to the backend, which knows the time of the request.
-  const valid = question.trim() !== '' && roleId !== null && channelId !== null && (end === null || !Number.isNaN(end))
+  const autoClosePercent = percent.trim() === '' ? null : Number(percent)
+  const percentValid = autoClosePercent === null || (Number.isInteger(autoClosePercent) && autoClosePercent >= 1 && autoClosePercent <= 100)
+  const valid =
+    question.trim() !== '' && roleId !== null && channelId !== null && (end === null || !Number.isNaN(end)) && percentValid
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -38,7 +43,7 @@ export function StartVoteForm() {
     setError(null)
     setStarted(false)
     createVote.mutate(
-      { question: question.trim(), roleId, channelId, endsAt: end },
+      { question: question.trim(), roleId, channelId, endsAt: end, autoClosePercent },
       {
         onSuccess: () => {
           setQuestion('')
@@ -141,6 +146,24 @@ export function StartVoteForm() {
                   />
                   Ohne Enddatum, bis jemand sie beendet
                 </label>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="vote-participation">Automatisch beenden bei Beteiligung (%)</Label>
+                <Input
+                  id="vote-participation"
+                  type="number"
+                  min={1}
+                  max={100}
+                  placeholder="z. B. 60"
+                  value={percent}
+                  aria-invalid={!percentValid}
+                  aria-describedby="vote-participation-hint"
+                  onChange={(event) => setPercent(event.target.value)}
+                />
+                <p id="vote-participation-hint" className="text-xs text-muted-foreground">
+                  Optional, 1 bis 100. Sie endet, sobald so viele Stimmberechtigte abgestimmt haben oder das Ende
+                  erreicht ist, je nachdem, was zuerst eintritt. Enthaltungen zählen mit.
+                </p>
               </div>
             </div>
             <Button type="submit" className="self-start" disabled={createVote.isPending || !valid}>

@@ -103,7 +103,13 @@ class VoteCommand(
                 VoteEnd.Open -> null
                 is VoteEnd.After -> clock.instant().plus(end.duration).toEpochMilli()
             }
-        val request = StartVoteRequest(actor(member), question, role.id, channel.id, endsAt)
+        val participationText = event.getOption(OPTION_PARTICIPATION)?.asString
+        // Discord keeps the option within the range already; this is for an outdated command.
+        val autoClosePercent = participationText?.toIntOrNull()
+        if (participationText != null && (autoClosePercent == null || autoClosePercent !in 1..100)) {
+            return "Die Beteiligung gibst du in Prozent von 1 bis 100 an, z. B. `60`."
+        }
+        val request = StartVoteRequest(actor(member), question, role.id, channel.id, endsAt, autoClosePercent)
         return when (backend.startVote(request)) {
             is StartVoteResponse.Started ->
                 "Die Abstimmung ist gestartet und erscheint gleich in ${channel.asMention}. Beenden oder abbrechen kannst du sie " +
@@ -142,6 +148,7 @@ class VoteCommand(
         private const val OPTION_ROLE = "rolle"
         private const val OPTION_CHANNEL = "kanal"
         private const val OPTION_END = "ende"
+        private const val OPTION_PARTICIPATION = "beteiligung"
         private const val OPTION_VOTE = "abstimmung"
         private const val AUTOCOMPLETE_TIMEOUT_MILLIS = 2_500L
 
@@ -168,6 +175,12 @@ class VoteCommand(
                                 "Dauer wie 48h, 3d oder 90m, oder „${VoteMessages.OPEN_END}“ für kein Enddatum; Standard 48h",
                                 false,
                             ),
+                            OptionData(
+                                OptionType.INTEGER,
+                                OPTION_PARTICIPATION,
+                                "Beteiligung in Prozent, bei der sie vorzeitig endet, z. B. 60",
+                                false,
+                            ).setRequiredRange(1, 100),
                         ),
                     SubcommandData(END, "Beendet eine Abstimmung vorzeitig; die Auswertung folgt")
                         .addOptions(OptionData(OptionType.STRING, OPTION_VOTE, "Die laufende Abstimmung", true, true)),

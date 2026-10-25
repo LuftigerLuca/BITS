@@ -78,18 +78,25 @@ class VoteService(
         }
     }
 
-    /** @throws ResponseStatusException 400 if the question is empty or too long, the end has passed or the role is unknown */
+    /**
+     * [autoClosePercent] ends the vote early once that share of the eligible members voted, see [participation].
+     *
+     * @throws ResponseStatusException 400 if the question is empty or too long, the end has passed, the participation
+     * is not 1 to 100 percent or the role is unknown
+     */
     fun start(
         manager: VoteManager,
         question: String,
         roleId: String,
         channelId: String,
         endsAt: Instant?,
+        autoClosePercent: Int? = null,
     ): StartOutcome {
         if (!mayManage(manager)) return StartOutcome.Forbidden
         val text = question.trim()
         if (text.isEmpty() || text.length > MAX_QUESTION_LENGTH) throw badRequest("Question must have 1 to $MAX_QUESTION_LENGTH characters")
         if (endsAt != null && !endsAt.isAfter(clock.instant())) throw badRequest("The end has passed already")
+        if (autoClosePercent != null && autoClosePercent !in 1..100) throw badRequest("Participation must be 1 to 100 percent")
         val role = guildRoles.all().firstOrNull { it.id == roleId } ?: throw badRequest("Unknown role $roleId")
         val channel = channelRepository.findById(channelId).orElse(null)
         if (channel == null || !channel.postable) return StartOutcome.ChannelNotPostable
@@ -98,9 +105,23 @@ class VoteService(
                 transactionTemplate.execute {
                     val saved =
                         voteRepository.save(
-                            Vote(text, role.id, role.name, channel.id, channel.name, clock.instant(), manager.name, endsAt),
+                            Vote(
+                                text,
+                                role.id,
+                                role.name,
+                                channel.id,
+                                channel.name,
+                                clock.instant(),
+                                manager.name,
+                                endsAt,
+                                autoClosePercent,
+                            ),
                         )
-                    val end = endsAt?.let { "bis ${format(it)}" } ?: "ohne Enddatum"
+                    val end =
+                        listOfNotNull(
+                            endsAt?.let { "bis ${format(it)}" } ?: "ohne Enddatum",
+                            autoClosePercent?.let { "endet automatisch bei $it % Beteiligung" },
+                        ).joinToString()
                     auditLog.record(manager.auditActor(), AuditAction.VOTE_STARTED, "${describe(saved)}, $end")
                     eventPublisher.publish(VoteStartedEvent(requireNotNull(saved.id), clock.millis()))
                     saved
@@ -166,29 +187,39 @@ class VoteService(
 
     /**
      * Counts the votes of [roleMemberIds], the members of the role right now. Members without a link cannot vote and
-     * do not count, unless they voted before they lost it.
+     * do not count, unless they voted before they lost it. Ends an open vote like its end date does once the
+     * participation reaches [Vote.autoClosePercent]; the bot reports it after each vote, so this is where it is checked.
      *
      * @throws ResponseStatusException 404 if there is no such vote
      */
     fun participation(
         voteId: Long,
         roleMemberIds: Collection<String>,
-    ): Participation =
-        requireNotNull(
-            transactionTemplate.execute {
-                val vote = voteRepository.findById(voteId).orElseThrow { notFound() }
-                val voters = ballotRepository.findByVoteId(voteId).mapTo(HashSet()) { it.discordUserId }
-                val linked = accountLinks.findAll().mapTo(HashSet()) { it.discordUserId }
-                val members = roleMemberIds.toSet()
-                val participation =
-                    Participation(
-                        voted = members.count { it in voters },
-                        eligible = members.count { it in linked || it in voters },
-                    )
-                if (vote.status == VoteStatus.OPEN) vote.eligibleCount = participation.eligible
-                participation
-            },
-        )
+    ): Participation {
+        var reached = false
+        val participation =
+            requireNotNull(
+                transactionTemplate.execute {
+                    val vote = voteRepository.findById(voteId).orElseThrow { notFound() }
+                    val voters = ballotRepository.findByVoteId(voteId).mapTo(HashSet()) { it.discordUserId }
+                    val linked = accountLinks.findAll().mapTo(HashSet()) { it.discordUserId }
+                    val members = roleMemberIds.toSet()
+                    val participation =
+                        Participation(
+                            voted = members.count { it in voters },
+                            eligible = members.count { it in linked || it in voters },
+                        )
+                    if (vote.status == VoteStatus.OPEN) {
+                        vote.eligibleCount = participation.eligible
+                        reached = vote.reachesAutoClose(participation.voted, participation.eligible)
+                    }
+                    participation
+                },
+            )
+        // Closing locks the vote and checks again that it is open, so a vote ended meanwhile is not closed twice.
+        if (reached) close(voteId, manager = null, cancel = false)
+        return participation
+    }
 
     /** @throws ResponseStatusException 404 if there is no such vote */
     fun find(voteId: Long): Vote = voteRepository.findById(voteId).orElseThrow { notFound() }

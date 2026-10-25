@@ -51,6 +51,38 @@ class VoteCommandTest {
             assertEquals("r-congress" to "c-votes", request.captured.roleId to request.captured.channelId)
             assertEquals(Instant.parse("2026-01-04T12:00:00Z").toEpochMilli(), request.captured.endsAt)
             assertEquals(listOf("r-speaker"), request.captured.actor.roleIds)
+            assertEquals(null, request.captured.autoClosePercent)
+        }
+
+    @Test
+    fun `starting sends the participation at which the vote ends early`() =
+        runTest {
+            val request = slot<StartVoteRequest>()
+            coEvery { backend.startVote(capture(request)) } returns StartVoteResponse.Started(7)
+            val replies = Replies()
+
+            VoteCommand(backend, backgroundScope, clock).onSlashCommandInteraction(
+                start(replies, mapOf("frage" to "Steuern?", "ende" to "offen", "beteiligung" to "60")),
+            )
+            runCurrent()
+
+            assertContains(replies.messages.single(), "Die Abstimmung ist gestartet")
+            assertEquals(60, request.captured.autoClosePercent)
+            assertEquals(null, request.captured.endsAt)
+        }
+
+    @Test
+    fun `a participation outside 1 to 100 percent is explained, not sent`() =
+        runTest {
+            val replies = Replies()
+
+            VoteCommand(backend, backgroundScope, clock).onSlashCommandInteraction(
+                start(replies, mapOf("frage" to "?", "beteiligung" to "120")),
+            )
+            runCurrent()
+
+            assertEquals(listOf("Die Beteiligung gibst du in Prozent von 1 bis 100 an, z. B. `60`."), replies.messages)
+            coVerify(exactly = 0) { backend.startVote(any()) }
         }
 
     @Test

@@ -71,8 +71,10 @@ erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10�
 `POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen WarEra-Daten, und ändert
 keine Rollen; Abweichungen gleicht der nächste Abgleich an. Verwaiste Regeln tauchen nicht auf.
 
-Mit `/abstimmung starten frage rolle kanal [ende]` startet jemand eine Ja/Nein/Enthaltung-Abstimmung, ebenso im
-Dashboard unter „Abstimmungen“. Das Ende ist eine Dauer wie `48h` (Standard), `3d` oder `90m` oder `offen`. Der Bot
+Mit `/abstimmung starten frage rolle kanal [ende] [beteiligung]` startet jemand eine Ja/Nein/Enthaltung-Abstimmung,
+ebenso im Dashboard unter „Abstimmungen“. Das Ende ist eine Dauer wie `48h` (Standard), `3d` oder `90m` oder `offen`.
+Mit `beteiligung` (1–100 %) endet sie vorzeitig, sobald so viele Stimmberechtigte abgestimmt haben, Enthaltungen
+eingeschlossen; je nachdem, was zuerst eintritt. Der Bot
 postet die Frage mit drei Buttons im Kanal und pingt die Rolle. Abstimmen darf, wer die Rolle und einen verknüpften
 WarEra-Account hat; die Antwort sieht nur der Abstimmende, und bis zum Ende kann er seine Stimme ändern. Die
 Nachricht zeigt nur, wie viele abgestimmt haben. Zum Ende, vorzeitig mit `/abstimmung beenden`, meldet der Bot die

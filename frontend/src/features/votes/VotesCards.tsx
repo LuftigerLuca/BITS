@@ -70,7 +70,14 @@ export function OpenVotesCard() {
                     <p>{vote.roleName ?? 'Unbekannte Rolle'}</p>
                     <p className="text-xs text-muted-foreground">#{vote.channelName ?? 'unbekannt'}</p>
                   </TableCell>
-                  <TableCell>{vote.endsAt === null ? 'offen' : formatTime(vote.endsAt)}</TableCell>
+                  <TableCell>
+                    <p>{vote.endsAt === null ? 'offen' : formatTime(vote.endsAt)}</p>
+                    {vote.autoClosePercent !== null && (
+                      <p className="text-xs text-muted-foreground">
+                        Endet automatisch bei {vote.autoClosePercent} % Beteiligung
+                      </p>
+                    )}
+                  </TableCell>
                   <TableCell>{participation(vote.voted, vote.eligible)}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
@@ -181,6 +188,12 @@ export function VoteArchiveCard() {
   )
 }
 
+function closedText(vote: Vote): string {
+  if (vote.closedBy) return `beendet von ${vote.closedBy}`
+  if (vote.endedByParticipation) return `automatisch beendet bei ${vote.autoClosePercent} % Beteiligung`
+  return 'beendet'
+}
+
 function ArchivedVote({ vote }: { vote: Vote }) {
   const status = STATUS[vote.status]
   return (
@@ -194,7 +207,7 @@ function ArchivedVote({ vote }: { vote: Vote }) {
             {vote.closedAt !== null && (
               <>
                 {' '}
-                · {vote.closedBy ? `beendet von ${vote.closedBy}` : 'beendet'}, {formatTime(vote.closedAt)}
+                · {closedText(vote)}, {formatTime(vote.closedAt)}
               </>
             )}
           </p>

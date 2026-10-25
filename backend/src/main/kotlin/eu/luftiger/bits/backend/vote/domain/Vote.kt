@@ -35,6 +35,9 @@ class Vote(
     /** `null` for a vote that runs until somebody ends it. */
     @Column(name = "ends_at")
     val endsAt: Instant?,
+    /** The participation in percent at which the vote ends early, `null` if it does not; set once at the start. */
+    @Column(name = "auto_close_percent")
+    val autoClosePercent: Int? = null,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,6 +75,24 @@ class Vote(
 
     @Column(name = "result_posted_at")
     var resultPostedAt: Instant? = null
+
+    /**
+     * Whether [voted] of [eligible] members reach [autoClosePercent]; abstentions count as votes. Never without
+     * eligible members, so a role without linked members does not end the vote at once.
+     */
+    fun reachesAutoClose(
+        voted: Int,
+        eligible: Int,
+    ): Boolean {
+        val percent = autoClosePercent ?: return false
+        return eligible > 0 && voted * 100 >= percent * eligible
+    }
+
+    /** Ended on its own before its end date, which only the participation does. */
+    fun endedByParticipation(): Boolean {
+        val closed = closedAt ?: return false
+        return autoClosePercent != null && closedByName == null && (endsAt == null || closed.isBefore(endsAt))
+    }
 }
 
 enum class VoteStatus {

@@ -20,7 +20,9 @@ A vote takes no ballots after its end even when a part is down; only its evaluat
 ausgewertet" until the bot has reported who has the role and WarEra has named the parties: the backend asks the bot
 again after 30 minutes without an answer, retries WarEra every 5 minutes and records the first failure in the system
 log, and publishes the result again until the bot confirms that it posted it. Clicks on a vote while the backend is
-down are answered with the usual error; the participation in the message catches up with the next click. If the
+down are answered with the usual error; the participation in the message catches up with the next click. A vote that
+ends at a participation is checked whenever the bot reports the participation, i.e. after a click; while the bot or the
+backend is down, it ends only with the next report or at its end date. If the
 vote's channel was deleted, the result is only in the dashboard. Without WarEra, admins cannot list the parties to pick their
 colours; result images are still drawn with the colours saved, and the preview uses invented parties.
 

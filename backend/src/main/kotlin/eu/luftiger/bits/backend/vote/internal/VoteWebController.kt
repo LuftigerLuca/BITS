@@ -83,7 +83,10 @@ class VoteWebController(
     ): VoteResponse {
         val manager = manager(session)
         val endsAt = request.endsAt?.let(Instant::ofEpochMilli)
-        return when (val outcome = voteService.start(manager, request.question, request.roleId, request.channelId, endsAt)) {
+        return when (
+            val outcome =
+                voteService.start(manager, request.question, request.roleId, request.channelId, endsAt, request.autoClosePercent)
+        ) {
             is StartOutcome.Started -> {
                 log.info("Vote {} started by {}", outcome.vote.id, session.subject)
                 outcome.vote.toResponse(voted = 0)
@@ -149,6 +152,8 @@ class VoteWebController(
         startedAt = startedAt.toEpochMilli(),
         startedBy = startedByName,
         endsAt = endsAt?.toEpochMilli(),
+        autoClosePercent = autoClosePercent,
+        endedByParticipation = endedByParticipation(),
         closedAt = closedAt?.toEpochMilli(),
         closedBy = closedByName,
         status = VoteStatusResponse.of(status),
@@ -204,6 +209,10 @@ data class VoteResponse(
     val startedAt: Long,
     val startedBy: String,
     val endsAt: Long?,
+    /** The participation in percent at which the vote ends early, `null` if it does not. */
+    val autoClosePercent: Int?,
+    /** Whether it ended because the participation reached [autoClosePercent]. */
+    val endedByParticipation: Boolean,
     val closedAt: Long?,
     /** `null` if it ended on its own. */
     val closedBy: String?,
@@ -265,6 +274,8 @@ data class CreateVoteRequest(
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote without end. */
     val endsAt: Long?,
+    /** 1 to 100; the vote ends early once this share of the eligible members voted. */
+    val autoClosePercent: Int? = null,
 )
 
 @Serializable

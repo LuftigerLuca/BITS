@@ -23,6 +23,8 @@ const vote: Vote = {
   startedAt: Date.UTC(2026, 9, 20, 12),
   startedBy: 'Luca',
   endsAt: Date.UTC(2026, 9, 22, 12),
+  autoClosePercent: null,
+  endedByParticipation: false,
   closedAt: null,
   closedBy: null,
   status: 'OPEN',
@@ -94,7 +96,49 @@ describe('votes page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
 
     expect(await screen.findByText('Die Abstimmung ist gestartet und erscheint gleich im Kanal.')).toBeInTheDocument()
-    expect(created).toEqual([{ question: 'Krieg erklären?', roleId: 'r-congress', channelId: 'c-votes', endsAt: null }])
+    expect(created).toEqual([
+      { question: 'Krieg erklären?', roleId: 'r-congress', channelId: 'c-votes', endsAt: null, autoClosePercent: null },
+    ])
+  })
+
+  it('starts a vote that ends at a participation, which must be 1 to 100 percent', async () => {
+    const created: unknown[] = []
+    stubVotes(member, undefined, {
+      'POST /web/votes': (init?: RequestInit) => {
+        created.push(JSON.parse(String(init?.body)))
+        return json(vote, 201)
+      },
+    })
+    renderApp('/votes')
+
+    await userEvent.type(await screen.findByLabelText('Frage'), 'Krieg erklären?')
+    await choose('Stimmberechtigte Rolle', 'Kongress')
+    await choose('Kanal', '#abstimmungen (Politik)')
+    const percent = screen.getByLabelText('Automatisch beenden bei Beteiligung (%)')
+    await userEvent.type(percent, '101')
+    expect(screen.getByRole('button', { name: 'Abstimmung starten' })).toBeDisabled()
+
+    await userEvent.clear(percent)
+    await userEvent.type(percent, '60')
+    await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
+
+    await expect.poll(() => created).toHaveLength(1)
+    expect(created[0]).toMatchObject({ autoClosePercent: 60 })
+  })
+
+  it('shows the participation a vote ends at, and that it ended by it', async () => {
+    stubVotes(member, undefined, {
+      'GET /web/votes': () =>
+        json({
+          open: [{ ...vote, autoClosePercent: 60 }],
+          closed: [{ ...evaluated, closedBy: null, autoClosePercent: 75, endedByParticipation: true }],
+        }),
+    })
+    renderApp('/votes')
+
+    expect(await screen.findByText('Endet automatisch bei 60 % Beteiligung')).toBeInTheDocument()
+    const archived = screen.getByRole('article', { name: 'Steuern senken?' })
+    expect(within(archived).getByText(/automatisch beendet bei 75 % Beteiligung/)).toBeInTheDocument()
   })
 
   it('ends a vote only after asking', async () => {

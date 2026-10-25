@@ -46,6 +46,8 @@ data class StartVoteRequest(
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote that runs until somebody ends it. */
     val endsAt: Long?,
+    /** 1 to 100; the vote ends early once this share of the eligible members voted, whichever comes first. */
+    val autoClosePercent: Int? = null,
 )
 
 /** Outcome of starting a vote. Each subtype is identified by its `type` field. */
@@ -150,6 +152,10 @@ data class VoteDto(
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote without end. */
     val endsAt: Long?,
+    /** The participation in percent at which the vote ends early, `null` if it does not. */
+    val autoClosePercent: Int? = null,
+    /** Whether it ended because the participation reached [autoClosePercent]. */
+    val endedByParticipation: Boolean = false,
     val state: VoteState,
     /** The bot's message with the buttons, `null` until it is posted. */
     val messageId: String?,

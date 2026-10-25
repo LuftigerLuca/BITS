@@ -400,6 +400,10 @@ export interface Vote {
   startedBy: string
   /** `null` for a vote without end. */
   endsAt: number | null
+  /** The participation in percent at which the vote ends early, `null` if it does not. */
+  autoClosePercent: number | null
+  /** Whether it ended because the participation reached `autoClosePercent`. */
+  endedByParticipation: boolean
   closedAt: number | null
   /** `null` if it ended on its own. */
   closedBy: string | null
@@ -432,6 +436,8 @@ export interface CreateVote {
   channelId: string
   /** Epoch milliseconds, `null` for a vote without end. */
   endsAt: number | null
+  /** 1 to 100; the vote ends early once this share of the eligible members voted. */
+  autoClosePercent: number | null
 }
 
 export async function getVoteAccess(): Promise<VoteAccess> {
