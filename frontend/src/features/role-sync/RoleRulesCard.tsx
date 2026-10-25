@@ -20,7 +20,8 @@ import type { RoleRule } from '@/lib/api'
 import { NewRuleForm } from './NewRuleForm'
 import { STATUS, errorMessage } from './labels'
 import { RoleName } from './RoleName'
-import { useDeleteRoleRule, useRoleRules, useRoles } from './queries'
+import { RulePreview } from './RulePreview'
+import { useDeleteRoleRule, useDeletionPreview, useRoleRules, useRoles } from './queries'
 
 /** Rules that tie Discord roles to WarEra data; BITS gives and takes these roles on its own. */
 export function RoleRulesCard() {
@@ -92,7 +93,6 @@ export function RoleRulesCard() {
         )}
         <DeleteRuleDialog
           rule={ruleToDelete}
-          lastOfRole={ruleToDelete !== null && rules.data?.filter((r) => r.roleId === ruleToDelete.roleId).length === 1}
           onConfirm={(rule) => {
             setRuleToDelete(null)
             deleteRule.mutate(rule.id)
@@ -112,20 +112,19 @@ export function RoleRulesCard() {
 }
 
 /**
- * Deleting a rule syncs everybody right away, so a slip in the table would take the role from members at once. The
- * last rule of a role ends its management instead, which takes the role from nobody.
+ * Deleting a rule syncs everybody right away, so a slip in the table would take the role from members at once; the
+ * dialog shows from whom. The last rule of a role ends its management instead, which takes the role from nobody.
  */
 function DeleteRuleDialog({
   rule,
-  lastOfRole,
   onConfirm,
   onCancel,
 }: {
   rule: RoleRule | null
-  lastOfRole: boolean
   onConfirm: (rule: RoleRule) => void
   onCancel: () => void
 }) {
+  const preview = useDeletionPreview(rule?.id ?? null)
   const role = rule?.roleName ?? 'gelöschte Rolle'
   return (
     <AlertDialog open={rule !== null} onOpenChange={(open) => !open && onCancel()}>
@@ -135,17 +134,19 @@ function DeleteRuleDialog({
           <AlertDialogDescription>
             {rule && (
               <>
-                <strong>{role}</strong>: {rule.label}.{' '}
-                {lastOfRole
-                  ? 'Es ist die letzte Regel der Rolle. BITS verwaltet sie danach nicht mehr; wer sie hat, behält sie.'
-                  : 'Mitglieder, die nur diese Regel erfüllen, verlieren die Rolle sofort.'}
+                <strong>{role}</strong>: {rule.label}.
               </>
             )}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {rule && <RulePreview preview={preview} />}
         <AlertDialogFooter>
           <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => rule && onConfirm(rule)}>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={preview.isPending}
+            onClick={() => rule && onConfirm(rule)}
+          >
             Regel löschen
           </AlertDialogAction>
         </AlertDialogFooter>

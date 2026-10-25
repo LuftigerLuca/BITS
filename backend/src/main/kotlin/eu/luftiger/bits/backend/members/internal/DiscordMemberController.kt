@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.members.internal
 
+import eu.luftiger.bits.backend.members.api.dto.GuildMember
 import eu.luftiger.bits.backend.shared.BotInput
 import eu.luftiger.bits.shared.DiscordMemberChange
 import eu.luftiger.bits.shared.DiscordMembersReport
@@ -11,7 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
-/** The bot reports the members of the guild on start and every hour, and each member who joins or leaves. */
+/**
+ * The bot reports the members of the guild with their roles on start, every hour and after role changes, and each
+ * member who joins or leaves.
+ */
 @RestController
 @RequestMapping("/api/discord-members")
 class DiscordMemberController(
@@ -24,7 +28,17 @@ class DiscordMemberController(
     ) {
         BotInput.memberCount(report.discordUserIds.size)
         report.discordUserIds.forEach(BotInput::discordUserId)
-        memberService.replaceAll(report.discordUserIds.toSet())
+        BotInput.memberCount(report.members.size)
+        report.members.forEach { member ->
+            BotInput.discordUserId(member.discordUserId)
+            BotInput.memberName(member.name)
+            BotInput.roleCount(member.roleIds.size)
+            member.roleIds.forEach(BotInput::roleId)
+        }
+        memberService.replaceAll(
+            report.discordUserIds.toSet(),
+            report.members.map { GuildMember(it.discordUserId, it.name, it.roleIds.toSet()) },
+        )
     }
 
     @PostMapping("/joined")

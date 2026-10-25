@@ -6,6 +6,7 @@ import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -18,9 +19,12 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
+import net.dv8tion.jda.api.entities.Role
 import net.dv8tion.jda.api.entities.User
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -36,6 +40,33 @@ class MemberReporterTest {
             runCurrent()
 
             assertEquals(listOf(listOf("1", "2")), backend.lists)
+        }
+
+    @Test
+    fun `the list carries the names and roles of the members`() =
+        runTest {
+            val guild = guild("100", member("1", roleIds = listOf("r-citizen", "r-veteran")))
+
+            MemberReporter("100", backend, backgroundScope).report(guild)
+            runCurrent()
+
+            assertEquals(listOf(ReportedMember("1", "Member 1", listOf("r-citizen", "r-veteran"))), backend.reports.single())
+        }
+
+    @Test
+    fun `role changes send the list again once they are over`() =
+        runTest {
+            val guild = guild("100", member("1"))
+            val reporter = MemberReporter("100", backend, backgroundScope)
+
+            repeat(3) { reporter.onGuildMemberRoleAdd(roleAdded(guild, user("1"))) }
+            reporter.onGuildMemberRoleRemove(roleRemoved(guild, user("1")))
+            reporter.onGuildMemberRoleAdd(roleAdded(guild, user("9", bot = true)))
+            advanceTimeBy(4_000)
+            assertEquals(emptyList(), backend.lists)
+
+            advanceTimeBy(2_000)
+            assertEquals(listOf(listOf("1")), backend.lists)
         }
 
     @Test
@@ -60,7 +91,7 @@ class MemberReporterTest {
             backend.failures = 2
             val reporter = MemberReporter("100", backend, backgroundScope)
 
-            reporter.report { listOf("1") }
+            reporter.report { listOf(ReportedMember("1", "Luca", emptyList())) }
             advanceTimeBy(600_000)
 
             assertEquals(listOf(listOf("1")), backend.lists)
@@ -109,12 +140,38 @@ class MemberReporterTest {
     private fun member(
         id: String,
         bot: Boolean = false,
+        roleIds: List<String> = emptyList(),
     ): Member {
         val member = mockk<Member>()
         val user = user(id, bot)
         every { member.id } returns id
         every { member.user } returns user
+        every { member.effectiveName } returns "Member $id"
+        every { member.roles } returns
+            roleIds.map { roleId ->
+                mockk<Role>().also { every { it.id } returns roleId }
+            }
         return member
+    }
+
+    private fun roleAdded(
+        guild: Guild,
+        user: User,
+    ): GuildMemberRoleAddEvent {
+        val event = mockk<GuildMemberRoleAddEvent>()
+        every { event.guild } returns guild
+        every { event.user } returns user
+        return event
+    }
+
+    private fun roleRemoved(
+        guild: Guild,
+        user: User,
+    ): GuildMemberRoleRemoveEvent {
+        val event = mockk<GuildMemberRoleRemoveEvent>()
+        every { event.guild } returns guild
+        every { event.user } returns user
+        return event
     }
 
     private fun user(
@@ -152,15 +209,16 @@ class MemberReporterTest {
     }
 
     private class FakeBackend : BackendClient {
-        val lists = mutableListOf<List<String>>()
+        val reports = mutableListOf<List<ReportedMember>>()
+        val lists get() = reports.map { report -> report.map { it.discordUserId } }
         val changes = mutableListOf<String>()
         var failures = 0
         var attempts = 0
 
-        override suspend fun reportMembers(discordUserIds: List<String>) {
+        override suspend fun reportMembers(members: List<ReportedMember>) {
             attempts++
             if (failures-- > 0) error("backend down")
-            lists += discordUserIds
+            reports += members
         }
 
         override suspend fun reportMemberJoined(discordUserId: String) {
