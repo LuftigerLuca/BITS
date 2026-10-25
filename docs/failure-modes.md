@@ -16,6 +16,13 @@ Failures of single calls are handled where they happen: a WarEra call is retried
 down, a role or nickname change that Discord refuses is skipped, and an event the bot cannot handle is retried and then moved to
 `bits:events:dead`.
 
+A vote takes no ballots after its end even when a part is down; only its evaluation waits. A vote that has ended stays "Wird
+ausgewertet" until the bot has reported who has the role and WarEra has named the parties: the backend asks the bot
+again after 30 minutes without an answer, retries WarEra every 5 minutes and records the first failure in the system
+log, and publishes the result again until the bot confirms that it posted it. Clicks on a vote while the backend is
+down are answered with the usual error; the participation in the message catches up with the next click. If the
+vote's channel was deleted, the result is only in the dashboard.
+
 Admins see most of this in the system log of the dashboard: members and governments whose WarEra data is missing,
 role and nickname changes Discord refused or the bot could not make, events moved to `bits:events:dead`, and events that wait more than 10 minutes for Redis.
 A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or

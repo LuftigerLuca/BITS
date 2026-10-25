@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.members
 
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.DiscordChannelDto
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
@@ -156,6 +157,8 @@ class MemberReporterTest {
         val changes = mutableListOf<String>()
         var failures = 0
         var attempts = 0
+
+        override suspend fun reportChannels(channels: List<DiscordChannelDto>) = TODO()
 
         override suspend fun reportMembers(discordUserIds: List<String>) {
             attempts++

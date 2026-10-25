@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { ActivityIcon, ChevronsUpDownIcon, HistoryIcon, HouseIcon, LogOutIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
+import { ActivityIcon, ChevronsUpDownIcon, HistoryIcon, HouseIcon, LogOutIcon, SettingsIcon, ShieldIcon, VoteIcon } from 'lucide-react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
+import { useVoteAccess } from '@/features/votes/queries'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -36,6 +37,8 @@ import { setTheme, storedTheme, type Theme } from '@/lib/theme'
 /** Frame of all pages behind the login: navigation in the sidebar, current user and logout in its menu. */
 export function Layout() {
   const { user } = useAuth()
+  // Whether the user may manage votes depends on their Discord roles, which only the backend knows.
+  const voteAccess = useVoteAccess()
   if (!user) return null
 
   return (
@@ -55,6 +58,11 @@ export function Layout() {
                     <NavItem to="/" end icon={<HouseIcon />}>
                       Start
                     </NavItem>
+                    {voteAccess.data?.canManage && (
+                      <NavItem to="/votes" icon={<VoteIcon />}>
+                        Abstimmungen
+                      </NavItem>
+                    )}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>

@@ -17,6 +17,12 @@ interface DiscordApi {
         limit: Int = MAX_GUILDS_PER_PAGE,
     ): List<DiscordGuild>
 
+    /** The user's membership in [guildId]; needs the scope `guilds.members.read`. */
+    fun getCurrentUserGuildMember(
+        accessToken: String,
+        guildId: String,
+    ): DiscordGuildMember
+
     /** Pages through the guilds of the user until [guildId] turns up, since Discord returns at most 200 at a time. */
     fun findCurrentUserGuild(
         accessToken: String,
@@ -44,6 +50,12 @@ data class DiscordUser(
     val globalName: String? = null,
     /** Hash of the avatar, `null` for the default avatar. */
     val avatar: String? = null,
+)
+
+@Serializable
+data class DiscordGuildMember(
+    /** IDs of the member's roles, without `@everyone`. */
+    val roles: List<String> = emptyList(),
 )
 
 @Serializable

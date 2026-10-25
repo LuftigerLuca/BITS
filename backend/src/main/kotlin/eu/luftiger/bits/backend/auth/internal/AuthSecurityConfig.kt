@@ -147,7 +147,8 @@ class AuthSecurityConfig {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("${properties.publicUrl}/auth/oauth2/callback/{registrationId}")
-                .scope("identify", "guilds")
+                // guilds.members.read for the member's roles, which decide who may manage votes.
+                .scope("identify", "guilds", "guilds.members.read")
                 .authorizationUri("https://discord.com/oauth2/authorize")
                 .tokenUri("$DISCORD_API_URL/oauth2/token")
                 .userInfoUri("$DISCORD_API_URL/users/@me")

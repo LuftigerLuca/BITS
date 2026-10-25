@@ -139,11 +139,16 @@ SELECT * FROM account_link WHERE discord_user_id = :'id';
 SELECT * FROM account_verification WHERE discord_user_id = :'id';
 SELECT * FROM nickname_opt_in WHERE discord_user_id = :'id';
 SELECT * FROM ping_log WHERE discord_user_id = :'id';
+SELECT * FROM vote_ballot WHERE discord_user_id = :'id';
+SELECT * FROM vote_elector WHERE discord_user_id = :'id';
 SELECT * FROM audit_entry WHERE actor_subject = 'discord:' || :'id';
 SELECT * FROM system_log_entry WHERE :'id' IN (discord_user_id, previous_discord_user_id);
 SELECT * FROM system_log_item WHERE discord_user_id = :'id';
 SQL
 ```
+
+Evaluated votes keep names only: who started or ended them (`vote`) and who did not vote (`vote_non_voter`); search
+those by the member's display name.
 
 To delete it for them, run the same with `DELETE FROM` instead of `SELECT * FROM`. The hourly sync then takes the
 managed roles away. The dumps in `BACKUP_PATH` still hold the data until they rotate out, at most four weeks; the

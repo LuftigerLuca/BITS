@@ -142,6 +142,16 @@ class SystemLogService(
                         message = "Der Sync ist abgebrochen: ${problem.error.take(MAX_ERROR_LENGTH)}",
                     ),
                 )
+            is SystemProblem.VoteEvaluationDelayed ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.VOTE_EVALUATION_DELAYED,
+                        message =
+                            "Die Auswertung der Abstimmung „${problem.question}“ ist fehlgeschlagen und wird alle paar Minuten " +
+                                "wiederholt: ${problem.error.take(MAX_ERROR_LENGTH)}",
+                    ),
+                )
             is SystemProblem.OutboxStuck ->
                 entries.save(
                     SystemLogEntry(

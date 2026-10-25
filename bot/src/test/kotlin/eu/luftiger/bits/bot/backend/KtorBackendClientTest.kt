@@ -1,12 +1,15 @@
 package eu.luftiger.bits.bot.backend
 
+import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
+import eu.luftiger.bits.shared.OpenVote
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.UnlinkAccountResponse
+import eu.luftiger.bits.shared.VoteChoice
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -41,6 +44,37 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
             assertEquals(PingResponse(pingCount = 3, wareraCountryCount = null), client.ping("42"))
+        }
+
+    @Test
+    fun `a click posts the choice of the member to the vote`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals("http://backend:8080/api/votes/7/ballots", request.url.toString())
+                    assertEquals("""{"discordUserId":"42","choice":"ABSTAIN"}""", request.body.toByteArray().decodeToString())
+                    respond("""{"type":"cast","previous":"YES"}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(CastVoteResponse.Cast(VoteChoice.YES), client.castVote(7, "42", VoteChoice.ABSTAIN))
+        }
+
+    @Test
+    fun `open votes come as a list`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals(HttpMethod.Get, request.method)
+                    assertEquals("http://backend:8080/api/votes/open", request.url.toString())
+                    respond(
+                        """{"votes":[{"id":7,"question":"Steuern?"}]}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(listOf(OpenVote(7, "Steuern?")), client.openVotes())
         }
 
     @Test

@@ -43,6 +43,16 @@ sealed interface SystemProblem {
         val linkedCount: Int,
     ) : SystemProblem
 
+    /**
+     * The result of a vote could not be worked out, e.g. because WarEra is down; it is tried again until it works.
+     * Recorded once per vote.
+     */
+    @NamedInterface("api")
+    data class VoteEvaluationDelayed(
+        val question: String,
+        val error: String,
+    ) : SystemProblem
+
     /** Events for the bot could not be written to Redis for a while. */
     @NamedInterface("api")
     data class OutboxStuck(

@@ -40,6 +40,9 @@ bits:
   system-log:
     # Once a day is enough for entries kept 30 days.
     cleanup-cron: "0 15 3 * * *"
+  vote:
+    # Ends votes within a minute of their end and tries stuck results again.
+    cron: "0 * * * * *"
   auth:
     public-url: ${BITS_PUBLIC_URL:http://localhost:5173}
     jwt-secret: ${BITS_JWT_SECRET:}

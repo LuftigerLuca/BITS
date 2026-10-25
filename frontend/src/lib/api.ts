@@ -140,7 +140,15 @@ export async function searchMilitaryUnits(query: string): Promise<Option[]> {
 
 const AUDIT_LOG = '/web/admin/audit-log'
 
-export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED' | 'OVERVIEW_COUNTRY_SET' | 'NICKNAME_SETTING_CHANGED'
+export type AuditAction =
+  | 'ROLE_RULE_CREATED'
+  | 'ROLE_RULE_DELETED'
+  | 'OVERVIEW_COUNTRY_SET'
+  | 'NICKNAME_SETTING_CHANGED'
+  | 'VOTE_STARTED'
+  | 'VOTE_ENDED'
+  | 'VOTE_CANCELLED'
+  | 'VOTE_MANAGER_ROLES_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
@@ -203,6 +211,7 @@ export type LogEntryType =
   | 'EVENT_UNDELIVERED'
   | 'OUTBOX_STUCK'
   | 'MEMBER_REPORT_REFUSED'
+  | 'VOTE_EVALUATION_DELAYED'
 
 export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE' | 'SETTING_CHANGE'
 
@@ -329,6 +338,107 @@ export async function setOverviewCountry(countryId: string): Promise<Option> {
     body: JSON.stringify({ countryId }),
   })
   return response.json()
+}
+
+const VOTES = '/web/votes'
+
+export interface VoteAccess {
+  /** Whether the user may see, start, end and cancel votes. */
+  canManage: boolean
+  /** Whether the user may choose the roles that manage votes, i.e. is an admin. */
+  canConfigure: boolean
+}
+
+/** `COUNTING`: ended, the result is not posted yet. */
+export type VoteStatus = 'OPEN' | 'COUNTING' | 'EVALUATED' | 'CANCELLED'
+
+export interface Vote {
+  id: number
+  question: string
+  /** Names as of the start; `null` if BITS did not know them. */
+  roleName: string | null
+  channelName: string | null
+  /** Epoch milliseconds, like the other times. */
+  startedAt: number
+  startedBy: string
+  /** `null` for a vote without end. */
+  endsAt: number | null
+  closedAt: number | null
+  /** `null` if it ended on its own. */
+  closedBy: string | null
+  status: VoteStatus
+  /** Ballots so far; only for open votes. */
+  voted: number | null
+  /** Members of the role with a linked account, as the bot last reported; `null` until it did. */
+  eligible: number | null
+  /** Only for evaluated votes; the image is at `voteResultImageUrl(id)`. */
+  resultText: string | null
+}
+
+export interface Votes {
+  /** Newest first. */
+  open: Vote[]
+  /** Newest end first. */
+  closed: Vote[]
+}
+
+export interface VoteOptions {
+  /** Highest first. */
+  roles: { id: string; name: string; color: number | null }[]
+  /** Only those the bot may post in, in Discord's order. */
+  channels: { id: string; name: string; category: string | null }[]
+}
+
+export interface CreateVote {
+  question: string
+  roleId: string
+  channelId: string
+  /** Epoch milliseconds, `null` for a vote without end. */
+  endsAt: number | null
+}
+
+export async function getVoteAccess(): Promise<VoteAccess> {
+  return (await request(`${VOTES}/access`)).json()
+}
+
+export async function getVotes(): Promise<Votes> {
+  return (await request(VOTES)).json()
+}
+
+export async function getVoteOptions(): Promise<VoteOptions> {
+  return (await request(`${VOTES}/options`)).json()
+}
+
+export async function createVote(vote: CreateVote): Promise<Vote> {
+  const response = await request(VOTES, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(vote),
+  })
+  return response.json()
+}
+
+/** Ends the vote early, which starts the evaluation; `cancel` ends it without one. */
+export async function closeVote(id: number, cancel: boolean): Promise<void> {
+  await request(`${VOTES}/${id}/${cancel ? 'cancel' : 'end'}`, { method: 'POST' })
+}
+
+export function voteResultImageUrl(id: number): string {
+  return `${VOTES}/${id}/result.png`
+}
+
+const VOTE_MANAGER_ROLES = '/web/admin/votes/manager-roles'
+
+export async function getVoteManagerRoles(): Promise<string[]> {
+  return (await (await request(VOTE_MANAGER_ROLES)).json()).roleIds
+}
+
+export async function setVoteManagerRoles(roleIds: string[]): Promise<void> {
+  await request(VOTE_MANAGER_ROLES, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roleIds }),
+  })
 }
 
 export const DISCORD_LOGIN_URL = '/auth/oauth2/authorization/discord'

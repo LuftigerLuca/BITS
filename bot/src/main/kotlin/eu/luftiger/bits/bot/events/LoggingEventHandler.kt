@@ -5,6 +5,9 @@ import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
+import eu.luftiger.bits.shared.VoteClosedEvent
+import eu.luftiger.bits.shared.VoteEvaluatedEvent
+import eu.luftiger.bits.shared.VoteStartedEvent
 import org.slf4j.LoggerFactory
 
 /** Example handler: only logs the events it receives. */
@@ -19,6 +22,9 @@ class LoggingEventHandler : EventHandler {
                 log.info("Verification check of user {}: {}", event.discordUserId, event.result::class.simpleName)
             is RoleSyncEvent ->
                 log.info("Role sync for {} members, {} with target roles", event.discordUserIds?.size ?: "all", event.members.size)
+            is VoteStartedEvent -> log.info("Vote {} started", event.voteId)
+            is VoteClosedEvent -> log.info("Vote {} closed", event.voteId)
+            is VoteEvaluatedEvent -> log.info("Vote {} evaluated", event.voteId)
         }
     }
 }

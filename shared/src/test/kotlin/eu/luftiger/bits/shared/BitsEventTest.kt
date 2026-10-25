@@ -46,6 +46,17 @@ class BitsEventTest {
     }
 
     @Test
+    fun `vote events survive a round trip with their types`() {
+        val events = listOf(VoteStartedEvent(7, occurredAt = 5), VoteClosedEvent(7, occurredAt = 6), VoteEvaluatedEvent(7, occurredAt = 7))
+
+        events.forEach { assertEquals(it, decodeEvent(it.encode())) }
+        assertEquals(
+            listOf("vote_started", "vote_closed", "vote_evaluated"),
+            events.map { Regex("\"type\":\"([a-z_]+)\"").find(it.encode())!!.groupValues[1] },
+        )
+    }
+
+    @Test
     fun `fields added by a newer sender are ignored`() {
         val payload = """{"type":"ping","discordUserId":"123","occurredAt":5,"addedLater":{"any":"thing"}}"""
 

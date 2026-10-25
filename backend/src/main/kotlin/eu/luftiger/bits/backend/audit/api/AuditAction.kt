@@ -4,8 +4,8 @@ import kotlinx.serialization.Serializable
 import org.springframework.modulith.NamedInterface
 
 /**
- * What an admin did. Stored by name and part of the dashboard API, so existing names stay as they are; the dashboard
- * spells them out in `frontend/src/lib/api.ts`.
+ * What an admin, or a member allowed to manage votes, did. Stored by name and part of the dashboard API, so existing
+ * names stay as they are; the dashboard spells them out in `frontend/src/lib/api.ts`.
  */
 @NamedInterface("api")
 @Serializable
@@ -16,4 +16,8 @@ enum class AuditAction {
 
     /** No longer recorded since members opt in themselves; kept for existing entries. */
     NICKNAME_SETTING_CHANGED,
+    VOTE_STARTED,
+    VOTE_ENDED,
+    VOTE_CANCELLED,
+    VOTE_MANAGER_ROLES_CHANGED,
 }

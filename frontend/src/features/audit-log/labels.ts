@@ -5,6 +5,10 @@ export const ACTIONS: Record<AuditAction, string> = {
   ROLE_RULE_DELETED: 'Regel gelöscht',
   OVERVIEW_COUNTRY_SET: 'Land der Startseite geändert',
   NICKNAME_SETTING_CHANGED: 'Nicknames umgeschaltet',
+  VOTE_STARTED: 'Abstimmung gestartet',
+  VOTE_ENDED: 'Abstimmung beendet',
+  VOTE_CANCELLED: 'Abstimmung abgebrochen',
+  VOTE_MANAGER_ROLES_CHANGED: 'Rollen für Abstimmungen geändert',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

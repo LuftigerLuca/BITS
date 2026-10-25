@@ -9,6 +9,8 @@ data class SessionUser(
     val name: String,
     val avatarUrl: String?,
     val role: Role,
+    /** The member's roles in the guild at login; empty for the admin account. */
+    val discordRoleIds: List<String> = emptyList(),
 ) {
     val discordUserId: String?
         get() = subject.takeIf { it.startsWith(DISCORD_PREFIX) }?.removePrefix(DISCORD_PREFIX)
@@ -22,7 +24,8 @@ data class SessionUser(
             name: String,
             avatarUrl: String,
             role: Role,
-        ) = SessionUser(DISCORD_PREFIX + discordUserId, name, avatarUrl, role)
+            discordRoleIds: List<String> = emptyList(),
+        ) = SessionUser(DISCORD_PREFIX + discordUserId, name, avatarUrl, role, discordRoleIds)
 
         fun admin(username: String) = SessionUser(ADMIN_PREFIX + username, username, avatarUrl = null, role = Role.ADMIN)
     }
