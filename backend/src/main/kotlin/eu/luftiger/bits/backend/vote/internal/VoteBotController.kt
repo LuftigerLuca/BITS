@@ -43,6 +43,7 @@ import java.util.Base64
 @RequestMapping("/api/votes")
 class VoteBotController(
     private val voteService: VoteService,
+    private val settingsService: VoteResultSettingsService,
 ) {
     @PostMapping
     fun start(
@@ -143,7 +144,7 @@ class VoteBotController(
         val (vote, result) = voteService.result(id)
         return VoteResultDto(
             text = VoteResultRenderer.text(result, markdown = true),
-            image = Base64.getEncoder().encodeToString(VoteResultRenderer.png(result)),
+            image = Base64.getEncoder().encodeToString(VoteResultRenderer.png(result, settingsService.style())),
             posted = vote.resultPostedAt != null,
         )
     }

@@ -186,6 +186,8 @@ export type AuditAction =
   | 'VOTE_ENDED'
   | 'VOTE_CANCELLED'
   | 'VOTE_MANAGER_ROLES_CHANGED'
+  | 'VOTE_RESULT_BACKGROUND_CHANGED'
+  | 'VOTE_PARTY_COLORS_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
@@ -476,6 +478,62 @@ export async function setVoteManagerRoles(roleIds: string[]): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ roleIds }),
   })
+}
+
+const RESULT_SETTINGS = '/web/admin/votes/result-settings'
+
+/** Largest file the backend takes as background of the result image. */
+export const MAX_BACKGROUND_BYTES = 5 * 1024 * 1024
+
+export interface ResultSettings {
+  /** Whether an admin uploaded a background; if not, it is the BITS eagle. */
+  customBackground: boolean
+  /** Epoch milliseconds of the last change; `null` while nothing was changed. */
+  updatedAt: number | null
+}
+
+export interface PartyColors {
+  /** `null` while no country is set under "Verwaltung"; `parties` is empty then. */
+  countryName: string | null
+  /** Largest first; `color` is `#RRGGBB`, `null` for the palette's. */
+  parties: { id: string; name: string; color: string | null }[]
+  /** `#RRGGBB`, `null` for the palette's grey. */
+  noPartyColor: string | null
+}
+
+export async function getResultSettings(): Promise<ResultSettings> {
+  return (await request(RESULT_SETTINGS)).json()
+}
+
+/** Sent as the raw body with the file's type; 413 if larger than [MAX_BACKGROUND_BYTES], 400 or 415 if no PNG or JPEG. */
+export async function uploadResultBackground(file: File): Promise<void> {
+  await request(`${RESULT_SETTINGS}/background`, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  })
+}
+
+export async function resetResultBackground(): Promise<void> {
+  await request(`${RESULT_SETTINGS}/background`, { method: 'DELETE' })
+}
+
+export async function getPartyColors(): Promise<PartyColors> {
+  return (await request(`${RESULT_SETTINGS}/party-colors`)).json()
+}
+
+/** `colors` by WarEra party ID; parties left out get the palette's colour again. */
+export async function setPartyColors(colors: Record<string, string>, noPartyColor: string | null): Promise<void> {
+  await request(`${RESULT_SETTINGS}/party-colors`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ colors, noPartyColor }),
+  })
+}
+
+/** [version] changes the URL, so the browser loads the preview again after a change. */
+export function resultPreviewUrl(version: number): string {
+  return `${RESULT_SETTINGS}/preview.png?v=${version}`
 }
 
 export const DISCORD_LOGIN_URL = '/auth/oauth2/authorization/discord'

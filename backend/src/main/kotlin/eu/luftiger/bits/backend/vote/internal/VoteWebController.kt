@@ -33,6 +33,7 @@ class VoteWebController(
     private val voteService: VoteService,
     private val channelService: DiscordChannelService,
     private val guildRoles: GuildRoles,
+    private val settingsService: VoteResultSettingsService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -118,7 +119,7 @@ class VoteWebController(
     ): ResponseEntity<ByteArray> {
         requireManager(session)
         val (_, result) = voteService.result(id)
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(VoteResultRenderer.png(result))
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(VoteResultRenderer.png(result, settingsService.style()))
     }
 
     private fun close(

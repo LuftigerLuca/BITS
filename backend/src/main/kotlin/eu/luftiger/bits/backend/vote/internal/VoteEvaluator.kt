@@ -100,7 +100,7 @@ class VoteEvaluator(
             if (vote == null || vote.status != VoteStatus.COUNTING) return@executeWithoutResult
             partyResultRepository.saveAll(
                 tally.parties.mapIndexed { index, party ->
-                    PartyResult(voteId, index, party.name, party.yes, party.no, party.abstain, party.eligible)
+                    PartyResult(voteId, index, party.name, party.yes, party.no, party.abstain, party.eligible, party.id)
                 },
             )
             nonVoterRepository.saveAll(tally.nonVoters.mapIndexed { index, name -> NonVoter(voteId, index, name) })
@@ -135,6 +135,7 @@ class VoteEvaluator(
                         .thenBy(collator) { it.key?.name.orEmpty() },
                 ).map { (party, members) ->
                     PartyTally(
+                        id = party?.id,
                         name = party?.name,
                         yes = members.count { it.choice == Choice.YES },
                         no = members.count { it.choice == Choice.NO },
@@ -208,6 +209,7 @@ class VoteEvaluator(
     )
 
     private class PartyTally(
+        val id: String?,
         val name: String?,
         val yes: Int,
         val no: Int,

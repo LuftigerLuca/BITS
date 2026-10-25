@@ -9,6 +9,8 @@ export const ACTIONS: Record<AuditAction, string> = {
   VOTE_ENDED: 'Abstimmung beendet',
   VOTE_CANCELLED: 'Abstimmung abgebrochen',
   VOTE_MANAGER_ROLES_CHANGED: 'Rollen für Abstimmungen geändert',
+  VOTE_RESULT_BACKGROUND_CHANGED: 'Hintergrund der Auswertung geändert',
+  VOTE_PARTY_COLORS_CHANGED: 'Parteifarben geändert',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
