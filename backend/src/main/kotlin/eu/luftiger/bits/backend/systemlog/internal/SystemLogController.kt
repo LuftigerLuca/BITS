@@ -61,7 +61,7 @@ data class SystemLogEntryResponse(
     val occurredAt: Long,
     val type: LogEntryType,
     val category: LogCategory,
-    /** Only for [LogEntryType.SYNC_RUN]. */
+    /** Only for [LogEntryType.SYNC_RUN] and [LogEntryType.EMBASSY_SYNC_RUN]. */
     val sync: SyncRunResponse?,
     val member: NamedRef?,
     /** The Discord account a WarEra account was linked to before, for [LogEntryType.ACCOUNT_RELINKED]. */
@@ -84,7 +84,7 @@ data class SystemLogEntryResponse(
             type = LogEntryType.of(entry.kind),
             category = LogCategory.of(entry.kind.category),
             sync =
-                if (entry.kind == EntryKind.SYNC_RUN) {
+                if (entry.kind == EntryKind.SYNC_RUN || entry.kind == EntryKind.EMBASSY_SYNC_RUN) {
                     SyncRunResponse(
                         trigger = entry.syncTrigger?.let(SyncTriggerType::of),
                         status = SyncRunStatus.of(requireNotNull(entry.syncStatus), entry.occurredAt < noResponseBefore),
@@ -115,9 +115,9 @@ data class SyncRunResponse(
     /** `null` for a sync that was aborted before its trigger was known. */
     val trigger: SyncTriggerType?,
     val status: SyncRunStatus,
-    /** Linked accounts when the sync started. */
+    /** Linked accounts when the sync started; embassy threads for an embassy sync. */
     val linkedCount: Int?,
-    /** Members the bot synced; the counts are `null` until the bot reports back. */
+    /** Members the bot synced, threads for an embassy sync; the counts are `null` until the bot reports back. */
     val memberCount: Int?,
     val staleMemberCount: Int?,
     val granted: Int?,
@@ -163,6 +163,7 @@ data class NamedRef(
 @Serializable
 enum class LogEntryType {
     SYNC_RUN,
+    EMBASSY_SYNC_RUN,
     ACCOUNT_LINKED,
     ACCOUNT_RELINKED,
     ACCOUNT_REMOVED,
@@ -174,12 +175,14 @@ enum class LogEntryType {
     OUTBOX_STUCK,
     MEMBER_REPORT_REFUSED,
     VOTE_EVALUATION_DELAYED,
+    EMBASSY_THREAD_UNAVAILABLE,
     ;
 
     companion object {
         fun of(kind: EntryKind) =
             when (kind) {
                 EntryKind.SYNC_RUN -> SYNC_RUN
+                EntryKind.EMBASSY_SYNC_RUN -> EMBASSY_SYNC_RUN
                 EntryKind.ACCOUNT_LINKED -> ACCOUNT_LINKED
                 EntryKind.ACCOUNT_RELINKED -> ACCOUNT_RELINKED
                 EntryKind.ACCOUNT_REMOVED -> ACCOUNT_REMOVED
@@ -191,6 +194,7 @@ enum class LogEntryType {
                 EntryKind.OUTBOX_STUCK -> OUTBOX_STUCK
                 EntryKind.MEMBER_REPORT_REFUSED -> MEMBER_REPORT_REFUSED
                 EntryKind.VOTE_EVALUATION_DELAYED -> VOTE_EVALUATION_DELAYED
+                EntryKind.EMBASSY_THREAD_UNAVAILABLE -> EMBASSY_THREAD_UNAVAILABLE
             }
     }
 }
@@ -271,6 +275,8 @@ enum class ItemOutcomeType {
     FAILED,
     NICKNAME_SET,
     NICKNAME_RESET,
+    THREAD_ADDED,
+    THREAD_REMOVED,
     ;
 
     companion object {
@@ -282,6 +288,8 @@ enum class ItemOutcomeType {
                 ItemOutcome.FAILED -> FAILED
                 ItemOutcome.NICKNAME_SET -> NICKNAME_SET
                 ItemOutcome.NICKNAME_RESET -> NICKNAME_RESET
+                ItemOutcome.THREAD_ADDED -> THREAD_ADDED
+                ItemOutcome.THREAD_REMOVED -> THREAD_REMOVED
             }
     }
 }

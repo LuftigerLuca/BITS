@@ -1,6 +1,8 @@
 package eu.luftiger.bits.bot.systemlog
 
 import eu.luftiger.bits.bot.backend.BackendClient
+import eu.luftiger.bits.bot.backend.EmbassyBackend
+import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import io.ktor.client.plugins.ClientRequestException
@@ -18,6 +20,7 @@ import org.slf4j.LoggerFactory
 class SystemLogReporter(
     private val backend: BackendClient,
     private val scope: CoroutineScope,
+    private val embassyBackend: EmbassyBackend,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -25,6 +28,11 @@ class SystemLogReporter(
         syncId: Long,
         report: RoleSyncReport,
     ) = send("the result of role sync $syncId") { backend.reportRoleSync(syncId, report) }
+
+    fun reportEmbassySync(
+        syncId: Long,
+        report: EmbassySyncReport,
+    ) = send("the result of embassy sync $syncId") { embassyBackend.reportEmbassySync(syncId, report) }
 
     fun reportUndeliveredEvent(report: UndeliveredEventReport) =
         send("undelivered event ${report.streamId}") { backend.reportUndeliveredEvent(report) }

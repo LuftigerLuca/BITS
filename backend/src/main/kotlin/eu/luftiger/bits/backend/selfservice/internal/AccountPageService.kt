@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.selfservice.internal
 
 import eu.luftiger.bits.backend.account.api.AccountSelfService
 import eu.luftiger.bits.backend.audit.api.AuditEntries
+import eu.luftiger.bits.backend.embassy.api.EmbassyMemberships
 import eu.luftiger.bits.backend.ping.api.PingLogs
 import eu.luftiger.bits.backend.rolesync.api.RoleExplanations
 import eu.luftiger.bits.backend.systemlog.api.SystemLogRecords
@@ -18,6 +19,7 @@ class AccountPageService(
     private val systemLog: SystemLogRecords,
     private val pings: PingLogs,
     private val audit: AuditEntries,
+    private val embassies: EmbassyMemberships,
     private val clock: Clock,
 ) {
     fun account(discordUserId: String): AccountResponse =
@@ -60,6 +62,7 @@ class AccountPageService(
     private fun dataExport(discordUserId: String): DataExport {
         val stored = accounts.storedData(discordUserId)
         val log = systemLog.recordsAbout(discordUserId)
+        val embassyRecords = embassies.recordsAbout(discordUserId)
         return DataExport(
             discordUserId = discordUserId,
             exportedAt = clock.instant().toString(),
@@ -70,6 +73,22 @@ class AccountPageService(
                 },
             nicknameOptedInAt = stored.nicknameOptedInAt?.toString(),
             pings = pings.pingsOf(discordUserId).map { it.toString() },
+            embassies =
+                ExportedEmbassies(
+                    addedByHand =
+                        embassyRecords.manual.map {
+                            ExportedManualMembership(it.countryName, it.threadName, it.memberName, it.addedAt.toString())
+                        },
+                    reportedIn =
+                        embassyRecords.reported.map {
+                            ExportedThreadMembership(
+                                it.countryName,
+                                it.threadName,
+                                it.memberName,
+                                it.reason,
+                            )
+                        },
+                ),
             systemLog =
                 ExportedSystemLog(
                     entries =

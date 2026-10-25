@@ -143,6 +143,8 @@ SELECT * FROM nickname_opt_in WHERE discord_user_id = :'id';
 SELECT * FROM ping_log WHERE discord_user_id = :'id';
 SELECT * FROM vote_ballot WHERE discord_user_id = :'id';
 SELECT * FROM vote_elector WHERE discord_user_id = :'id';
+SELECT * FROM embassy_manual_member WHERE discord_user_id = :'id';
+SELECT * FROM embassy_thread_member WHERE discord_user_id = :'id';
 SELECT * FROM audit_entry WHERE actor_subject = 'discord:' || :'id';
 SELECT * FROM system_log_entry WHERE :'id' IN (discord_user_id, previous_discord_user_id);
 SELECT * FROM system_log_item WHERE discord_user_id = :'id';

@@ -90,6 +90,22 @@ haben. Danach löscht BITS, wer wie abgestimmt hat. `/abstimmung abbrechen` been
 Starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins auf der Seite „Abstimmungen“ freigeben. Damit
 der Bot nur Kanäle anbietet, in denen er posten kann, meldet er seine Textkanäle per `PUT /api/discord-channels`.
 
+Diplomatie mit anderen Ländern läuft in privaten Botschafts-Threads, einer pro Land. Auf der Dashboard-Seite
+„Botschaften“ ordnen Admins einem Land einen privaten Thread zu, den sie vorher selbst in Discord angelegt haben; das
+Land unter „Verwaltung“ bekommt keinen. Dort wählen sie auch die Ämter, die jemanden zum Botschafter machen (Standard:
+Präsident, Vizepräsident, Außenminister), die Botschafter-Rolle und Gastgeber-Rollen wie die eigene Regierung, und sie
+fügen Mitglieder von Hand hinzu. In jedem Thread sollen genau die verknüpften Mitglieder mit einem der Ämter in dessen
+Land sein, die von Hand Hinzugefügten und die Mitglieder der Gastgeber-Rollen; alle anderen entfernt der Bot, außer wer
+im Kanal Threads verwalten darf. Botschafter und von Hand Hinzugefügte bekommen die Botschafter-Rolle, die den Kanal
+sichtbar macht, und verlieren sie, sobald sie in keinem Thread mehr sind; Gastgeber-Rollen bekommen sie nicht. Das
+Backend lädt dafür nur die Regierungen der zugeordneten Länder (aus dem Cache, bis zu 10 Minuten alt) und publiziert ein
+`EmbassySyncEvent`, nach jeder Verknüpfung, nach jeder Änderung auf der Seite und stündlich. Der Bot setzt es um,
+entarchiviert einen Thread nur, wenn sich etwas ändert, und meldet per `POST /api/embassies/syncs/{id}`, wer jetzt in
+den Threads ist; das zeigt die Seite mit Grund. Ist eine Regierung nicht ladbar, entfernt der Abgleich aus deren Thread
+niemanden. Damit Admins Threads auswählen können, meldet der Bot die privaten Threads per `PUT /api/discord-threads`.
+Dafür braucht der Bot im Botschafts-Kanal die Rechte „Threads verwalten“ und „Nachrichten in Threads senden“, und die
+Botschafter-Rolle muss den Kanal sehen dürfen; diese Kanalrechte richten Admins selbst ein.
+
 Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
 verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür
 meldet der Bot die Mitglieder mit ihren Rollen per `PUT /api/discord-members`, sobald alle geladen sind, beim Start,
@@ -125,6 +141,8 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | Discord-ID, WarEra-ID, Stimme                    | `vote_ballot`              | laufende Abstimmung                 | bis zur Auswertung oder zum Abbruch                                         |
 | Discord-ID und -Name der Rollenmitglieder        | `vote_elector`             | Auswertung einer Abstimmung         | bis zur Auswertung                                                          |
 | Namen: Start, Ende, nicht abgestimmt             | `vote`, `vote_non_voter`   | Archiv der Abstimmungen             | unbegrenzt                                                                  |
+| Discord-ID, Name beim Hinzufügen                 | `embassy_manual_member`    | Botschafts-Threads                  | bis ein Admin das Mitglied entfernt oder die Zuordnung aufhebt              |
+| Discord-ID, Name, Grund der Thread-Mitglieder    | `embassy_thread_member`    | Botschafts-Threads im Dashboard     | bis zur nächsten Meldung des Bots oder zum Aufheben der Zuordnung           |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |

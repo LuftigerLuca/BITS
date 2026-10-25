@@ -13,8 +13,11 @@ import eu.luftiger.bits.shared.DiscordMemberChange
 import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.DiscordRolesReport
+import eu.luftiger.bits.shared.DiscordThreadDto
+import eu.luftiger.bits.shared.DiscordThreadsReport
 import eu.luftiger.bits.shared.Elector
 import eu.luftiger.bits.shared.ElectorateReport
+import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
@@ -61,7 +64,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import java.time.Duration
 
-/** [BackendClient] and [VoteBackend] that authenticate with the service token of the bot. */
+/** [BackendClient], [VoteBackend] and [EmbassyBackend] that authenticate with the service token of the bot. */
 class KtorBackendClient(
     baseUrl: String,
     serviceToken: String,
@@ -69,6 +72,7 @@ class KtorBackendClient(
     requestTimeout: Duration = REQUEST_TIMEOUT,
 ) : BackendClient,
     VoteBackend,
+    EmbassyBackend,
     AutoCloseable {
     private val http =
         HttpClient(engine) {
@@ -165,6 +169,23 @@ class KtorBackendClient(
 
     override suspend fun reportUndeliveredEvent(report: UndeliveredEventReport) {
         http.post("api/system-log/undelivered-events") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportThreads(threads: List<DiscordThreadDto>) {
+        http.put("api/discord-threads") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordThreadsReport(threads))
+        }
+    }
+
+    override suspend fun reportEmbassySync(
+        syncId: Long,
+        report: EmbassySyncReport,
+    ) {
+        http.post("api/embassies/syncs/$syncId") {
             contentType(ContentType.Application.Json)
             setBody(report)
         }

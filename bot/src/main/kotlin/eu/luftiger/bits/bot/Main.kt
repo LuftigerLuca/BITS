@@ -10,6 +10,9 @@ import eu.luftiger.bits.bot.commands.ProfileCommand
 import eu.luftiger.bits.bot.commands.RolesCommand
 import eu.luftiger.bits.bot.commands.UnverifyCommand
 import eu.luftiger.bits.bot.commands.VerifyCommand
+import eu.luftiger.bits.bot.embassies.EmbassySyncHandler
+import eu.luftiger.bits.bot.embassies.JdaEmbassyGuild
+import eu.luftiger.bits.bot.embassies.ThreadReporter
 import eu.luftiger.bits.bot.events.EventHandler
 import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
@@ -21,6 +24,7 @@ import eu.luftiger.bits.bot.votes.VoteButtons
 import eu.luftiger.bits.bot.votes.VoteCommand
 import eu.luftiger.bits.bot.votes.VoteEvents
 import eu.luftiger.bits.shared.AccountLinkedEvent
+import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.VoteClosedEvent
@@ -62,6 +66,7 @@ fun main() {
     val roleReporter = RoleReporter(config.guildId, backend, scope)
     val memberReporter = MemberReporter(config.guildId, backend, scope)
     val channelReporter = ChannelReporter(config.guildId, backend, scope)
+    val threadReporter = ThreadReporter(config.guildId, backend, scope)
     val verifyCommand = VerifyCommand(backend, scope)
 
     // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent.
@@ -83,6 +88,7 @@ fun main() {
                 roleReporter,
                 memberReporter,
                 channelReporter,
+                threadReporter,
             ).build()
             .awaitReady()
 
@@ -101,12 +107,14 @@ fun main() {
     roleReporter.reportPeriodically(guild)
     memberReporter.reportPeriodically(guild)
     channelReporter.reportPeriodically(guild)
+    threadReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()
-    val systemLog = SystemLogReporter(backend, scope)
+    val systemLog = SystemLogReporter(backend, scope, backend)
     val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit, systemLog::reportRoleSync)
     val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
     val votes = VoteEvents(jda, config.guildId, backend)
+    val embassies = EmbassySyncHandler(JdaEmbassyGuild(jda, config.guildId), systemLog::reportEmbassySync)
     val events =
         EventHandler { event ->
             logging.handle(event)
@@ -117,6 +125,7 @@ fun main() {
                 is VoteStartedEvent -> votes.onStarted(event)
                 is VoteClosedEvent -> votes.onClosed(event)
                 is VoteEvaluatedEvent -> votes.onEvaluated(event)
+                is EmbassySyncEvent -> embassies.handle(event)
                 else -> Unit
             }
         }

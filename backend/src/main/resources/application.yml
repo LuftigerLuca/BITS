@@ -40,6 +40,9 @@ bits:
   system-log:
     # Once a day is enough for entries kept 30 days.
     cleanup-cron: "0 15 3 * * *"
+  embassy:
+    # Hourly like the role sync, but not at the same minute, when the role sync loads every linked user.
+    cron: "0 10 * * * *"
   vote:
     # Ends votes within a minute of their end and tries stuck results again.
     cron: "0 * * * * *"

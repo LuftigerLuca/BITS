@@ -5,6 +5,7 @@ import {
   CircleUserIcon,
   HistoryIcon,
   HouseIcon,
+  LandmarkIcon,
   LogOutIcon,
   SettingsIcon,
   ShieldIcon,
@@ -92,6 +93,9 @@ export function Layout() {
                       </NavItem>
                       <NavItem to="/admin/roles" icon={<ShieldIcon />}>
                         Rollen
+                      </NavItem>
+                      <NavItem to="/admin/embassies" icon={<LandmarkIcon />}>
+                        Botschaften
                       </NavItem>
                       <NavItem to="/admin/audit-log" icon={<HistoryIcon />}>
                         Audit-Log

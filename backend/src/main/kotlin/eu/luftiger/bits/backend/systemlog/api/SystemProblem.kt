@@ -18,6 +18,24 @@ sealed interface SystemProblem {
         val countryName: String?,
     ) : SystemProblem
 
+    /**
+     * The government of a country with an embassy thread could not be loaded; nobody was removed from the thread
+     * because of their office. Recorded once per sync.
+     */
+    @NamedInterface("api")
+    data class EmbassyGovernmentUnavailable(
+        val countryId: String,
+        val countryName: String,
+    ) : SystemProblem
+
+    /** The bot could not sync an embassy thread; the other threads were synced. */
+    @NamedInterface("api")
+    data class EmbassyThreadUnavailable(
+        val threadName: String,
+        val countryName: String,
+        val cause: EmbassyThreadCause,
+    ) : SystemProblem
+
     /** A role with rules was deleted in Discord or moved above the bot, so its rules no longer run. */
     @NamedInterface("api")
     data class RoleNotAssignable(
@@ -58,4 +76,16 @@ sealed interface SystemProblem {
     data class OutboxStuck(
         val count: Int,
     ) : SystemProblem
+}
+
+@NamedInterface("api")
+enum class EmbassyThreadCause {
+    /** Deleted, or the bot cannot see it. */
+    MISSING,
+
+    /** The bot may not manage threads or send messages in threads in its channel. */
+    NO_PERMISSION,
+
+    /** Discord refused to list its members or to unarchive it. */
+    FAILED,
 }

@@ -20,6 +20,9 @@ object BotInput {
     const val MAX_ROLE_NAME_LENGTH = 100
     const val MAX_CHANNELS = 500
 
+    /** Active and archived private threads; far above what a guild keeps, a list beyond is a bug. */
+    const val MAX_THREADS = 10_000
+
     /** Discord names are at most 32 characters; nicknames as well. Checked against the column, which leaves room. */
     private const val MAX_MEMBER_NAME_LENGTH = 100
 
@@ -56,6 +59,8 @@ object BotInput {
 
     /** Discord allows 500 channels per guild. */
     fun channelCount(count: Int) = check(count <= MAX_CHANNELS, "number of channels")
+
+    fun threadCount(count: Int) = check(count <= MAX_THREADS, "number of threads")
 
     fun messageId(value: String) = check(DISCORD_ID.matches(value), "message id")
 

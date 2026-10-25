@@ -873,6 +873,9 @@ class RoleSyncTest {
         val parties = mutableMapOf<String, List<WareraParty>>()
         val partyLookups = CopyOnWriteArrayList<String>()
         var governmentDown = false
+
+        /** Governments by country ID; without an entry, Other (w2) is President of Germany and nobody holds any other office. */
+        val governments = mutableMapOf<String, WareraGovernment>()
         var partiesDown = false
         var companiesDown = false
         var down = false
@@ -897,6 +900,7 @@ class RoleSyncTest {
             users["w2"] = WareraUser("w2", "Other", country = "fr", leveling = WareraUser.Leveling(3))
             failingUsers.clear()
             parties.clear()
+            governments.clear()
             partyLookups.clear()
             deletedUsers.clear()
             governmentDown = false
@@ -944,7 +948,7 @@ class RoleSyncTest {
         override fun getGovernment(countryId: String) =
             available {
                 if (governmentDown) throw WareraApiException("down")
-                WareraGovernment(country = countryId, president = "w2".takeIf { countryId == "de" })
+                governments[countryId] ?: WareraGovernment(country = countryId, president = "w2".takeIf { countryId == "de" })
             }
 
         override fun searchMilitaryUnitIds(text: String) = available { listOf("m1") }
