@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.backend
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
+import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -28,6 +29,9 @@ interface BackendClient {
 
     /** Deletes the link and any open code of the user. */
     suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse
+
+    /** @throws WareraUnavailableException if the backend cannot reach the WarEra API */
+    suspend fun profile(discordUserId: String): ProfileResponse
 
     /** @throws WareraUnavailableException if the backend cannot load the user from WarEra */
     suspend fun explainRoles(discordUserId: String): RoleExplanationResponse

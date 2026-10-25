@@ -33,6 +33,11 @@ einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer s
 wieder. Wer den Server verlässt, verliert seine Verknüpfung und muss sich nach einem erneuten Beitritt neu
 verifizieren.
 
+Mit `/profil` zeigt der Bot im Kanal das WarEra-Profil des eigenen verknüpften Accounts, mit `/profil @nutzer` das
+eines anderen Mitglieds: Name mit Link zu WarEra, Level, Militärrang, Staatsbürgerschaft und Military Unit. Das
+Backend lädt den Nutzer dafür frisch über `POST /api/profiles`; die Namen von Land und Military Unit kommen aus dem
+Cache. Hinweise, etwa auf eine fehlende Verknüpfung, sieht nur, wer den Command aufgerufen hat.
+
 Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an ein WarEra-Merkmal koppeln:
 Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit, Level oder Militärrang ab
 einem Schwellwert. Mehrere Regeln für dieselbe Rolle gelten als ODER. Eine Rolle mit mindestens einer Regel
@@ -70,17 +75,17 @@ geprüft. Der Logout sperrt die Sitzung auch für Kopien des Cookies.
 
 BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
 
-| Daten                                            | Wo                         | Wozu                              | Wie lange                                                                   |
-|--------------------------------------------------|----------------------------|-----------------------------------|-----------------------------------------------------------------------------|
-| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten vergeben | bis `/unverify`, zum Verlassen des Servers oder zu einer neuen Verknüpfung  |
-| Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links    | bis zur nächsten Meldung des Bots oder zum Neustart                         |
-| Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung              | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
-| Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                           | 30 Tage                                                                     |
-| Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard            | unbegrenzt                                                                  |
-| Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard           | 30 Tage                                                                     |
-| Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot             | 7 Tage                                                                      |
-| Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                       | im Deployment höchstens 5 × 10 MB pro Dienst                                |
-| alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                 | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
+| Daten                                            | Wo                         | Wozu                                | Wie lange                                                                   |
+|--------------------------------------------------|----------------------------|-------------------------------------|-----------------------------------------------------------------------------|
+| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profil` | bis `/unverify`, zum Verlassen des Servers oder zu einer neuen Verknüpfung  |
+| Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links      | bis zur nächsten Meldung des Bots oder zum Neustart                         |
+| Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung                | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
+| Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |
+| Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
+| Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |
+| Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot               | 7 Tage                                                                      |
+| Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                         | im Deployment höchstens 5 × 10 MB pro Dienst                                |
+| alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                   | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
 
 WarEra-Daten der Nutzer hält das Backend nur im Speicher. Ein Hinweis in `/verify` sagt, was gespeichert wird.
 Mit `/unverify` löscht ein Nutzer seine Verknüpfung und einen offenen Code; die Rollen, die BITS verwaltet, verliert

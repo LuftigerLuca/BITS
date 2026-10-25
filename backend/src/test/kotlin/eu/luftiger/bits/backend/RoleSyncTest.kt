@@ -580,6 +580,9 @@ class RoleSyncTest {
     class FakeWarera : WareraClient {
         val users = mutableMapOf<String, WareraUser>()
         val failingUsers = mutableSetOf<String>()
+
+        /** Users WarEra no longer knows. */
+        val deletedUsers = mutableSetOf<String>()
         val lookups = CopyOnWriteArrayList<String>()
         private val heldUsers = ConcurrentHashMap.newKeySet<String>()
         private var gate = CountDownLatch(0)
@@ -605,6 +608,7 @@ class RoleSyncTest {
             users["w1"] = WareraUser("w1", "Luftiger", country = "de", mu = "m1", militaryRank = 40, leveling = WareraUser.Leveling(30))
             users["w2"] = WareraUser("w2", "Other", country = "fr", leveling = WareraUser.Leveling(3))
             failingUsers.clear()
+            deletedUsers.clear()
             governmentDown = false
             down = false
             companyName = ""
@@ -632,6 +636,7 @@ class RoleSyncTest {
                 if (userId in heldUsers) gate.await(10, TimeUnit.SECONDS)
                 // WarEra changed its answer in a way BITS cannot read.
                 if (userId in failingUsers) throw WareraSchemaException("unexpected response")
+                if (userId in deletedUsers) throw WareraNotFoundException("no such user")
                 users.getValue(userId)
             }
 
