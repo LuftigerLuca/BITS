@@ -134,9 +134,10 @@ data class RulePreviewResponse(
     val membersReported: Boolean,
     /** `false` until the WarEra data of all linked members was loaded since the backend started; many are [unknown]. */
     val usersLoaded: Boolean,
-    val gains: List<PreviewMember> = emptyList(),
-    val losses: List<PreviewMember> = emptyList(),
-    val unknown: List<PreviewMember> = emptyList(),
+    // Without defaults: kotlinx leaves out values equal to their default, and the dashboard expects every list.
+    val gains: List<PreviewMember>,
+    val losses: List<PreviewMember>,
+    val unknown: List<PreviewMember>,
 )
 
 @Serializable
