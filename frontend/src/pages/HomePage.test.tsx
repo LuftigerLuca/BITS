@@ -6,7 +6,7 @@ import type { Me, Overview } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null }
+const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
 const overview: Overview = {
   members: 1234,

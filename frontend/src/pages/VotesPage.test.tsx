@@ -5,7 +5,7 @@ import type { Me, Vote, VoteOptions } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: 'luca' }
+const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: 'luca', discordUser: true }
 
 const options: VoteOptions = {
   roles: [

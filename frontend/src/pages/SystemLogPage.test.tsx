@@ -6,7 +6,7 @@ import type { Me, SystemLogEntry, SystemLogItem } from '@/lib/api'
 import { json, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null }
+const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
 const run: SystemLogEntry = {
   id: 3,

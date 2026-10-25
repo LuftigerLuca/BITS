@@ -1,5 +1,15 @@
 import { useState, type ReactNode } from 'react'
-import { ActivityIcon, ChevronsUpDownIcon, HistoryIcon, HouseIcon, LogOutIcon, SettingsIcon, ShieldIcon, VoteIcon } from 'lucide-react'
+import {
+  ActivityIcon,
+  ChevronsUpDownIcon,
+  CircleUserIcon,
+  HistoryIcon,
+  HouseIcon,
+  LogOutIcon,
+  SettingsIcon,
+  ShieldIcon,
+  VoteIcon,
+} from 'lucide-react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
 import { useVoteAccess } from '@/features/votes/queries'
@@ -61,6 +71,11 @@ export function Layout() {
                     {voteAccess.data?.canManage && (
                       <NavItem to="/votes" icon={<VoteIcon />}>
                         Abstimmungen
+                      </NavItem>
+                    )}
+                    {user.discordUser && (
+                      <NavItem to="/account" icon={<CircleUserIcon />}>
+                        Mein Account
                       </NavItem>
                     )}
                   </SidebarMenu>

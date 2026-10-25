@@ -23,6 +23,7 @@ class MeController(
             avatarUrl = user.avatarUrl,
             role = WebRole.of(user.role),
             wareraUsername = user.discordUserId?.let(accountLinks::findByDiscordUserId)?.wareraUsername,
+            discordUser = user.discordUserId != null,
         )
     }
 }
@@ -34,6 +35,8 @@ data class MeResponse(
     val role: WebRole,
     /** WarEra account the Discord account is linked to; always `null` for the admin account. */
     val wareraUsername: String?,
+    /** Whether the session belongs to a Discord account; the admin account from the environment has none. */
+    val discordUser: Boolean,
 )
 
 /** The API's names for [Role]; the dashboard spells them out in `frontend/src/lib/api.ts`. */

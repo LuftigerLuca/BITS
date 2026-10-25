@@ -6,7 +6,7 @@ import type { Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: null }
+const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: null, discordUser: true }
 const admin: Me = { ...member, role: 'ADMIN' }
 
 describe('guards', () => {

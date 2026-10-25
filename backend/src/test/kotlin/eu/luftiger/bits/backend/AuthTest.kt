@@ -94,6 +94,7 @@ class AuthTest {
             jsonPath("$.avatarUrl") { value("https://cdn.discordapp.com/avatars/42/abc.png?size=128") }
             jsonPath("$.role") { value("USER") }
             jsonPath("$.wareraUsername") { value(null) }
+            jsonPath("$.discordUser") { value(true) }
         }
         mockMvc.get("/web/admin/anything") { cookie(session) }.andExpect { status { isForbidden() } }
     }
@@ -167,6 +168,7 @@ class AuthTest {
             jsonPath("$.name") { value("admin") }
             jsonPath("$.role") { value("ADMIN") }
             jsonPath("$.wareraUsername") { value(null) }
+            jsonPath("$.discordUser") { value(false) }
         }
     }
 

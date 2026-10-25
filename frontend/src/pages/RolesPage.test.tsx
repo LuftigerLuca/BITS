@@ -5,7 +5,7 @@ import type { Me } from '@/lib/api'
 import { json, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
-const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null }
+const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
 describe('roles page', () => {
   it('is linked from the sidebar and shows the role rules', async () => {

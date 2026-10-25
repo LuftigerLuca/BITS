@@ -29,8 +29,8 @@ speichert den Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das 
 Mit `/verify <WarEra-Name>` verknüpft ein Nutzer seinen Discord-Account mit seinem WarEra-Account. Er bekommt
 einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer seiner WarEra-Firmen und klickt auf
 „Prüfen“. Das Backend sucht den Code über die öffentliche API, speichert die Verknüpfung und publiziert ein
-`AccountLinkedEvent`. Der Code zählt nur in Firmen, die dem Nutzer gehören. Mit `/unverify` löst er die Verknüpfung
-wieder. Wer den Server verlässt, verliert seine Verknüpfung und muss sich nach einem erneuten Beitritt neu
+`AccountLinkedEvent`. Der Code zählt nur in Firmen, die dem Nutzer gehören. Mit `/unverify` oder unter „Mein
+Account“ im Dashboard löst er die Verknüpfung wieder. Wer den Server verlässt, verliert seine Verknüpfung und muss sich nach einem erneuten Beitritt neu
 verifizieren.
 
 Mit `/profil` zeigt der Bot im Kanal das WarEra-Profil des eigenen verknüpften Accounts, mit `/profil @nutzer` das
@@ -100,13 +100,18 @@ ist er bis zum Ende des Zeitfensters gesperrt. Der Hash braucht BCrypt-Kosten vo
 ein JWT im Cookie, gilt 8 Stunden, für `ADMIN` 1 Stunde, und wird nicht verlängert. Rollen werden nur beim Login
 geprüft. Der Logout sperrt die Sitzung auch für Kopien des Cookies.
 
+Unter „Mein Account“ sieht jedes Mitglied, das sich mit Discord anmeldet, seine Verknüpfung, den letzten Abgleich
+aller Mitglieder und die verwalteten Rollen mit Begründung wie bei `/rollen` (`/web/account`). Es kann dort die
+Verknüpfung lösen, was wie `/unverify` wirkt, und als JSON herunterladen, was BITS zu seiner Discord-ID speichert.
+Die Discord-ID kommt immer aus der Sitzung, nie aus dem Request; der Admin-Account ohne Discord hat die Seite nicht.
+
 ## Datenschutz
 
 BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmungen braucht:
 
 | Daten                                            | Wo                         | Wozu                                | Wie lange                                                                   |
 |--------------------------------------------------|----------------------------|-------------------------------------|-----------------------------------------------------------------------------|
-| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profil` | bis `/unverify`, zum Verlassen des Servers oder zu einer neuen Verknüpfung  |
+| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profil` | bis zum Lösen, zum Verlassen des Servers oder zu einer neuen Verknüpfung    |
 | Discord-ID, Zeitpunkt                            | `nickname_opt_in`          | Nickname aus WarEra                 | bis `/nickname aus` oder zum Verlassen des Servers                          |
 | Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links      | bis zur nächsten Meldung des Bots oder zum Neustart                         |
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung                | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
@@ -121,10 +126,14 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                   | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
 
 WarEra-Daten der Nutzer hält das Backend nur im Speicher. Ein Hinweis in `/verify` sagt, was gespeichert wird.
-Mit `/unverify` löscht ein Nutzer seine Verknüpfung und einen offenen Code; die Rollen, die BITS verwaltet, verliert
-er beim folgenden Abgleich. Wer den Server verlässt, verliert beides ebenso, spätestens beim nächsten Start des Bots.
-Abgelaufene Codes und alte Pings löscht ein Job jede Stunde. Wie Admins Auskunft geben oder für jemanden löschen,
-steht in [deploy/README.md](deploy/README.md#data-protection-requests).
+Mit `/unverify` oder unter „Mein Account“ im Dashboard löscht ein Nutzer seine Verknüpfung und einen offenen Code;
+die Rollen, die BITS verwaltet, verliert er beim folgenden Abgleich. Wer den Server verlässt, verliert beides ebenso,
+spätestens beim nächsten Start des Bots. Abgelaufene Codes und alte Pings löscht ein Job jede Stunde.
+
+Auskunft holt sich jedes Mitglied selbst unter „Mein Account“: Der Download enthält alle Zeilen der Tabellen oben, die
+seine Discord-ID betreffen, aus dem System-Log aber nur seine eigene Seite eines Eintrags und aus dem Audit-Log nur, was
+es selbst als Admin geändert hat. Events in Redis, Container-Logs und Backups enthält er nicht. Wie Admins Auskunft
+geben oder für jemanden löschen, steht in [deploy/README.md](deploy/README.md#data-protection-requests).
 
 Verifiziert sich ein anderer Discord-Account für einen schon verknüpften WarEra-Account, ersetzt die neue
 Verknüpfung die alte. Der vorherige Account bekommt dann eine Direktnachricht vom Bot, falls er welche annimmt.

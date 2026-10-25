@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
+import { RoleName } from '@/components/RoleName'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RoleName } from '@/features/role-sync/RoleName'
 import { DEFAULT_DURATION_MILLIS, errorMessage, toLocalInput } from './labels'
 import { useCreateVote, useVoteOptions } from './queries'
 

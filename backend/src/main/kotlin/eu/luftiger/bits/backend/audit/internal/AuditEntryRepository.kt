@@ -24,6 +24,8 @@ interface AuditEntryRepository : JpaRepository<AuditEntry, Long> {
         limit: Limit,
     ): List<AuditEntry>
 
+    fun findByActorSubjectOrderById(actorSubject: String): List<AuditEntry>
+
     /** Everybody who appears in the log, former admins too, each with the name and avatar of their latest entry. */
     @Query(
         """

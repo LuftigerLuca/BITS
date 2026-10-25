@@ -16,3 +16,10 @@ export function RequireAdmin() {
   if (user?.role !== 'ADMIN') return <Navigate to="/" replace />
   return <Outlet />
 }
+
+/** Pages about the member's own Discord account; the admin account from the environment has none. */
+export function RequireDiscordUser() {
+  const { user } = useAuth()
+  if (!user?.discordUser) return <Navigate to="/" replace />
+  return <Outlet />
+}

@@ -130,7 +130,9 @@ database again on startup. Dumps can also be inspected without touching the stac
 ## Data protection requests
 
 What BITS stores and for how long is listed under "Datenschutz" in the [README](../README.md#datenschutz). Members
-delete their link themselves with `/unverify`. To tell someone what is stored about them, look up their Discord ID:
+handle most requests themselves: they delete their link with `/unverify` or on the dashboard page "Mein Account", and
+download what is stored about them there as JSON. Point them there first. For a member who cannot log in to the
+dashboard, e.g. because they left the server, or for anything the download leaves out, look up their Discord ID:
 
 ```sh
 cd /srv/bits-staging          # DEPLOY_PATH
