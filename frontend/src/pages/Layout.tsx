@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronsUpDownIcon, HouseIcon, LogOutIcon, SettingsIcon } from 'lucide-react'
+import { ActivityIcon, ChevronsUpDownIcon, HistoryIcon, HouseIcon, LogOutIcon, SettingsIcon } from 'lucide-react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -20,6 +20,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -54,14 +55,28 @@ export function Layout() {
                     <NavItem to="/" end icon={<HouseIcon />}>
                       Start
                     </NavItem>
-                    {user.role === 'ADMIN' && (
-                      <NavItem to="/admin" icon={<SettingsIcon />}>
-                        Verwaltung
-                      </NavItem>
-                    )}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
+              {user.role === 'ADMIN' && (
+                <SidebarGroup>
+                  <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {/* Only the page itself, so the log pages below do not mark it as well. */}
+                      <NavItem to="/admin" end icon={<SettingsIcon />}>
+                        Verwaltung
+                      </NavItem>
+                      <NavItem to="/admin/audit-log" icon={<HistoryIcon />}>
+                        Audit-Log
+                      </NavItem>
+                      <NavItem to="/admin/system-log" icon={<ActivityIcon />}>
+                        System-Log
+                      </NavItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
             </nav>
           </SidebarContent>
           <SidebarFooter className="p-2">

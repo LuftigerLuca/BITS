@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
@@ -111,7 +111,7 @@ describe('system log page', () => {
     expect(systemLogCalls().at(-1)).toBe('category=ERROR&member=Luca&roleId=r-citizen')
   })
 
-  it('is linked from the admin area next to the audit log', async () => {
+  it('is linked from the sidebar', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
       'GET /web/admin/role-sync/roles': () => json([]),
@@ -121,8 +121,8 @@ describe('system log page', () => {
     })
     const router = renderApp('/admin')
 
-    expect(await screen.findByRole('link', { name: 'Audit-Log' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('link', { name: 'System-Log' }))
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    await userEvent.click(within(navigation).getByRole('link', { name: 'System-Log' }))
 
     expect(await screen.findByRole('heading', { name: 'System-Log' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/admin/system-log')
