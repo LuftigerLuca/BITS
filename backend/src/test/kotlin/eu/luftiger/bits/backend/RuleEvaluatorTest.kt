@@ -1,7 +1,7 @@
 package eu.luftiger.bits.backend
 
+import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
-import eu.luftiger.bits.backend.rolesync.domain.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.internal.RoleOutcome
 import eu.luftiger.bits.backend.rolesync.internal.RuleEvaluator

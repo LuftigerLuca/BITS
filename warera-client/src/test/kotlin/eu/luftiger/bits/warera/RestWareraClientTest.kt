@@ -186,7 +186,7 @@ class RestWareraClientTest {
             ).andRespond(withSuccess("""{"result":{"data":{"items":[{"_id":"p2","name":"Leer"}]}}}""", MediaType.APPLICATION_JSON))
 
         assertEquals(
-            listOf(WareraParty("p1", "Partei", listOf("u1", "u2")), WareraParty("p2", "Leer")),
+            listOf(WareraParty("p1", "Partei", listOf("u1", "u2"), leader = "u1"), WareraParty("p2", "Leer")),
             client.getParties("c1"),
         )
         server.verify()

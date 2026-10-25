@@ -34,9 +34,12 @@ Account“ im Dashboard löst er die Verknüpfung wieder. Wer den Server verläs
 verifizieren.
 
 Mit `/profil` zeigt der Bot im Kanal das WarEra-Profil des eigenen verknüpften Accounts, mit `/profil @nutzer` das
-eines anderen Mitglieds: Name mit Link zu WarEra, Level, Militärrang, Staatsbürgerschaft und Military Unit. Das
-Backend lädt den Nutzer dafür frisch über `POST /api/profiles`; die Namen von Land und Military Unit kommen aus dem
-Cache. Hinweise, etwa auf eine fehlende Verknüpfung, sieht nur, wer den Command aufgerufen hat.
+eines anderen Mitglieds: Name mit Link zu WarEra, Level, Militärrang, Staatsbürgerschaft, Military Unit, Partei im
+Land der Staatsbürgerschaft (mit „(Vorsitz)“ für die Parteiführung), Regierungsamt, Anzahl der Firmen und die von
+BITS verwalteten Rollen, die das Mitglied auf dem Server hat. Das Backend lädt den Nutzer und seine Firmen dafür frisch
+über `POST /api/profiles`; Land und Military Unit kommen aus dem Cache, Parteien und Regierung des Landes ebenfalls,
+bis zu 10 Minuten alt. Kann WarEra Partei, Regierung oder Firmen gerade nicht liefern, zeigt die Karte dort „nicht
+verfügbar“. Hinweise, etwa auf eine fehlende Verknüpfung, sieht nur, wer den Command aufgerufen hat.
 
 Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an ein WarEra-Merkmal koppeln:
 Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit, Level oder Militärrang ab
@@ -45,7 +48,7 @@ verwaltet BITS: Wer keine ihrer Regeln erfüllt, verliert sie, auch wenn sie von
 berechnet die Soll-Rollen und publiziert ein `RoleSyncEvent`, der Bot setzt es mit Grund im Audit-Log um. Abgeglichen
 wird beim Verknüpfen für den Nutzer (und den zuvor verknüpften Discord-Account), nach jeder Regeländerung für alle
 mit den WarEra-Daten des letzten Abgleichs und stündlich für alle mit frischen Daten, eine WarEra-Abfrage pro
-Sekunde. Kann ein Nutzer oder eine Regierung nicht geladen werden, bleiben die betroffenen Rollen unverändert. Der
+Sekunde; die Regierungen kommen dabei aus dem Cache und sind bis zu 10 Minuten alt. Kann ein Nutzer oder eine Regierung nicht geladen werden, bleiben die betroffenen Rollen unverändert. Der
 Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und bei jeder Änderung; Regeln für
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
@@ -68,7 +71,7 @@ Mitglieder über seiner Rolle kann er nicht umbenennen; das landet als überspru
 
 Mit `/rollen` sieht ein verknüpftes Mitglied, nur für sich, zu jeder Rolle, die BITS verwaltet, ob es sie
 erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10“. Das Backend wertet die Regeln über
-`POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen WarEra-Daten, und ändert
+`POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen Daten des Nutzers, und ändert
 keine Rollen; Abweichungen gleicht der nächste Abgleich an. Verwaiste Regeln tauchen nicht auf.
 
 Mit `/abstimmung starten frage rolle kanal [ende]` startet jemand eine Ja/Nein/Enthaltung-Abstimmung, ebenso im
@@ -77,7 +80,8 @@ postet die Frage mit drei Buttons im Kanal und pingt die Rolle. Abstimmen darf, 
 WarEra-Account hat; die Antwort sieht nur der Abstimmende, und bis zum Ende kann er seine Stimme ändern. Die
 Nachricht zeigt nur, wie viele abgestimmt haben. Zum Ende, vorzeitig mit `/abstimmung beenden`, meldet der Bot die
 aktuellen Mitglieder der Rolle; Stimmen von Mitgliedern, die die Rolle nicht mehr haben, zählen nicht. Das Backend
-ordnet die Stimmen über WarEra den Parteien im Land der Staatsbürgerschaft zu, wer in keiner ist, gilt als
+ordnet die Stimmen über WarEra den Parteien im Land der Staatsbürgerschaft zu (die Parteien aus dem Cache, bis zu 10
+Minuten alt), wer in keiner ist, gilt als
 „Parteilos“. Der Bot postet das Ergebnis als Grafik und Text im Kanal, mit den Namen derer, die nicht abgestimmt
 haben. Danach löscht BITS, wer wie abgestimmt hat. `/abstimmung abbrechen` beendet eine Abstimmung ohne Auswertung.
 Starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins auf der Seite „Abstimmungen“ freigeben. Damit

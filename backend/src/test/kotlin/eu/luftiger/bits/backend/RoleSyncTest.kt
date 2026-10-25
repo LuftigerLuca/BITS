@@ -873,6 +873,8 @@ class RoleSyncTest {
         val parties = mutableMapOf<String, List<WareraParty>>()
         val partyLookups = CopyOnWriteArrayList<String>()
         var governmentDown = false
+        var partiesDown = false
+        var companiesDown = false
         var down = false
         var companyName = ""
 
@@ -898,6 +900,8 @@ class RoleSyncTest {
             partyLookups.clear()
             deletedUsers.clear()
             governmentDown = false
+            partiesDown = false
+            companiesDown = false
             down = false
             companyName = ""
         }
@@ -928,7 +932,11 @@ class RoleSyncTest {
                 users.getValue(userId)
             }
 
-        override fun getCompanyIds(userId: String) = available { listOf("c-$userId") }
+        override fun getCompanyIds(userId: String) =
+            available {
+                if (companiesDown) throw WareraApiException("down")
+                listOf("c-$userId")
+            }
 
         override fun getCompany(companyId: String) =
             available { WareraCompany(companyId, companyName, ownerId = companyId.removePrefix("c-")) }
@@ -951,6 +959,7 @@ class RoleSyncTest {
         override fun getParties(countryId: String) =
             available {
                 partyLookups += countryId
+                if (partiesDown) throw WareraApiException("down")
                 parties[countryId].orEmpty()
             }
 

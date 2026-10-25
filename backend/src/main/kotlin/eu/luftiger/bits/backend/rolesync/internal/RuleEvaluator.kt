@@ -1,7 +1,6 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
-import eu.luftiger.bits.backend.rolesync.domain.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
@@ -46,26 +45,12 @@ class RuleEvaluator(
         if (user == null) return null
         return when (rule.type) {
             ConditionType.CITIZENSHIP -> user.country == rule.countryId
-            ConditionType.GOVERNMENT_OFFICE -> governments[rule.countryId]?.let { holds(it, requireNotNull(rule.office), user.id) }
+            ConditionType.GOVERNMENT_OFFICE -> governments[rule.countryId]?.let { requireNotNull(rule.office).isHeldBy(it, user.id) }
             ConditionType.MILITARY_UNIT -> user.mu == rule.muId
             ConditionType.LEVEL -> user.leveling.level >= requireNotNull(rule.threshold)
             ConditionType.MILITARY_RANK -> user.militaryRank >= requireNotNull(rule.threshold)
         }
     }
-
-    private fun holds(
-        government: WareraGovernment,
-        office: GovernmentOffice,
-        userId: String,
-    ): Boolean =
-        when (office) {
-            GovernmentOffice.PRESIDENT -> government.president == userId
-            GovernmentOffice.VICE_PRESIDENT -> government.vicePresident == userId
-            GovernmentOffice.MINISTER_OF_ECONOMY -> government.minOfEconomy == userId
-            GovernmentOffice.MINISTER_OF_DEFENSE -> government.minOfDefense == userId
-            GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS -> government.minOfForeignAffairs == userId
-            GovernmentOffice.CONGRESS -> userId in government.congressMembers
-        }
 }
 
 /** [met] is `null` if the data to decide is missing. */
