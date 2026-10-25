@@ -4,6 +4,7 @@ export const ACTIONS: Record<AuditAction, string> = {
   ROLE_RULE_CREATED: 'Regel angelegt',
   ROLE_RULE_DELETED: 'Regel gelöscht',
   OVERVIEW_COUNTRY_SET: 'Land der Startseite geändert',
+  NICKNAME_SETTING_CHANGED: 'Nicknames umgeschaltet',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

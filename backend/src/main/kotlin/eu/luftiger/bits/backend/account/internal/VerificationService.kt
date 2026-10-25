@@ -182,7 +182,9 @@ class VerificationService(
             )
             verificationRepository.deleteById(verification.discordUserId)
             val previousDiscordUserId = previous?.discordUserId?.takeIf { it != verification.discordUserId }
-            applicationEvents.publishEvent(AccountLinked(verification.discordUserId, verification.wareraUserId, previousDiscordUserId))
+            applicationEvents.publishEvent(
+                AccountLinked(verification.discordUserId, verification.wareraUserId, previousDiscordUserId, verification.wareraUsername),
+            )
             systemLog.recordAccountLinked(
                 AccountLinkRecord(
                     discordUserId = verification.discordUserId,
@@ -215,7 +217,7 @@ class VerificationService(
             verificationRepository.findByIdOrNull(discordUserId)?.let(verificationRepository::delete)
             if (link != null) {
                 log.info("User {} unlinked their WarEra account", discordUserId)
-                applicationEvents.publishEvent(AccountUnlinked(discordUserId))
+                applicationEvents.publishEvent(AccountUnlinked(discordUserId, link.wareraUserId, link.wareraUsername))
             }
             UnlinkAccountResponse(link?.wareraUsername)
         }!!

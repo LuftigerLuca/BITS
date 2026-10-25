@@ -73,7 +73,7 @@ class SystemLogTest {
         awaitBackgroundWork()
         jdbc.execute(
             "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, system_log_entry, " +
-                "system_log_item, audit_entry",
+                "system_log_item, audit_entry, nickname_setting",
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
@@ -139,6 +139,38 @@ class SystemLogTest {
     }
 
     @Test
+    fun `nickname changes are items of the run, the ones that did not work count as skipped and failed`() {
+        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        awaitBackgroundWork()
+        val syncId = syncIds().single()
+
+        report(
+            syncId,
+            """
+            {"memberCount":3,"staleMemberCount":0,"changes":[],"nicknameChanges":[
+              {"discordUserId":"1","memberName":"Luca","nickname":"Luftiger","outcome":"SET"},
+              {"discordUserId":"2","memberName":"Other","nickname":null,"outcome":"RESET"},
+              {"discordUserId":"3","memberName":"Owner","nickname":"Third","outcome":"SKIPPED",
+               "reason":"Das Mitglied besitzt den Server oder steht über der Rolle des Bots."}
+            ]}
+            """,
+        ).andExpect { status { isNoContent() } }
+
+        val sync = systemLog("category" to "SYNC").read<List<Map<String, Int>>>("$.entries[*].sync").single()
+        assertEquals(listOf(0, 0, 1, 0, 2), listOf("granted", "removed", "skipped", "failed", "nicknames").map { sync[it] })
+        val items = items(syncId)
+        assertEquals(listOf("NICKNAME_SET", "NICKNAME_RESET", "SKIPPED"), items.read("$[*].outcome"))
+        assertEquals(
+            listOf(
+                "Nickname: Luftiger",
+                "Nickname aus WarEra entfernt",
+                "Nickname Third: Das Mitglied besitzt den Server oder steht über der Rolle des Bots.",
+            ),
+            items.read("$[*].reason"),
+        )
+    }
+
+    @Test
     fun `a run without answer is pending, then has no response, and a stale one is skipped`() {
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
         awaitBackgroundWork()
@@ -167,6 +199,12 @@ class SystemLogTest {
             1,
             """{"memberCount":0,"staleMemberCount":0,"changes":[{"discordUserId":"x","memberName":"","roleId":"r",""" +
                 """"roleName":null,"outcome":"GRANTED"}]}""",
+        ).andExpect { status { isBadRequest() } }
+        // Longer than Discord allows for a nickname.
+        report(
+            1,
+            """{"memberCount":0,"staleMemberCount":0,"changes":[],"nicknameChanges":[{"discordUserId":"1","memberName":"Luca",""" +
+                """"nickname":"${"x".repeat(33)}","outcome":"SET"}]}""",
         ).andExpect { status { isBadRequest() } }
     }
 

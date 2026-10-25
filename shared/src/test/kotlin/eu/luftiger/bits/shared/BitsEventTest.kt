@@ -28,9 +28,21 @@ class BitsEventTest {
                 discordUserIds = null,
                 members = mapOf("1" to MemberRoles(grants = listOf(RoleGrant("r1", "BITS: Level ab 10")), keepRoleIds = listOf("r2"))),
                 occurredAt = 5,
+                nicknames = mapOf("1" to "Rommel"),
+                nicknameResets = mapOf("2" to "Guderian"),
             )
 
         assertEquals(event, decodeEvent(event.encode()))
+    }
+
+    @Test
+    fun `role sync of a backend without nicknames leaves them alone`() {
+        val payload = """{"type":"role_sync","managedRoleIds":[],"discordUserIds":null,"members":{},"occurredAt":5}"""
+
+        val event = decodeEvent(payload) as RoleSyncEvent
+
+        assertEquals(null, event.nicknames)
+        assertEquals(emptyMap(), event.nicknameResets)
     }
 
     @Test

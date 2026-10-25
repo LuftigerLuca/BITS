@@ -17,6 +17,7 @@ export const TRIGGERS: Record<SyncTrigger, string> = {
   HOURLY: 'stündlich',
   RULE_CHANGE: 'nach Regeländerung',
   ACCOUNT_CHANGE: 'nach Verknüpfung',
+  SETTING_CHANGE: 'nach Einschalten der Nicknames',
 }
 
 export const STATUS: Record<SyncRunStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
@@ -32,6 +33,8 @@ export const OUTCOMES: Record<ItemOutcome, string> = {
   REMOVED: 'Entzogen',
   SKIPPED: 'Übersprungen',
   FAILED: 'Fehlgeschlagen',
+  NICKNAME_SET: 'Nickname gesetzt',
+  NICKNAME_RESET: 'Nickname entfernt',
 }
 
 export function name(ref: NamedRef): string {
@@ -52,6 +55,7 @@ export function describe(entry: SystemLogEntry): string {
       `${sync.removed} entzogen`,
       `${sync.skipped} übersprungen`,
       `${sync.failed} fehlgeschlagen`,
+      ...(sync.nicknames ? [`${sync.nicknames} Nicknames`] : []),
     ]
     return `${title}: ${counts.join(' · ')}`
   }

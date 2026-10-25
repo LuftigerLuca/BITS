@@ -95,6 +95,7 @@ data class SystemLogEntryResponse(
                         removed = entry.removedCount,
                         skipped = entry.skippedCount,
                         failed = entry.failedCount,
+                        nicknames = entry.nicknameCount,
                     )
                 } else {
                     null
@@ -123,6 +124,8 @@ data class SyncRunResponse(
     val removed: Int?,
     val skipped: Int?,
     val failed: Int?,
+    /** Nicknames set or cleared; skipped and failed ones are in [skipped] and [failed]. */
+    val nicknames: Int?,
 )
 
 @Serializable
@@ -220,6 +223,7 @@ enum class SyncTriggerType {
     HOURLY,
     RULE_CHANGE,
     ACCOUNT_CHANGE,
+    SETTING_CHANGE,
     ;
 
     companion object {
@@ -228,6 +232,7 @@ enum class SyncTriggerType {
                 SyncTrigger.HOURLY -> HOURLY
                 SyncTrigger.RULE_CHANGE -> RULE_CHANGE
                 SyncTrigger.ACCOUNT_CHANGE -> ACCOUNT_CHANGE
+                SyncTrigger.SETTING_CHANGE -> SETTING_CHANGE
             }
     }
 }
@@ -262,6 +267,8 @@ enum class ItemOutcomeType {
     REMOVED,
     SKIPPED,
     FAILED,
+    NICKNAME_SET,
+    NICKNAME_RESET,
     ;
 
     companion object {
@@ -271,6 +278,8 @@ enum class ItemOutcomeType {
                 ItemOutcome.REMOVED -> REMOVED
                 ItemOutcome.SKIPPED -> SKIPPED
                 ItemOutcome.FAILED -> FAILED
+                ItemOutcome.NICKNAME_SET -> NICKNAME_SET
+                ItemOutcome.NICKNAME_RESET -> NICKNAME_RESET
             }
     }
 }

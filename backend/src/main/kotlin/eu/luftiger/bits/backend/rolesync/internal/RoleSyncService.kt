@@ -3,14 +3,17 @@ package eu.luftiger.bits.backend.rolesync.internal
 import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.rolesync.domain.NicknameSetting
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
+import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
@@ -26,10 +29,14 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Every sync is a run in the [SystemLog], written together with its event; members whose WarEra data is missing and
  * governments that cannot be loaded are recorded there as problems of the run.
+ *
+ * If admins turned it on, the event also carries the WarEra names the bot sets as nicknames, and for members who lost
+ * their link the name to clear again. Then a sync runs even without rules.
  */
 @Service
 class RoleSyncService(
     private val ruleInputs: RuleInputs,
+    private val nicknameSettings: NicknameSettingRepository,
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
@@ -69,11 +76,23 @@ class RoleSyncService(
         trigger: SyncTrigger = SyncTrigger.HOURLY,
     ) = sync(accountLinks.findAll(), discordUserIds = null, refresh = false, trigger = trigger, confirmedRoleIds = confirmedRoleIds)
 
-    /** Syncs the given members only, with fresh WarEra data; members without a link lose all managed roles. */
+    /**
+     * Syncs the given members only, with fresh WarEra data; members without a link lose all managed roles, and the
+     * nickname of the account in [formerAccounts] they had.
+     */
     @Synchronized
-    fun syncMembers(discordUserIds: Collection<String>) {
+    fun syncMembers(
+        discordUserIds: Collection<String>,
+        formerAccounts: Map<String, FormerAccount> = emptyMap(),
+    ) {
         val links = discordUserIds.mapNotNull { id -> accountLinks.findByDiscordUserId(id)?.let { LinkedAccount(id, it.wareraUserId) } }
-        sync(links, discordUserIds = discordUserIds.distinct(), refresh = true, trigger = SyncTrigger.ACCOUNT_CHANGE)
+        sync(
+            links,
+            discordUserIds = discordUserIds.distinct(),
+            refresh = true,
+            trigger = SyncTrigger.ACCOUNT_CHANGE,
+            formerAccounts = formerAccounts,
+        )
     }
 
     private fun sync(
@@ -82,9 +101,11 @@ class RoleSyncService(
         refresh: Boolean,
         trigger: SyncTrigger,
         confirmedRoleIds: List<String> = emptyList(),
+        formerAccounts: Map<String, FormerAccount> = emptyMap(),
     ) {
         val rules = ruleInputs.activeRules()
-        if (rules.isEmpty()) {
+        val nicknamesEnabled = nicknameSettings.findByIdOrNull(NicknameSetting.SINGLE_ROW_ID)?.enabled == true
+        if (rules.isEmpty() && !nicknamesEnabled) {
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
@@ -95,15 +116,23 @@ class RoleSyncService(
         val evaluator = RuleEvaluator(rules, governments)
         var lookups = 0
         val unavailable = mutableListOf<String>()
-        val members =
-            links
-                .mapNotNull { link ->
-                    val cached = users[link.wareraUserId]?.takeUnless { refresh }
-                    val user = if (cached != null) cached.user else loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
-                    if (user == null) unavailable += link.discordUserId
-                    evaluator.evaluate(user)?.let { link.discordUserId to it }
-                }.toMap()
+        val members = HashMap<String, MemberRoles>()
+        val nicknames = HashMap<String, String>()
+        links.forEach { link ->
+            val cached = users[link.wareraUserId]?.takeUnless { refresh }
+            val user = if (cached != null) cached.user else loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
+            if (user == null) unavailable += link.discordUserId else nicknames[link.discordUserId] = user.username
+            evaluator.evaluate(user)?.let { members[link.discordUserId] = it }
+        }
         if (unavailable.isNotEmpty()) systemLog.recordProblem(SystemProblem.WareraUsersUnavailable(unavailable))
+        val linkedIds = links.mapTo(HashSet()) { it.discordUserId }
+        // The nickname was set from the data loaded last, which may be newer than the name at the time of linking.
+        val nicknameResets =
+            formerAccounts
+                .filterKeys { it !in linkedIds }
+                .mapNotNull { (discordUserId, account) ->
+                    (users[account.wareraUserId]?.user?.username ?: account.wareraUsername)?.let { discordUserId to it }
+                }.toMap()
         transactionTemplate.executeWithoutResult {
             val syncId = systemLog.recordSyncRun(trigger, links.size)
             eventPublisher.publish(
@@ -114,11 +143,20 @@ class RoleSyncService(
                     occurredAt = clock.millis(),
                     confirmedRoleIds = confirmedRoleIds,
                     syncId = syncId,
+                    nicknames = nicknames.takeIf { nicknamesEnabled },
+                    nicknameResets = if (nicknamesEnabled) nicknameResets else emptyMap(),
                 ),
             )
         }
         log.info("Role sync published for {} members, {} linked", discordUserIds?.size ?: "all", links.size)
     }
+
+    /** WarEra account a member was linked to until now, for clearing the nickname taken from it. */
+    data class FormerAccount(
+        val wareraUserId: String,
+        /** Name at the time of linking, in case the account's data is not loaded. */
+        val wareraUsername: String?,
+    )
 
     private fun loadUser(
         wareraUserId: String,

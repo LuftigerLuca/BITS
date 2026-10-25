@@ -14,7 +14,8 @@ a test server, so testing never touches the real WarEra Discord.
    application (e.g. "BITS Staging") and copy the token under **Bot → Reset Token**. On the same page, turn on
    **Server Members Intent**; the role sync needs all members, and the bot does not start without it. Invite the
    bot to the test server via **OAuth2 → URL Generator** with the scopes `bot` and `applications.commands` and
-   the permission **Manage Roles**. The bot can only give roles below its own highest role. Copy the ID of
+   the permissions **Manage Roles** and **Manage Nicknames**. The bot can only give roles below its own highest role
+   and can only rename members below it, never the owner of the server. Copy the ID of
    the server (developer mode in Discord, right-click on the server → **Copy Server ID**). For the dashboard
    login, copy **Client ID** and **Client Secret** under **OAuth2** and add
    `<BITS_PUBLIC_URL>/auth/oauth2/callback/discord` under **Redirects**.

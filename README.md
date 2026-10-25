@@ -50,6 +50,14 @@ Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und be
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
 
+Optional setzt BITS den Nickname verknüpfter Mitglieder auf ihren WarEra-Namen; Admins schalten das unter
+„Verwaltung“ ein. Der Bot gleicht ihn bei jedem Abgleich an, also auch nach einer Umbenennung in WarEra spätestens nach
+einer Stunde, und nennt „BITS: WarEra-Name“ als Grund im Audit-Log. Beim Lösen der Verknüpfung oder wenn ein anderer
+Discord-Account den WarEra-Account übernimmt, entfernt er den Nickname wieder, sofern er noch dem WarEra-Namen
+entspricht. Kann ein Nutzer nicht geladen werden, bleibt sein Nickname, wie er ist; ausgeschaltet ändert BITS keine
+Nicknames. Dafür braucht der Bot die Berechtigung „Nicknames verwalten“. Den Server-Besitzer und Mitglieder über seiner
+Rolle kann er nicht umbenennen; das landet als übersprungene Änderung im System-Log.
+
 Mit `/rollen` sieht ein verknüpftes Mitglied, nur für sich, zu jeder Rolle, die BITS verwaltet, ob es sie
 erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10“. Das Backend wertet die Regeln über
 `POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen WarEra-Daten, und ändert

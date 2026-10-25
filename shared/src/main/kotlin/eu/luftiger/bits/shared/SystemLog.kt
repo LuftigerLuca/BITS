@@ -13,6 +13,8 @@ data class RoleSyncReport(
     /** Members left alone because a newer sync had set their roles already. */
     val staleMemberCount: Int,
     val changes: List<ReportedRoleChange>,
+    /** Nicknames the bot changed or could not change. */
+    val nicknameChanges: List<ReportedNicknameChange> = emptyList(),
 )
 
 @Serializable
@@ -33,6 +35,32 @@ enum class RoleChangeOutcome {
     REMOVED,
 
     /** Not tried, e.g. because the role is above the bot or the sync would take it from too many members. */
+    SKIPPED,
+
+    /** Tried, but Discord refused it. */
+    FAILED,
+}
+
+@Serializable
+data class ReportedNicknameChange(
+    val discordUserId: String,
+    /** As Discord showed the member before the change. */
+    val memberName: String,
+    /** The new nickname; `null` if it was cleared. */
+    val nickname: String?,
+    val outcome: NicknameChangeOutcome,
+    /** Why a change was skipped or failed, in German for the dashboard. */
+    val reason: String? = null,
+)
+
+@Serializable
+enum class NicknameChangeOutcome {
+    SET,
+
+    /** Cleared, since the member lost their link. */
+    RESET,
+
+    /** Not tried, e.g. because the member is above the bot or the bot may not manage nicknames. */
     SKIPPED,
 
     /** Tried, but Discord refused it. */
