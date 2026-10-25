@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { RequireAdmin, RequireAuth } from './auth/guards.tsx'
+import { RequireVoteAccess } from './features/votes/RequireVoteAccess.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { Layout } from './pages/Layout.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
@@ -14,6 +15,15 @@ export const routes: RouteObject[] = [
         element: <Layout />,
         children: [
           { index: true, element: <HomePage /> },
+          {
+            element: <RequireVoteAccess />,
+            children: [
+              {
+                path: 'votes',
+                lazy: async () => ({ Component: (await import('./pages/VotesPage.tsx')).VotesPage }),
+              },
+            ],
+          },
           {
             element: <RequireAdmin />,
             children: [

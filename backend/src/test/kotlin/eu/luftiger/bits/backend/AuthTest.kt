@@ -2,7 +2,9 @@ package eu.luftiger.bits.backend
 
 import eu.luftiger.bits.backend.auth.internal.DiscordApi
 import eu.luftiger.bits.backend.auth.internal.DiscordGuild
+import eu.luftiger.bits.backend.auth.internal.DiscordGuildMember
 import eu.luftiger.bits.backend.auth.internal.DiscordUser
+import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -23,6 +25,7 @@ import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResp
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest
 import org.springframework.security.oauth2.core.OAuth2AccessToken
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse
+import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -65,6 +68,9 @@ class AuthTest {
     lateinit var clock: MutableClock
 
     @Autowired
+    lateinit var jwtDecoder: JwtDecoder
+
+    @Autowired
     lateinit var passwordEncoder: CountingPasswordEncoder
 
     @Autowired
@@ -90,6 +96,15 @@ class AuthTest {
             jsonPath("$.wareraUsername") { value(null) }
         }
         mockMvc.get("/web/admin/anything") { cookie(session) }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `the session keeps the member's roles from the guild`() {
+        discord.memberRoles = listOf("r-congress", "r-citizen")
+
+        val session = discordLogin().sessionCookie()
+
+        assertEquals(listOf("r-congress", "r-citizen"), SessionTokens.user(jwtDecoder.decode(session.value)).discordRoleIds)
     }
 
     @Test
@@ -369,6 +384,7 @@ class AuthTest {
         assertEquals("discord.com", location.host)
         assertEquals("https://bits.test/auth/oauth2/callback/discord", location.queryParams.getFirst("redirect_uri")?.let(::urlDecode))
         assertNotNull(location.queryParams.getFirst("code_challenge"))
+        assertEquals("identify guilds guilds.members.read", location.queryParams.getFirst("scope")?.let(::urlDecode))
 
         return mockMvc.get("/auth/oauth2/callback/discord") {
             session = start.request.session as MockHttpSession
@@ -400,17 +416,24 @@ class AuthTest {
     /** Discord as seen with the access token of user 42, who is a plain member of guild 100. */
     class FakeDiscord : DiscordApi {
         var guilds = emptyList<DiscordGuild>()
+        var memberRoles = emptyList<String>()
         var down = false
         val requestedPages = mutableListOf<String?>()
 
         fun reset() {
             guilds = listOf(DiscordGuild(id = "7"), DiscordGuild(id = "100", permissions = "0"))
+            memberRoles = emptyList()
             down = false
             requestedPages.clear()
         }
 
         override fun getCurrentUser(accessToken: String) =
             available(accessToken) { DiscordUser(id = "42", username = "luca", globalName = "Luca", avatar = "abc") }
+
+        override fun getCurrentUserGuildMember(
+            accessToken: String,
+            guildId: String,
+        ) = available(accessToken) { DiscordGuildMember(roles = memberRoles) }
 
         // Paged like Discord, in the order of [guilds] instead of by ID.
         override fun getCurrentUserGuilds(

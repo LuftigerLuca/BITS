@@ -81,5 +81,7 @@ class CachingWareraClientTest {
             override fun searchMilitaryUnitIds(text: String) = TODO()
 
             override fun getMilitaryUnit(muId: String) = TODO()
+
+            override fun getParties(countryId: String) = TODO()
         }
 }

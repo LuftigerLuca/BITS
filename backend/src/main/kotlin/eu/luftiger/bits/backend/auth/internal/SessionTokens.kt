@@ -21,7 +21,8 @@ import java.util.UUID
  * - **Logout** puts the token's ID (`jti`) on a denylist in Redis ([RevokedSessions]) until it would have expired,
  *   so a copied cookie stops working too.
  * - **Lost admin rights** are not seen by the token, which keeps the role from the login. ADMIN sessions therefore
- *   last only [ADMIN_VALIDITY]; the role is decided anew at the next login. Checking Discord on every request would
+ *   last only [ADMIN_VALIDITY]; the role is decided anew at the next login. The same goes for the member's Discord
+ *   roles, which a USER session keeps for up to [USER_VALIDITY]. Checking Discord on every request would
  *   need the user's access token, which BITS does not keep.
  *
  * The last resort is rotating `BITS_JWT_SECRET`, which ends every session (see deploy/README.md).
@@ -45,6 +46,7 @@ class SessionTokens(
                 .claim(NAME_CLAIM, user.name)
                 .claim(ROLE_CLAIM, user.role.name)
                 .apply { user.avatarUrl?.let { claim(AVATAR_CLAIM, it) } }
+                .apply { if (user.discordRoleIds.isNotEmpty()) claim(DISCORD_ROLES_CLAIM, user.discordRoleIds) }
                 .build()
         val header = JwsHeader.with(MacAlgorithm.HS256).build()
         val token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).tokenValue
@@ -73,6 +75,9 @@ class SessionTokens(
         private const val NAME_CLAIM = "name"
         private const val AVATAR_CLAIM = "avatar"
 
+        /** Missing in sessions from before the roles were kept, which end within [USER_VALIDITY]. */
+        private const val DISCORD_ROLES_CLAIM = "discord_roles"
+
         val USER_VALIDITY: Duration = Duration.ofHours(8)
 
         /** How long a Discord user keeps ADMIN after losing the Administrator permission, at most. */
@@ -90,6 +95,7 @@ class SessionTokens(
                 name = requireNotNull(jwt.getClaimAsString(NAME_CLAIM)),
                 avatarUrl = jwt.getClaimAsString(AVATAR_CLAIM),
                 role = Role.valueOf(requireNotNull(jwt.getClaimAsString(ROLE_CLAIM))),
+                discordRoleIds = jwt.getClaimAsStringList(DISCORD_ROLES_CLAIM).orEmpty(),
             )
     }
 }

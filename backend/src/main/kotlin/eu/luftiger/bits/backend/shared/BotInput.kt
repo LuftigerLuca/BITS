@@ -18,6 +18,7 @@ object BotInput {
     /** Discord allows 250 roles per guild and 100 characters per role name. */
     const val MAX_ROLES = 250
     const val MAX_ROLE_NAME_LENGTH = 100
+    const val MAX_CHANNELS = 500
 
     /** Discord names are at most 32 characters; nicknames as well. Checked against the column, which leaves room. */
     private const val MAX_MEMBER_NAME_LENGTH = 100
@@ -46,6 +47,17 @@ object BotInput {
     fun roleId(value: String) = check(value.isNotBlank() && value.length <= MAX_ROLE_ID_LENGTH, "role id")
 
     fun roleName(value: String) = check(value.length <= MAX_ROLE_NAME_LENGTH, "role name")
+
+    /** Channel IDs are snowflakes; checked like role IDs. */
+    fun channelId(value: String) = check(value.isNotBlank() && value.length <= MAX_ROLE_ID_LENGTH, "channel id")
+
+    /** Discord allows 100 characters per channel and category name, as for roles. */
+    fun channelName(value: String) = check(value.length <= MAX_ROLE_NAME_LENGTH, "channel name")
+
+    /** Discord allows 500 channels per guild. */
+    fun channelCount(count: Int) = check(count <= MAX_CHANNELS, "number of channels")
+
+    fun messageId(value: String) = check(DISCORD_ID.matches(value), "message id")
 
     fun roleCount(count: Int) = check(count <= MAX_ROLES, "number of roles")
 

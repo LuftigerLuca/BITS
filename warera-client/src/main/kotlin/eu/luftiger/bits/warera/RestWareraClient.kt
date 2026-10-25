@@ -66,6 +66,23 @@ class RestWareraClient(
     override fun getMilitaryUnit(muId: String): WareraMilitaryUnit =
         query("mu.getById", WareraMilitaryUnit.serializer(), buildJsonObject { put("muId", muId) })
 
+    override fun getParties(countryId: String): List<WareraParty> {
+        val parties = mutableListOf<WareraParty>()
+        var cursor: String? = null
+        do {
+            val input =
+                buildJsonObject {
+                    put("countryId", countryId)
+                    put("limit", PARTY_PAGE_SIZE)
+                    cursor?.let { put("cursor", it) }
+                }
+            val page = query("party.getManyPaginated", PartyPage.serializer(), input)
+            parties += page.items
+            cursor = page.nextCursor
+        } while (cursor != null)
+        return parties
+    }
+
     private fun search(text: String): SearchResult =
         query("search.searchAnything", SearchResult.serializer(), buildJsonObject { put("searchText", text) })
 
@@ -130,11 +147,20 @@ class RestWareraClient(
         val nextCursor: String? = null,
     )
 
+    @Serializable
+    private data class PartyPage(
+        val items: List<WareraParty>,
+        val nextCursor: String? = null,
+    )
+
     companion object {
         const val DEFAULT_BASE_URL = "https://api2.warera.io/trpc"
 
         /** Largest page size the API accepts. */
         private const val COMPANY_PAGE_SIZE = 100
+
+        /** Largest page size the API accepts; Germany has about 20 parties. */
+        private const val PARTY_PAGE_SIZE = 100
 
         private val json = Json { ignoreUnknownKeys = true }
 

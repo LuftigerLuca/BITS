@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.roles
 
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.DiscordChannelDto
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
@@ -212,6 +213,8 @@ class RoleReporterTest {
         ) = TODO()
 
         override suspend fun reportUndeliveredEvent(report: UndeliveredEventReport) = TODO()
+
+        override suspend fun reportChannels(channels: List<DiscordChannelDto>) = TODO()
 
         override suspend fun reportMembers(members: List<ReportedMember>) = TODO()
 

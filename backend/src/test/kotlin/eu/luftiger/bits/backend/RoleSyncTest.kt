@@ -32,6 +32,7 @@ import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraNotFoundException
+import eu.luftiger.bits.warera.WareraParty
 import eu.luftiger.bits.warera.WareraSchemaException
 import eu.luftiger.bits.warera.WareraUser
 import jakarta.servlet.http.Cookie
@@ -867,6 +868,10 @@ class RoleSyncTest {
         val lookups = CopyOnWriteArrayList<String>()
         private val heldUsers = ConcurrentHashMap.newKeySet<String>()
         private var gate = CountDownLatch(0)
+
+        /** Parties by country ID. */
+        val parties = mutableMapOf<String, List<WareraParty>>()
+        val partyLookups = CopyOnWriteArrayList<String>()
         var governmentDown = false
         var down = false
         var companyName = ""
@@ -889,6 +894,8 @@ class RoleSyncTest {
             users["w1"] = WareraUser("w1", "Luftiger", country = "de", mu = "m1", militaryRank = 40, leveling = WareraUser.Leveling(30))
             users["w2"] = WareraUser("w2", "Other", country = "fr", leveling = WareraUser.Leveling(3))
             failingUsers.clear()
+            parties.clear()
+            partyLookups.clear()
             deletedUsers.clear()
             governmentDown = false
             down = false
@@ -939,6 +946,12 @@ class RoleSyncTest {
                 if (" " in muId) throw WareraBadRequestException("invalid id")
                 if (muId != "m1") throw WareraNotFoundException("no such MU")
                 WareraMilitaryUnit("m1", "Deutsche Marine")
+            }
+
+        override fun getParties(countryId: String) =
+            available {
+                partyLookups += countryId
+                parties[countryId].orEmpty()
             }
 
         private fun <T> available(block: () -> T): T = if (down) throw WareraApiException("down") else block()

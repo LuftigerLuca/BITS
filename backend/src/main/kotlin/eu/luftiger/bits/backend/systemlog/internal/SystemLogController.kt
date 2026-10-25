@@ -173,6 +173,7 @@ enum class LogEntryType {
     EVENT_UNDELIVERED,
     OUTBOX_STUCK,
     MEMBER_REPORT_REFUSED,
+    VOTE_EVALUATION_DELAYED,
     ;
 
     companion object {
@@ -189,6 +190,7 @@ enum class LogEntryType {
                 EntryKind.EVENT_UNDELIVERED -> EVENT_UNDELIVERED
                 EntryKind.OUTBOX_STUCK -> OUTBOX_STUCK
                 EntryKind.MEMBER_REPORT_REFUSED -> MEMBER_REPORT_REFUSED
+                EntryKind.VOTE_EVALUATION_DELAYED -> VOTE_EVALUATION_DELAYED
             }
     }
 }

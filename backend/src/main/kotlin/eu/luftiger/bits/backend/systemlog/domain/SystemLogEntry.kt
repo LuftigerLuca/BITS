@@ -104,6 +104,9 @@ enum class EntryKind(
 
     /** A member list from the bot would have deleted too many links at once. */
     MEMBER_REPORT_REFUSED(Category.ERROR),
+
+    /** The result of a vote could not be worked out yet. */
+    VOTE_EVALUATION_DELAYED(Category.ERROR),
     ;
 
     enum class Category {

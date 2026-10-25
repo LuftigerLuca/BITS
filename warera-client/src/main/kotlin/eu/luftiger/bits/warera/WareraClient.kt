@@ -20,6 +20,9 @@ interface WareraClient {
     fun searchMilitaryUnitIds(text: String): List<String>
 
     fun getMilitaryUnit(muId: String): WareraMilitaryUnit
+
+    /** All parties of the country with their members, across all pages. */
+    fun getParties(countryId: String): List<WareraParty>
 }
 
 open class WareraApiException(

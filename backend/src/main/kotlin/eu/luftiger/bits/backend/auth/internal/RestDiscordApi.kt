@@ -20,6 +20,11 @@ class RestDiscordApi(
         return get("/users/@me/guilds$query", accessToken, ListSerializer(DiscordGuild.serializer()))
     }
 
+    override fun getCurrentUserGuildMember(
+        accessToken: String,
+        guildId: String,
+    ): DiscordGuildMember = get("/users/@me/guilds/$guildId/member", accessToken, DiscordGuildMember.serializer())
+
     private fun <T> get(
         path: String,
         accessToken: String,

@@ -166,6 +166,33 @@ class RestWareraClientTest {
     }
 
     @Test
+    fun `parties are collected across all pages`() {
+        server
+            .expect(
+                requestTo(
+                    "https://warera.test/trpc/party.getManyPaginated?input=%7B%22countryId%22%3A%22c1%22%2C%22limit%22%3A100%7D",
+                ),
+            ).andRespond(
+                withSuccess(
+                    """{"result":{"data":{"items":[{"_id":"p1","name":"Partei","members":["u1","u2"],"leader":"u1"}],"nextCursor":"next"}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        server
+            .expect(
+                requestTo(
+                    "https://warera.test/trpc/party.getManyPaginated?input=%7B%22countryId%22%3A%22c1%22%2C%22limit%22%3A100%2C%22cursor%22%3A%22next%22%7D",
+                ),
+            ).andRespond(withSuccess("""{"result":{"data":{"items":[{"_id":"p2","name":"Leer"}]}}}""", MediaType.APPLICATION_JSON))
+
+        assertEquals(
+            listOf(WareraParty("p1", "Partei", listOf("u1", "u2")), WareraParty("p2", "Leer")),
+            client.getParties("c1"),
+        )
+        server.verify()
+    }
+
+    @Test
     fun `company comes with its owner`() {
         server
             .expect(requestTo("https://warera.test/trpc/company.getById?input=%7B%22companyId%22%3A%22c1%22%7D"))

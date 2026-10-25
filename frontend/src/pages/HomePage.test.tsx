@@ -52,13 +52,17 @@ describe('home page', () => {
   })
 
   it('shows members no figures and does not ask for them', async () => {
-    const fetch = stubFetch({ 'GET /web/me': () => json({ ...admin, role: 'USER' }) })
+    const fetch = stubFetch({
+      'GET /web/me': () => json({ ...admin, role: 'USER' }),
+      'GET /web/votes/access': () => json({ canManage: false, canConfigure: false }),
+    })
 
     renderApp('/')
 
     expect(await screen.findByText('Willkommen, Luca')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Kennzahlen' })).not.toBeInTheDocument()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    // The sidebar asks whether to show the votes, nobody asks for the figures.
+    expect(fetch.mock.calls.map(([input]) => String(input))).not.toContainEqual(expect.stringContaining('overview'))
   })
 
   it('says the members are unknown until the bot reported them, and links to the country setting', async () => {

@@ -71,6 +71,18 @@ erfüllt und warum: die greifende Regel oder was fehlt, etwa „Level 8 von 10�
 `POST /api/role-explanations` mit derselben Logik wie der Abgleich aus, aber mit frischen WarEra-Daten, und ändert
 keine Rollen; Abweichungen gleicht der nächste Abgleich an. Verwaiste Regeln tauchen nicht auf.
 
+Mit `/abstimmung starten frage rolle kanal [ende]` startet jemand eine Ja/Nein/Enthaltung-Abstimmung, ebenso im
+Dashboard unter „Abstimmungen“. Das Ende ist eine Dauer wie `48h` (Standard), `3d` oder `90m` oder `offen`. Der Bot
+postet die Frage mit drei Buttons im Kanal und pingt die Rolle. Abstimmen darf, wer die Rolle und einen verknüpften
+WarEra-Account hat; die Antwort sieht nur der Abstimmende, und bis zum Ende kann er seine Stimme ändern. Die
+Nachricht zeigt nur, wie viele abgestimmt haben. Zum Ende, vorzeitig mit `/abstimmung beenden`, meldet der Bot die
+aktuellen Mitglieder der Rolle; Stimmen von Mitgliedern, die die Rolle nicht mehr haben, zählen nicht. Das Backend
+ordnet die Stimmen über WarEra den Parteien im Land der Staatsbürgerschaft zu, wer in keiner ist, gilt als
+„Parteilos“. Der Bot postet das Ergebnis als Grafik und Text im Kanal, mit den Namen derer, die nicht abgestimmt
+haben. Danach löscht BITS, wer wie abgestimmt hat. `/abstimmung abbrechen` beendet eine Abstimmung ohne Auswertung.
+Starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins auf der Seite „Abstimmungen“ freigeben. Damit
+der Bot nur Kanäle anbietet, in denen er posten kann, meldet er seine Textkanäle per `PUT /api/discord-channels`.
+
 Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
 verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür
 meldet der Bot die Mitglieder mit ihren Rollen per `PUT /api/discord-members`, sobald alle geladen sind, beim Start,
@@ -78,18 +90,19 @@ stündlich und einige Sekunden nach Rollenänderungen, dazu jeden Beitritt und A
 darin fehlen. Würde eine Liste mehr als die Hälfte und mindestens 10 Verknüpfungen auf einmal löschen, verweigert
 es sie als vermutlich fehlerhaft und vermerkt das im System-Log.
 
-Im Dashboard melden sich Mitglieder des Discord-Servers mit Discord an (OAuth2, Scopes `identify guilds`).
-Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, bekommt die Rolle `ADMIN` und sieht
-den Verwaltungsbereich, alle anderen `USER`. Zusätzlich gibt es optional einen Admin-Account mit Benutzername
-und Passwort aus der Umgebung (`BITS_ADMIN_USERNAME`, `BITS_ADMIN_PASSWORD_HASH`), der ohne Discord
-funktioniert. Pro IP werden in 15 Minuten höchstens 5 Anmeldeversuche geprüft, über alle IPs höchstens 50; danach
+Im Dashboard melden sich Mitglieder des Discord-Servers mit Discord an (OAuth2, Scopes
+`identify guilds guilds.members.read`); seine Rollen auf dem Server liest das Backend dabei, damit das Dashboard
+weiß, wer Abstimmungen verwalten darf. Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt,
+bekommt die Rolle `ADMIN` und sieht den Verwaltungsbereich, alle anderen `USER`. Zusätzlich gibt es optional einen
+Admin-Account mit Benutzername und Passwort aus der Umgebung (`BITS_ADMIN_USERNAME`, `BITS_ADMIN_PASSWORD_HASH`), der
+ohne Discord funktioniert. Pro IP werden in 15 Minuten höchstens 5 Anmeldeversuche geprüft, über alle IPs höchstens 50; danach
 ist er bis zum Ende des Zeitfensters gesperrt. Der Hash braucht BCrypt-Kosten von mindestens 10. Die Sitzung ist
 ein JWT im Cookie, gilt 8 Stunden, für `ADMIN` 1 Stunde, und wird nicht verlängert. Rollen werden nur beim Login
 geprüft. Der Logout sperrt die Sitzung auch für Kopien des Cookies.
 
 ## Datenschutz
 
-BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
+BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmungen braucht:
 
 | Daten                                            | Wo                         | Wozu                                | Wie lange                                                                   |
 |--------------------------------------------------|----------------------------|-------------------------------------|-----------------------------------------------------------------------------|
@@ -97,6 +110,9 @@ BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
 | Discord-ID, Zeitpunkt                            | `nickname_opt_in`          | Nickname aus WarEra                 | bis `/nickname aus` oder zum Verlassen des Servers                          |
 | Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links      | bis zur nächsten Meldung des Bots oder zum Neustart                         |
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung                | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
+| Discord-ID, WarEra-ID, Stimme                    | `vote_ballot`              | laufende Abstimmung                 | bis zur Auswertung oder zum Abbruch                                         |
+| Discord-ID und -Name der Rollenmitglieder        | `vote_elector`             | Auswertung einer Abstimmung         | bis zur Auswertung                                                          |
+| Namen: Start, Ende, nicht abgestimmt             | `vote`, `vote_non_voter`   | Archiv der Abstimmungen             | unbegrenzt                                                                  |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |

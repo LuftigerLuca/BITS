@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot
 import eu.luftiger.bits.bot.accounts.JdaDirectMessages
 import eu.luftiger.bits.bot.accounts.RelinkNotifier
 import eu.luftiger.bits.bot.backend.KtorBackendClient
+import eu.luftiger.bits.bot.channels.ChannelReporter
 import eu.luftiger.bits.bot.commands.NicknameCommand
 import eu.luftiger.bits.bot.commands.PingCommand
 import eu.luftiger.bits.bot.commands.ProfileCommand
@@ -16,9 +17,15 @@ import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
 import eu.luftiger.bits.bot.systemlog.SystemLogReporter
+import eu.luftiger.bits.bot.votes.VoteButtons
+import eu.luftiger.bits.bot.votes.VoteCommand
+import eu.luftiger.bits.bot.votes.VoteEvents
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
+import eu.luftiger.bits.shared.VoteClosedEvent
+import eu.luftiger.bits.shared.VoteEvaluatedEvent
+import eu.luftiger.bits.shared.VoteStartedEvent
 import io.lettuce.core.RedisClient
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +61,7 @@ fun main() {
     val redis = RedisClient.create(config.redisUrl)
     val roleReporter = RoleReporter(config.guildId, backend, scope)
     val memberReporter = MemberReporter(config.guildId, backend, scope)
+    val channelReporter = ChannelReporter(config.guildId, backend, scope)
     val verifyCommand = VerifyCommand(backend, scope)
 
     // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent.
@@ -70,8 +78,11 @@ fun main() {
                 NicknameCommand(backend, scope),
                 ProfileCommand(backend, scope),
                 RolesCommand(backend, scope),
+                VoteCommand(backend, scope),
+                VoteButtons(backend, scope),
                 roleReporter,
                 memberReporter,
+                channelReporter,
             ).build()
             .awaitReady()
 
@@ -85,14 +96,17 @@ fun main() {
             NicknameCommand.data,
             ProfileCommand.data,
             RolesCommand.data,
+            VoteCommand.data,
         ).queue()
     roleReporter.reportPeriodically(guild)
     memberReporter.reportPeriodically(guild)
+    channelReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()
     val systemLog = SystemLogReporter(backend, scope)
     val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit, systemLog::reportRoleSync)
     val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
+    val votes = VoteEvents(jda, config.guildId, backend)
     val events =
         EventHandler { event ->
             logging.handle(event)
@@ -100,6 +114,9 @@ fun main() {
                 is RoleSyncEvent -> roleSync.handle(event)
                 is VerificationCheckedEvent -> verifyCommand.onChecked(event)
                 is AccountLinkedEvent -> relinkNotifier.handle(event)
+                is VoteStartedEvent -> votes.onStarted(event)
+                is VoteClosedEvent -> votes.onClosed(event)
+                is VoteEvaluatedEvent -> votes.onEvaluated(event)
                 else -> Unit
             }
         }

@@ -16,8 +16,8 @@ import java.math.BigInteger
 
 /**
  * Turns a Discord login into a [SessionUser]. Only members of the configured guild get in; the guild's owner and
- * members with the Administrator permission become [Role.ADMIN]. The access token is used for these two calls only
- * and then dropped.
+ * members with the Administrator permission become [Role.ADMIN]. The member's roles go into the session as well, for
+ * permissions given to roles such as managing votes. The access token is used for these calls only and then dropped.
  */
 @Service
 class DiscordLoginService(
@@ -35,6 +35,7 @@ class DiscordLoginService(
                 log.info("Discord login of {} rejected: not a member of the guild", user.id)
                 throw OAuth2AuthenticationException(OAuth2Error(NOT_MEMBER_ERROR))
             }
+            val member = discordApi.getCurrentUserGuildMember(accessToken, properties.discord.guildId)
             val isAdmin = guild.owner || BigInteger(guild.permissions).testBit(ADMINISTRATOR_BIT)
             val role = if (isAdmin) Role.ADMIN else Role.USER
             log.info("Discord login of {} as {}", user.id, role)
@@ -44,6 +45,7 @@ class DiscordLoginService(
                     name = user.globalName ?: user.username,
                     avatarUrl = avatarUrl(user),
                     role = role,
+                    discordRoleIds = member.roles,
                 ),
             )
         } catch (e: RestClientException) {

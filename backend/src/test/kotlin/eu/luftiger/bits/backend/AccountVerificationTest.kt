@@ -439,6 +439,8 @@ class AccountVerificationTest {
 
         override fun getMilitaryUnit(muId: String) = TODO()
 
+        override fun getParties(countryId: String) = TODO()
+
         private fun <T> available(block: () -> T): T = if (down) throw WareraApiException("down") else block()
     }
 

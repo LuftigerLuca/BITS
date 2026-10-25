@@ -1,14 +1,26 @@
 package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.BitsJson
+import eu.luftiger.bits.shared.CastVoteRequest
+import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.CheckVerificationRequest
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.CloseVoteRequest
+import eu.luftiger.bits.shared.CloseVoteResponse
+import eu.luftiger.bits.shared.DiscordChannelDto
+import eu.luftiger.bits.shared.DiscordChannelsReport
 import eu.luftiger.bits.shared.DiscordMemberChange
 import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.DiscordRolesReport
+import eu.luftiger.bits.shared.Elector
+import eu.luftiger.bits.shared.ElectorateReport
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
+import eu.luftiger.bits.shared.OpenVote
+import eu.luftiger.bits.shared.OpenVotesResponse
+import eu.luftiger.bits.shared.ParticipationRequest
+import eu.luftiger.bits.shared.ParticipationResponse
 import eu.luftiger.bits.shared.PingRequest
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileRequest
@@ -19,9 +31,16 @@ import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.StartVoteRequest
+import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.UnlinkAccountRequest
 import eu.luftiger.bits.shared.UnlinkAccountResponse
+import eu.luftiger.bits.shared.VoteActor
+import eu.luftiger.bits.shared.VoteChoice
+import eu.luftiger.bits.shared.VoteDto
+import eu.luftiger.bits.shared.VoteMessageReport
+import eu.luftiger.bits.shared.VoteResultDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.HttpClientEngine
@@ -32,6 +51,7 @@ import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -41,13 +61,14 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import java.time.Duration
 
-/** [BackendClient] that authenticates with the service token of the bot. */
+/** [BackendClient] and [VoteBackend] that authenticate with the service token of the bot. */
 class KtorBackendClient(
     baseUrl: String,
     serviceToken: String,
     engine: HttpClientEngine = CIO.create(),
     requestTimeout: Duration = REQUEST_TIMEOUT,
 ) : BackendClient,
+    VoteBackend,
     AutoCloseable {
     private val http =
         HttpClient(engine) {
@@ -101,6 +122,13 @@ class KtorBackendClient(
         }
     }
 
+    override suspend fun reportChannels(channels: List<DiscordChannelDto>) {
+        http.put("api/discord-channels") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordChannelsReport(channels))
+        }
+    }
+
     override suspend fun reportMembers(members: List<ReportedMember>) {
         http.put("api/discord-members") {
             contentType(ContentType.Application.Json)
@@ -140,6 +168,55 @@ class KtorBackendClient(
             contentType(ContentType.Application.Json)
             setBody(report)
         }
+    }
+
+    override suspend fun startVote(request: StartVoteRequest): StartVoteResponse = post("api/votes", request)
+
+    override suspend fun openVotes(): List<OpenVote> = http.get("api/votes/open").body<OpenVotesResponse>().votes
+
+    override suspend fun vote(voteId: Long): VoteDto = http.get("api/votes/$voteId").body()
+
+    override suspend fun closeVote(
+        voteId: Long,
+        actor: VoteActor,
+        cancel: Boolean,
+    ): CloseVoteResponse = post("api/votes/$voteId/close", CloseVoteRequest(actor, cancel))
+
+    override suspend fun castVote(
+        voteId: Long,
+        discordUserId: String,
+        choice: VoteChoice,
+    ): CastVoteResponse = post("api/votes/$voteId/ballots", CastVoteRequest(discordUserId, choice))
+
+    override suspend fun participation(
+        voteId: Long,
+        roleMemberIds: List<String>,
+    ): ParticipationResponse = post("api/votes/$voteId/participation", ParticipationRequest(roleMemberIds))
+
+    override suspend fun reportVoteMessage(
+        voteId: Long,
+        messageId: String,
+    ) {
+        http.put("api/votes/$voteId/message") {
+            contentType(ContentType.Application.Json)
+            setBody(VoteMessageReport(messageId))
+        }
+    }
+
+    override suspend fun reportElectorate(
+        voteId: Long,
+        electors: List<Elector>,
+    ) {
+        http.put("api/votes/$voteId/electorate") {
+            contentType(ContentType.Application.Json)
+            setBody(ElectorateReport(electors))
+        }
+    }
+
+    override suspend fun voteResult(voteId: Long): VoteResultDto = http.get("api/votes/$voteId/result").body()
+
+    override suspend fun markVoteResultPosted(voteId: Long) {
+        http.post("api/votes/$voteId/result/posted")
     }
 
     /** The backend answers 503 if WarEra cannot be reached. */
