@@ -23,6 +23,7 @@ const run: SystemLogEntry = {
     removed: 1,
     skipped: 0,
     failed: 0,
+    nicknames: 0,
   },
   member: null,
   previousMember: null,
@@ -49,6 +50,7 @@ const unanswered: SystemLogEntry = { ...run, id: 1, sync: { ...run.sync!, status
 const items: SystemLogItem[] = [
   { id: 1, member: { id: '1', name: 'Luca' }, role: { id: 'r-veteran', name: 'Veteran' }, outcome: 'GRANTED', reason: null },
   { id: 2, member: { id: '2', name: null }, role: { id: 'r-citizen', name: 'Bürger' }, outcome: 'REMOVED', reason: null },
+  { id: 3, member: { id: '1', name: 'Luca' }, role: null, outcome: 'NICKNAME_SET', reason: 'Nickname: Luftiger' },
 ]
 
 /** The query strings the page sent to the system log; the fetch stub matches by path only. */
@@ -82,6 +84,18 @@ describe('system log page', () => {
     expect(screen.getByText('Keine Rückmeldung vom Bot')).toBeInTheDocument()
   })
 
+  it('counts nicknames only for runs that changed some', async () => {
+    stubLog([{ ...run, sync: { ...run.sync!, trigger: 'SETTING_CHANGE', granted: 0, removed: 0, nicknames: 2 } }])
+
+    renderApp('/admin/system-log')
+
+    expect(
+      await screen.findByText(
+        'Sync nach Einschalten der Nicknames: 2 Mitglieder · 0 vergeben · 0 entzogen · 0 übersprungen · 0 fehlgeschlagen · 2 Nicknames',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('expands a run to show the role changes', async () => {
     stubLog()
     renderApp('/admin/system-log')
@@ -90,6 +104,8 @@ describe('system log page', () => {
 
     expect(await screen.findByText('Veteran')).toBeInTheDocument()
     expect(screen.getByText('Vergeben')).toBeInTheDocument()
+    expect(screen.getByText('Nickname gesetzt')).toBeInTheDocument()
+    expect(screen.getByText('Nickname: Luftiger')).toBeInTheDocument()
     // A member whose name BITS never saw is shown by ID.
     expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Details ausblenden' })).toHaveAttribute('aria-expanded', 'true')

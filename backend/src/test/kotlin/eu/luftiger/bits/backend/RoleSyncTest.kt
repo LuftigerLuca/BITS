@@ -53,6 +53,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -92,7 +93,9 @@ class RoleSyncTest {
     @BeforeTest
     fun reset() {
         awaitBackgroundWork()
-        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication")
+        jdbc.execute(
+            "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, nickname_setting, audit_entry",
+        )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
@@ -102,6 +105,13 @@ class RoleSyncTest {
             """{"id":"r-veteran","name":"Veteran","color":null,"position":1,"assignable":true}""",
             """{"id":"r-mod","name":"Moderator","color":null,"position":9,"assignable":false}""",
         )
+    }
+
+    /** Other tests share the database and expect no syncs without rules. */
+    @AfterTest
+    fun turnOffNicknames() {
+        awaitBackgroundWork()
+        jdbc.execute("TRUNCATE nickname_setting")
     }
 
     @Test
@@ -266,6 +276,70 @@ class RoleSyncTest {
         assertEquals(listOf("1"), event.discordUserIds)
         assertEquals(listOf("r-citizen"), event.managedRoleIds)
         assertEquals(emptySet(), event.members.keys)
+    }
+
+    @Test
+    fun `nicknames are off until an admin turns them on, which only admins may`() {
+        val user = session(SessionUser.discord("42", "Luca", "https://avatar", Role.USER))
+
+        mockMvc.get("/web/admin/role-sync/nicknames") { cookie(admin) }.andExpect { jsonPath("$.enabled") { value(false) } }
+        mockMvc.get("/web/admin/role-sync/nicknames") { cookie(user) }.andExpect { status { isForbidden() } }
+        setNicknames(true, user).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `turning nicknames on syncs everybody with their WarEra names, even without rules`() {
+        // A user no sync has seen yet, so the sync with cached data has to look them up.
+        warera.users["w4"] = WareraUser("w4", "Fourth", country = "de")
+        link("1", "w1")
+        link("4", "w4")
+        warera.failingUsers += "w4"
+
+        setNicknames(true).andExpect { jsonPath("$.enabled") { value(true) } }
+
+        val event = awaitEvents(1).single() as RoleSyncEvent
+        assertEquals(emptyList(), event.managedRoleIds)
+        // Without WarEra data, the nickname stays as it is.
+        assertEquals(mapOf("1" to "Luftiger"), event.nicknames)
+        assertEquals(
+            listOf("Nicknames aus WarEra-Namen eingeschaltet"),
+            jdbc.queryForList("SELECT description FROM audit_entry WHERE action = 'NICKNAME_SETTING_CHANGED'", String::class.java),
+        )
+    }
+
+    @Test
+    fun `nicknames follow a rename with the hourly sync and stop when turned off`() {
+        link("1", "w1")
+        setNicknames(true)
+        awaitEvents(1)
+        // Turning it on again changes nothing.
+        setNicknames(true)
+        awaitEvents(1)
+
+        warera.users["w1"] = warera.users.getValue("w1").copy(username = "Umbenannt")
+        syncTrigger.hourly()
+        assertEquals(mapOf("1" to "Umbenannt"), (awaitEvents(2).last() as RoleSyncEvent).nicknames)
+
+        setNicknames(false)
+        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        assertEquals(null, (awaitEvents(3).last() as RoleSyncEvent).nicknames)
+    }
+
+    @Test
+    fun `members who lose their link get the WarEra name to clear`() {
+        link("1", "w1")
+        setNicknames(true)
+        awaitEvents(1)
+
+        verify("2", "Luftiger")
+        val relinked = awaitEvents(2).last() as RoleSyncEvent
+        assertEquals(mapOf("2" to "Luftiger"), relinked.nicknames)
+        assertEquals(mapOf("1" to "Luftiger"), relinked.nicknameResets)
+
+        unlink("2")
+        val unlinked = awaitEvents(3).last() as RoleSyncEvent
+        assertEquals(emptyMap(), unlinked.nicknames)
+        assertEquals(mapOf("2" to "Luftiger"), unlinked.nicknameResets)
     }
 
     @Test
@@ -496,6 +570,23 @@ class RoleSyncTest {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }
+
+    private fun setNicknames(
+        enabled: Boolean,
+        cookie: Cookie = admin,
+    ) = mockMvc.put("/web/admin/role-sync/nicknames") {
+        cookie(cookie)
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"enabled":$enabled}"""
+    }
+
+    private fun unlink(discordUserId: String) =
+        mockMvc
+            .post("/api/verifications/unlink") {
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"discordUserId":"$discordUserId"}"""
+            }.andExpect { status { isOk() } }
 
     private fun ruleId(result: ResultActionsDsl): Long = result.read<Number>("$.id").toLong()
 

@@ -11,6 +11,8 @@ import eu.luftiger.bits.backend.systemlog.domain.SyncStatus
 import eu.luftiger.bits.backend.systemlog.domain.SystemLogEntry
 import eu.luftiger.bits.backend.systemlog.domain.SystemLogItem
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.NicknameChangeOutcome
+import eu.luftiger.bits.shared.ReportedNicknameChange
 import eu.luftiger.bits.shared.RoleChangeOutcome
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.UndeliveredEventReport
@@ -182,15 +184,20 @@ class SystemLogService(
         items.saveAll(
             report.changes.map {
                 SystemLogItem(syncId, it.discordUserId, it.memberName, it.roleId, it.roleName, outcome(it.outcome), it.reason)
-            },
+            } +
+                report.nicknameChanges.map {
+                    SystemLogItem(syncId, it.discordUserId, it.memberName, null, null, outcome(it.outcome), nicknameReason(it))
+                },
         )
         val counts = report.changes.groupingBy { it.outcome }.eachCount()
+        val nicknameCounts = report.nicknameChanges.groupingBy { it.outcome }.eachCount()
         entry.memberCount = report.memberCount
         entry.staleMemberCount = report.staleMemberCount
         entry.grantedCount = counts[RoleChangeOutcome.GRANTED] ?: 0
         entry.removedCount = counts[RoleChangeOutcome.REMOVED] ?: 0
-        entry.skippedCount = counts[RoleChangeOutcome.SKIPPED] ?: 0
-        entry.failedCount = counts[RoleChangeOutcome.FAILED] ?: 0
+        entry.skippedCount = (counts[RoleChangeOutcome.SKIPPED] ?: 0) + (nicknameCounts[NicknameChangeOutcome.SKIPPED] ?: 0)
+        entry.failedCount = (counts[RoleChangeOutcome.FAILED] ?: 0) + (nicknameCounts[NicknameChangeOutcome.FAILED] ?: 0)
+        entry.nicknameCount = (nicknameCounts[NicknameChangeOutcome.SET] ?: 0) + (nicknameCounts[NicknameChangeOutcome.RESET] ?: 0)
         entry.syncStatus = if (report.memberCount == 0 && report.staleMemberCount > 0) SyncStatus.STALE else SyncStatus.APPLIED
         entry.reportedAt = clock.instant()
     }
@@ -255,6 +262,23 @@ class SystemLogService(
             RoleChangeOutcome.REMOVED -> ItemOutcome.REMOVED
             RoleChangeOutcome.SKIPPED -> ItemOutcome.SKIPPED
             RoleChangeOutcome.FAILED -> ItemOutcome.FAILED
+        }
+
+    private fun outcome(outcome: NicknameChangeOutcome) =
+        when (outcome) {
+            NicknameChangeOutcome.SET -> ItemOutcome.NICKNAME_SET
+            NicknameChangeOutcome.RESET -> ItemOutcome.NICKNAME_RESET
+            NicknameChangeOutcome.SKIPPED -> ItemOutcome.SKIPPED
+            NicknameChangeOutcome.FAILED -> ItemOutcome.FAILED
+        }
+
+    /** Items of nicknames have no role, so the reason says what the item is about. */
+    private fun nicknameReason(change: ReportedNicknameChange): String =
+        when (change.outcome) {
+            NicknameChangeOutcome.SET -> "Nickname: ${change.nickname}"
+            NicknameChangeOutcome.RESET -> "Nickname aus WarEra entfernt"
+            NicknameChangeOutcome.SKIPPED, NicknameChangeOutcome.FAILED ->
+                listOfNotNull("Nickname ${change.nickname ?: "entfernen"}", change.reason).joinToString(": ")
         }
 
     companion object {

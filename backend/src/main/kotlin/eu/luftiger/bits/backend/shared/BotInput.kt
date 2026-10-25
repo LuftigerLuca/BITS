@@ -22,6 +22,9 @@ object BotInput {
     /** Discord names are at most 32 characters; nicknames as well. Checked against the column, which leaves room. */
     private const val MAX_MEMBER_NAME_LENGTH = 100
 
+    /** Discord's limit. */
+    private const val MAX_NICKNAME_LENGTH = 32
+
     /** A sync of a large guild reports one change per member and role at most; anything beyond is a bug. */
     private const val MAX_REPORTED_CHANGES = 100_000
 
@@ -45,6 +48,8 @@ object BotInput {
     fun roleName(value: String) = check(value.length <= MAX_ROLE_NAME_LENGTH, "role name")
 
     fun roleCount(count: Int) = check(count <= MAX_ROLES, "number of roles")
+
+    fun nickname(value: String) = check(value.length <= MAX_NICKNAME_LENGTH, "nickname")
 
     fun memberName(value: String) = check(value.length <= MAX_MEMBER_NAME_LENGTH, "member name")
 

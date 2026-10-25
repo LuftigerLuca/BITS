@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.roles
 
 import eu.luftiger.bits.shared.MemberRoles
+import eu.luftiger.bits.shared.NicknameChangeOutcome
 import eu.luftiger.bits.shared.RoleChangeOutcome
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
@@ -9,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import net.dv8tion.jda.api.JDA
+import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.Role
@@ -35,6 +37,11 @@ class RoleSyncHandlerTest {
     private val applied = mutableListOf<String>()
     private val failing = mutableSetOf<String>()
     private val reasons = mutableListOf<String>()
+    private val nicknames = mutableMapOf<String, String?>()
+
+    /** Members the bot cannot rename, like the owner. */
+    private val aboveBot = mutableSetOf<String>()
+    private var mayManageNicknames = true
 
     @BeforeTest
     fun setUp() {
@@ -46,6 +53,9 @@ class RoleSyncHandlerTest {
         every { self.canInteract(any<Role>()) } answers { firstArg<Role>().id != "above-bot" }
         every { guild.addRoleToMember(any<Member>(), any()) } answers { change("+", firstArg(), secondArg()) }
         every { guild.removeRoleFromMember(any<Member>(), any()) } answers { change("-", firstArg(), secondArg()) }
+        every { self.canInteract(any<Member>()) } answers { firstArg<Member>().id !in aboveBot }
+        every { self.hasPermission(Permission.NICKNAME_MANAGE) } answers { mayManageNicknames }
+        every { guild.modifyNickname(any(), any()) } answers { rename(firstArg(), secondArg()) }
         listOf("citizen", "veteran", "above-bot").forEach(::role)
     }
 
@@ -171,6 +181,94 @@ class RoleSyncHandlerTest {
             assertEquals(emptyList(), reports)
         }
 
+    @Test
+    fun `sets nicknames to WarEra names, leaving those that match and members without one alone`() =
+        runTest {
+            member("1")
+            member("2", nickname = "Guderian")
+            member("3", nickname = "Eigener Name")
+
+            handler().handle(sync(emptyMap(), nicknames = mapOf("1" to "Rommel", "2" to "Guderian")))
+
+            assertEquals(listOf("Rommel@1"), applied)
+            assertEquals(listOf(NICKNAME_REASON), reasons)
+        }
+
+    @Test
+    fun `clears a nickname after unlinking only while it is still the WarEra name`() =
+        runTest {
+            member("1", nickname = "Rommel")
+            member("2", nickname = "Selbst gewählt")
+
+            handler().handle(
+                sync(
+                    emptyMap(),
+                    discordUserIds = listOf("1", "2"),
+                    nicknames = emptyMap(),
+                    resets = mapOf("1" to "Rommel", "2" to "Guderian"),
+                ),
+            )
+
+            assertEquals(listOf("null@1"), applied)
+        }
+
+    @Test
+    fun `leaves nicknames alone while BITS does not manage them`() =
+        runTest {
+            member("1", nickname = "Rommel")
+
+            handler().handle(sync(emptyMap(), resets = mapOf("1" to "Rommel")))
+
+            assertEquals(emptyList(), applied)
+        }
+
+    @Test
+    fun `reports nicknames it could not change and carries on`() =
+        runTest {
+            member("1")
+            member("2")
+            member("3")
+            aboveBot += "2"
+            failing += "Patton@3"
+            val reports = mutableListOf<RoleSyncReport>()
+
+            RoleSyncHandler(jda, "100") { _, report -> reports += report }.handle(
+                sync(emptyMap(), syncId = 1, nicknames = mapOf("1" to "Rommel", "2" to "Guderian", "3" to "Patton")),
+            )
+
+            assertEquals(listOf("Rommel@1"), applied)
+            assertEquals(
+                listOf(
+                    "SET Rommel Member 1 null",
+                    "SKIPPED Guderian Member 2 Das Mitglied besitzt den Server oder steht über der Rolle des Bots.",
+                    "FAILED Patton Member 3 Discord hat die Änderung abgelehnt: Missing permissions",
+                ),
+                reports.single().nicknameChanges.map { "${it.outcome} ${it.nickname} ${it.memberName} ${it.reason}" },
+            )
+        }
+
+    @Test
+    fun `without the permission every nickname change is skipped`() =
+        runTest {
+            member("1")
+            mayManageNicknames = false
+            val reports = mutableListOf<RoleSyncReport>()
+
+            RoleSyncHandler(jda, "100") { _, report -> reports += report }.handle(
+                sync(emptyMap(), syncId = 1, nicknames = mapOf("1" to "Rommel")),
+            )
+
+            assertEquals(emptyList(), applied)
+            assertEquals(
+                NicknameChangeOutcome.SKIPPED,
+                reports
+                    .single()
+                    .nicknameChanges
+                    .single()
+                    .outcome,
+            )
+        }
+
     private fun handler() = RoleSyncHandler(jda, "100")
 
     private fun sync(
@@ -179,12 +277,16 @@ class RoleSyncHandlerTest {
         managed: List<String> = listOf("citizen", "veteran"),
         occurredAt: Long = 1,
         syncId: Long? = null,
+        nicknames: Map<String, String>? = null,
+        resets: Map<String, String> = emptyMap(),
     ) = RoleSyncEvent(
         managedRoleIds = managed,
         discordUserIds = discordUserIds,
         members = members,
         occurredAt = occurredAt,
         syncId = syncId,
+        nicknames = nicknames,
+        nicknameResets = resets,
     )
 
     private fun grants(vararg roleIds: String) = MemberRoles(grants = roleIds.map { RoleGrant(it, "BITS: $it") })
@@ -203,11 +305,14 @@ class RoleSyncHandlerTest {
     private fun member(
         id: String,
         vararg roleIds: String,
+        nickname: String? = null,
     ): Member {
         memberRoles[id] = roleIds.toMutableSet()
+        nicknames[id] = nickname
         val member = mockk<Member>()
         every { member.id } returns id
         every { member.effectiveName } returns "Member $id"
+        every { member.nickname } answers { nicknames[id] }
         every { member.roles } answers { memberRoles.getValue(id).map { roleId: String -> roles[roleId] ?: roleMock(roleId) } }
         members[id] = member
         return member
@@ -227,12 +332,19 @@ class RoleSyncHandlerTest {
         every { guild.retrieveMemberById(id) } returns action
     }
 
+    private fun rename(
+        member: Member,
+        nickname: String?,
+    ): AuditableRestAction<Void> = action("$nickname@${member.id}")
+
     private fun change(
         sign: String,
         member: Member,
         role: Role,
-    ): AuditableRestAction<Void> {
-        val key = "$sign${role.id}@${member.id}"
+    ): AuditableRestAction<Void> = action("$sign${role.id}@${member.id}")
+
+    /** Applies [key] on submit, unless it is [failing]. */
+    private fun action(key: String): AuditableRestAction<Void> {
         val action = mockk<AuditableRestAction<Void>>()
         every { action.reason(any()) } answers {
             reasons += firstArg<String>()

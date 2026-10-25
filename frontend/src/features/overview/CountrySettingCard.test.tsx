@@ -19,6 +19,7 @@ function stub(overview: Overview, setCountry: (init?: RequestInit) => Response) 
     'GET /web/admin/role-sync/countries': () => json(countries),
     'GET /web/admin/overview': () => json(overview),
     'PUT /web/admin/overview/country': setCountry,
+    'GET /web/admin/role-sync/nicknames': () => json({ enabled: false }),
   })
 }
 

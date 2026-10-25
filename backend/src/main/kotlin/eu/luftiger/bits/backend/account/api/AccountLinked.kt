@@ -9,4 +9,6 @@ data class AccountLinked(
     val wareraUserId: String,
     /** Discord account the WarEra account was linked to before, if it was another one. */
     val previousDiscordUserId: String?,
+    /** WarEra name at the time of linking; `null` from a publication stored before it was added. */
+    val wareraUsername: String? = null,
 )

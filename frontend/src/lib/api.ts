@@ -138,9 +138,26 @@ export async function searchMilitaryUnits(query: string): Promise<Option[]> {
   return (await request(`${ROLE_SYNC}/military-units?${new URLSearchParams({ query })}`)).json()
 }
 
+export interface NicknameSetting {
+  enabled: boolean
+}
+
+export async function getNicknameSetting(): Promise<NicknameSetting> {
+  return (await request(`${ROLE_SYNC}/nicknames`)).json()
+}
+
+export async function setNicknameSetting(enabled: boolean): Promise<NicknameSetting> {
+  const response = await request(`${ROLE_SYNC}/nicknames`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
+  return response.json()
+}
+
 const AUDIT_LOG = '/web/admin/audit-log'
 
-export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED' | 'OVERVIEW_COUNTRY_SET'
+export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED' | 'OVERVIEW_COUNTRY_SET' | 'NICKNAME_SETTING_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
@@ -204,12 +221,12 @@ export type LogEntryType =
   | 'OUTBOX_STUCK'
   | 'MEMBER_REPORT_REFUSED'
 
-export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE'
+export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE' | 'SETTING_CHANGE'
 
 /** `NO_RESPONSE`: still `PENDING` 15 minutes after the sync. */
 export type SyncRunStatus = 'PENDING' | 'APPLIED' | 'STALE' | 'NO_RULES' | 'NO_RESPONSE'
 
-export type ItemOutcome = 'GRANTED' | 'REMOVED' | 'SKIPPED' | 'FAILED'
+export type ItemOutcome = 'GRANTED' | 'REMOVED' | 'SKIPPED' | 'FAILED' | 'NICKNAME_SET' | 'NICKNAME_RESET'
 
 /** A member or role by its Discord ID; `name` is `null` if BITS never saw it. */
 export interface NamedRef {
@@ -229,6 +246,8 @@ export interface SyncRun {
   removed: number | null
   skipped: number | null
   failed: number | null
+  /** Nicknames set or cleared; skipped and failed ones are in `skipped` and `failed`. `null` from an older bot. */
+  nicknames: number | null
 }
 
 export interface SystemLogEntry {

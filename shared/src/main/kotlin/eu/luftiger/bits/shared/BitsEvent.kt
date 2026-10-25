@@ -44,7 +44,8 @@ data class VerificationCheckedEvent(
 
 /**
  * Target state of the roles BITS manages. The bot gives each member the roles in [members] and takes away every other
- * role of [managedRoleIds], except for those listed in [MemberRoles.keepRoleIds].
+ * role of [managedRoleIds], except for those listed in [MemberRoles.keepRoleIds]. If admins turned it on, it also sets
+ * the nicknames of linked members to their WarEra names, see [nicknames].
  */
 @Serializable
 @SerialName("role_sync")
@@ -67,6 +68,16 @@ data class RoleSyncEvent(
      * [RoleSyncReport]. `null` from a backend before the system log.
      */
     val syncId: Long? = null,
+    /**
+     * WarEra name by Discord user ID, which the bot sets as nickname; `null` if BITS leaves nicknames alone. Members
+     * without an entry keep theirs, e.g. because their WarEra data could not be loaded.
+     */
+    val nicknames: Map<String, String>? = null,
+    /**
+     * Members of [discordUserIds] who lost their link, with the WarEra name they had. The bot clears the nickname if it
+     * is still that name; one the member chose stays. Only while [nicknames] is set.
+     */
+    val nicknameResets: Map<String, String> = emptyMap(),
 ) : BitsEvent
 
 @Serializable

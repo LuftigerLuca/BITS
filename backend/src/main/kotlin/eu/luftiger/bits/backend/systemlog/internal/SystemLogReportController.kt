@@ -23,7 +23,13 @@ class SystemLogReportController(
         @PathVariable syncId: Long,
         @RequestBody report: RoleSyncReport,
     ) {
-        BotInput.reportedChangeCount(report.changes.size)
+        BotInput.reportedChangeCount(report.changes.size + report.nicknameChanges.size)
+        report.nicknameChanges.forEach {
+            BotInput.discordUserId(it.discordUserId)
+            BotInput.memberName(it.memberName)
+            it.nickname?.let(BotInput::nickname)
+            it.reason?.let(BotInput::reason)
+        }
         report.changes.forEach {
             BotInput.discordUserId(it.discordUserId)
             BotInput.memberName(it.memberName)

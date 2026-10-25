@@ -72,6 +72,10 @@ class SystemLogEntry(
     @Column(name = "failed_count")
     var failedCount: Int? = null
 
+    /** Nicknames set or cleared; `null` from a bot before nicknames. */
+    @Column(name = "nickname_count")
+    var nicknameCount: Int? = null
+
     @Column(name = "reported_at")
     var reportedAt: Instant? = null
 }

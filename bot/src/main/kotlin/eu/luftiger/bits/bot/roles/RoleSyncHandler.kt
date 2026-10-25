@@ -1,5 +1,7 @@
 package eu.luftiger.bits.bot.roles
 
+import eu.luftiger.bits.shared.NicknameChangeOutcome
+import eu.luftiger.bits.shared.ReportedNicknameChange
 import eu.luftiger.bits.shared.ReportedRoleChange
 import eu.luftiger.bits.shared.RoleChangeOutcome
 import eu.luftiger.bits.shared.RoleSyncEvent
@@ -7,6 +9,8 @@ import eu.luftiger.bits.shared.RoleSyncReport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.future.await
 import net.dv8tion.jda.api.JDA
+import net.dv8tion.jda.api.Permission
+import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.exceptions.ErrorResponseException
 import net.dv8tion.jda.api.requests.ErrorResponse
@@ -16,8 +20,8 @@ import org.slf4j.LoggerFactory
  * Brings the managed roles of the members to the target state from the backend. A change that fails is logged and
  * skipped instead of failing the event, since the next sync tries again anyway. Members whose roles a newer sync has
  * set already are left alone, and a role that a sync would take from too many of its holders stays, see
- * [RemovalLimit]. What it changed, skipped and failed goes to [onApplied] for the backend's system log, with the names
- * of members and roles as they are now.
+ * [RemovalLimit]. If the event carries nicknames, it sets them too, see [nicknameChange]. What it changed, skipped and
+ * failed goes to [onApplied] for the backend's system log, with the names of members and roles as they are now.
  */
 class RoleSyncHandler(
     private val jda: JDA,
@@ -71,6 +75,7 @@ class RoleSyncHandler(
                 outcomes += change to Outcome(RoleChangeOutcome.FAILED, "Discord hat die Änderung abgelehnt: ${e.message?.take(500)}")
             }
         }
+        val nicknameChanges = applyNicknames(guild, members, event)
         appliedSyncs.record(event)
         event.syncId?.let { syncId ->
             val report =
@@ -88,6 +93,7 @@ class RoleSyncHandler(
                                 reason = outcome.reason,
                             )
                         },
+                    nicknameChanges = nicknameChanges,
                 )
             onApplied(syncId, report)
         }
@@ -99,6 +105,49 @@ class RoleSyncHandler(
             stale.size,
         )
     }
+
+    /** The owner and members above the bot cannot be renamed by any bot; that is skipped, not failed. */
+    private suspend fun applyNicknames(
+        guild: Guild,
+        members: List<Member>,
+        event: RoleSyncEvent,
+    ): List<ReportedNicknameChange> {
+        val changes = members.mapNotNull { member -> nicknameChange(member.id, member.nickname, event)?.let { member to it } }
+        if (changes.isEmpty()) return emptyList()
+        val mayManage = guild.selfMember.hasPermission(Permission.NICKNAME_MANAGE)
+        val reports =
+            changes.map { (member, change) ->
+                val (outcome, reason) =
+                    when {
+                        !mayManage -> NicknameChangeOutcome.SKIPPED to NO_NICKNAME_PERMISSION
+                        !guild.selfMember.canInteract(member) -> NicknameChangeOutcome.SKIPPED to MEMBER_ABOVE_BOT
+                        else -> changeNickname(guild, member, change)
+                    }
+                ReportedNicknameChange(member.id, member.effectiveName, change.nickname, outcome, reason)
+            }
+        if (!mayManage) log.warn("Skipping {} nickname changes: the bot may not manage nicknames", changes.size)
+        log.info("Nickname sync changed {} of {} nicknames", reports.count { it.outcome in APPLIED_NICKNAMES }, changes.size)
+        return reports
+    }
+
+    private suspend fun changeNickname(
+        guild: Guild,
+        member: Member,
+        change: NicknameChange,
+    ): Pair<NicknameChangeOutcome, String?> =
+        try {
+            guild
+                .modifyNickname(member, change.nickname)
+                .reason(NICKNAME_REASON)
+                .submit()
+                .await()
+            (if (change.nickname == null) NicknameChangeOutcome.RESET else NicknameChangeOutcome.SET) to null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error("Changing the nickname of member {} failed", member.id, e)
+            NicknameChangeOutcome.FAILED to "Discord hat die Änderung abgelehnt: ${e.message?.take(500)}"
+        }
 
     private class Outcome(
         val outcome: RoleChangeOutcome,
@@ -119,5 +168,8 @@ class RoleSyncHandler(
     private companion object {
         const val HELD_BACK = "Zurückgehalten: Der Sync hätte die Rolle zu vielen Mitgliedern entzogen."
         const val NOT_ASSIGNABLE = "Die Rolle fehlt in Discord oder steht über der Rolle des Bots."
+        const val NO_NICKNAME_PERMISSION = "Dem Bot fehlt die Berechtigung „Nicknames verwalten“."
+        val APPLIED_NICKNAMES = setOf(NicknameChangeOutcome.SET, NicknameChangeOutcome.RESET)
+        const val MEMBER_ABOVE_BOT = "Das Mitglied besitzt den Server oder steht über der Rolle des Bots."
     }
 }

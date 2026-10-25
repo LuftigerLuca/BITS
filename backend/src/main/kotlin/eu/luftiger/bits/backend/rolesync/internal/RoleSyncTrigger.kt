@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinked
 import eu.luftiger.bits.backend.account.api.AccountUnlinked
+import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService.FormerAccount
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -17,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Starts syncs in the background: right away for a member who links or unlinks an account, for everybody after a
- * rule change, and every hour with fresh WarEra data.
+ * rule change or after nicknames were turned on, and every hour with fresh WarEra data.
  *
  * Two lanes keep the quick syncs from waiting behind the hourly one. The hourly refresh loads every linked user, about
  * one per second, on a lane of its own and publishes nothing; once done, it asks for a sync of all members with the
@@ -44,8 +45,10 @@ class RoleSyncTrigger(
 
     private val lock = Any()
     private var syncAllPending = false
+    private var settingChangePending = false
     private val pendingConfirmedRoleIds = HashSet<String>()
     private val pendingMembers = LinkedHashSet<String>()
+    private val pendingFormerAccounts = HashMap<String, FormerAccount>()
     private var draining = false
 
     /**
@@ -58,14 +61,31 @@ class RoleSyncTrigger(
             pendingConfirmedRoleIds += confirmedRoleIds
         }
 
-    /** The previous Discord account of a relinked WarEra account loses its roles. */
+    /** Syncs all members with the WarEra data loaded last, so that nicknames just turned on are set right away. */
+    fun syncAllForSettingChange() =
+        request {
+            syncAllPending = true
+            settingChangePending = true
+        }
+
+    /** The previous Discord account of a relinked WarEra account loses its roles and the nickname from it. */
     @ApplicationModuleListener
     fun onAccountLinked(event: AccountLinked) =
-        request { pendingMembers += listOfNotNull(event.discordUserId, event.previousDiscordUserId) }
+        request {
+            pendingMembers += event.discordUserId
+            event.previousDiscordUserId?.let { previous ->
+                pendingMembers += previous
+                pendingFormerAccounts[previous] = FormerAccount(event.wareraUserId, event.wareraUsername)
+            }
+        }
 
-    /** An unlinked account meets no rule, so the member loses the managed roles. */
+    /** An unlinked account meets no rule, so the member loses the managed roles and the nickname from WarEra. */
     @ApplicationModuleListener
-    fun onAccountUnlinked(event: AccountUnlinked) = request { pendingMembers += event.discordUserId }
+    fun onAccountUnlinked(event: AccountUnlinked) =
+        request {
+            pendingMembers += event.discordUserId
+            event.wareraUserId?.let { pendingFormerAccounts[event.discordUserId] = FormerAccount(it, event.wareraUsername) }
+        }
 
     @Scheduled(cron = "\${bits.role-sync.cron}")
     fun hourly() {
@@ -104,27 +124,50 @@ class RoleSyncTrigger(
     /** Runs what is pending until nothing is left; requests that come in meanwhile are picked up by the next round. */
     private fun drain() {
         while (true) {
-            val (syncAll, confirmedRoleIds, members) =
+            val pending =
                 synchronized(lock) {
                     if (!syncAllPending && pendingMembers.isEmpty()) {
                         draining = false
                         return
                     }
-                    Triple(syncAllPending, pendingConfirmedRoleIds.toList(), pendingMembers.toList()).also {
+                    Pending(
+                        syncAll = syncAllPending,
+                        settingChange = settingChangePending,
+                        confirmedRoleIds = pendingConfirmedRoleIds.toList(),
+                        members = pendingMembers.toList(),
+                        formerAccounts = pendingFormerAccounts.toMap(),
+                    ).also {
                         syncAllPending = false
+                        settingChangePending = false
                         pendingConfirmedRoleIds.clear()
                         pendingMembers.clear()
+                        pendingFormerAccounts.clear()
                     }
                 }
             // Members first: a single lookup each, while the sync of everybody may have to load users it has not seen.
-            if (members.isNotEmpty()) attempt(SyncTrigger.ACCOUNT_CHANGE) { syncService.syncMembers(members) }
-            if (syncAll) {
+            if (pending.members.isNotEmpty()) {
+                attempt(SyncTrigger.ACCOUNT_CHANGE) { syncService.syncMembers(pending.members, pending.formerAccounts) }
+            }
+            if (pending.syncAll) {
                 // Only rule changes confirm roles, see syncAllWithCachedData.
-                val trigger = if (confirmedRoleIds.isEmpty()) SyncTrigger.HOURLY else SyncTrigger.RULE_CHANGE
-                attempt(trigger) { syncService.syncAll(confirmedRoleIds, trigger) }
+                val trigger =
+                    when {
+                        pending.confirmedRoleIds.isNotEmpty() -> SyncTrigger.RULE_CHANGE
+                        pending.settingChange -> SyncTrigger.SETTING_CHANGE
+                        else -> SyncTrigger.HOURLY
+                    }
+                attempt(trigger) { syncService.syncAll(pending.confirmedRoleIds, trigger) }
             }
         }
     }
+
+    private class Pending(
+        val syncAll: Boolean,
+        val settingChange: Boolean,
+        val confirmedRoleIds: List<String>,
+        val members: List<String>,
+        val formerAccounts: Map<String, FormerAccount>,
+    )
 
     private fun attempt(
         trigger: SyncTrigger,
