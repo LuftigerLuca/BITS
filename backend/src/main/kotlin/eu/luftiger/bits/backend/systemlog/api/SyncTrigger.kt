@@ -14,6 +14,6 @@ enum class SyncTrigger {
     /** A member linked or unlinked their WarEra account. */
     ACCOUNT_CHANGE,
 
-    /** An admin turned on nicknames from WarEra names. */
+    /** An admin turned on nicknames for everybody; no longer used since members opt in, kept for existing entries. */
     SETTING_CHANGE,
 }

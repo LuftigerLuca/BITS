@@ -1,9 +1,9 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinks
+import eu.luftiger.bits.backend.account.api.NicknameOptIns
 import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.event.api.EventPublisher
-import eu.luftiger.bits.backend.rolesync.domain.NicknameSetting
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -13,7 +13,6 @@ import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
 import org.slf4j.LoggerFactory
-import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
@@ -30,13 +29,13 @@ import java.util.concurrent.ConcurrentHashMap
  * Every sync is a run in the [SystemLog], written together with its event; members whose WarEra data is missing and
  * governments that cannot be loaded are recorded there as problems of the run.
  *
- * If admins turned it on, the event also carries the WarEra names the bot sets as nicknames, and for members who lost
- * their link the name to clear again. Then a sync runs even without rules.
+ * The event also carries the WarEra names the bot sets as nicknames of members who opted in, and for those who lost
+ * their link the name to clear again. With opt-ins, a sync runs even without rules.
  */
 @Service
 class RoleSyncService(
     private val ruleInputs: RuleInputs,
-    private val nicknameSettings: NicknameSettingRepository,
+    private val nicknameOptIns: NicknameOptIns,
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
@@ -104,8 +103,8 @@ class RoleSyncService(
         formerAccounts: Map<String, FormerAccount> = emptyMap(),
     ) {
         val rules = ruleInputs.activeRules()
-        val nicknamesEnabled = nicknameSettings.findByIdOrNull(NicknameSetting.SINGLE_ROW_ID)?.enabled == true
-        if (rules.isEmpty() && !nicknamesEnabled) {
+        val optedIn = nicknameOptIns.discordUserIds()
+        if (rules.isEmpty() && optedIn.isEmpty()) {
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
@@ -121,7 +120,11 @@ class RoleSyncService(
         links.forEach { link ->
             val cached = users[link.wareraUserId]?.takeUnless { refresh }
             val user = if (cached != null) cached.user else loadUser(link.wareraUserId, pauseBefore = lookups++ > 0)
-            if (user == null) unavailable += link.discordUserId else nicknames[link.discordUserId] = user.username
+            if (user == null) {
+                unavailable += link.discordUserId
+            } else if (link.discordUserId in optedIn) {
+                nicknames[link.discordUserId] = user.username
+            }
             evaluator.evaluate(user)?.let { members[link.discordUserId] = it }
         }
         if (unavailable.isNotEmpty()) systemLog.recordProblem(SystemProblem.WareraUsersUnavailable(unavailable))
@@ -129,7 +132,7 @@ class RoleSyncService(
         // The nickname was set from the data loaded last, which may be newer than the name at the time of linking.
         val nicknameResets =
             formerAccounts
-                .filterKeys { it !in linkedIds }
+                .filterKeys { it !in linkedIds && it in optedIn }
                 .mapNotNull { (discordUserId, account) ->
                     (users[account.wareraUserId]?.user?.username ?: account.wareraUsername)?.let { discordUserId to it }
                 }.toMap()
@@ -143,8 +146,8 @@ class RoleSyncService(
                     occurredAt = clock.millis(),
                     confirmedRoleIds = confirmedRoleIds,
                     syncId = syncId,
-                    nicknames = nicknames.takeIf { nicknamesEnabled },
-                    nicknameResets = if (nicknamesEnabled) nicknameResets else emptyMap(),
+                    nicknames = nicknames,
+                    nicknameResets = nicknameResets,
                 ),
             )
         }

@@ -73,7 +73,7 @@ class SystemLogTest {
         awaitBackgroundWork()
         jdbc.execute(
             "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, system_log_entry, " +
-                "system_log_item, audit_entry, nickname_setting",
+                "system_log_item, audit_entry, nickname_opt_in",
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()

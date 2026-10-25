@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 class DepartedMemberCleanup(
     private val linkRepository: AccountLinkRepository,
     private val verificationRepository: AccountVerificationRepository,
+    private val nicknameOptInRepository: NicknameOptInRepository,
     private val systemLog: SystemLog,
 ) : AccountRemoval {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -22,6 +23,7 @@ class DepartedMemberCleanup(
         val links = linkRepository.findAllById(byId.keys)
         linkRepository.deleteAll(links)
         verificationRepository.deleteAllById(byId.keys)
+        nicknameOptInRepository.deleteAllById(byId.keys)
         links.forEach { link ->
             systemLog.recordAccountRemoved(
                 AccountRemovalRecord(link.discordUserId, byId[link.discordUserId]?.discordName, link.wareraUserId, link.wareraUsername),

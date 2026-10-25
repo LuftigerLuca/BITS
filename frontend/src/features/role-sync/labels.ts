@@ -31,6 +31,3 @@ export function errorMessage(error: unknown): string {
   }
   return 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'
 }
-
-export const NICKNAME_ERROR_MESSAGE = 'Die Einstellung konnte nicht geladen werden. Bitte versuche es später erneut.'
-export const NICKNAME_SAVE_ERROR_MESSAGE = 'Die Einstellung konnte nicht gespeichert werden. Bitte versuche es erneut.'

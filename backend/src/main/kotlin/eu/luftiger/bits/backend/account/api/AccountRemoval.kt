@@ -7,7 +7,7 @@ import org.springframework.modulith.NamedInterface
 @NamedInterface("api")
 interface AccountRemoval {
     /**
-     * Deletes the links and open codes of [members], everything BITS keeps about them, and records each deleted link in
+     * Deletes the links, open codes and nickname opt-ins of [members], everything BITS keeps about them, and records each deleted link in
      * the system log. Unlike `/unverify`, no role sync follows, since they are no longer on the server; after joining
      * again they verify anew. Returns how many links were deleted.
      */

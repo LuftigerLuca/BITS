@@ -2,10 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createRoleRule,
   deleteRoleRule,
-  getNicknameSetting,
   getRoleRules,
   getRoles,
-  setNicknameSetting,
   type CreateRoleRule,
 } from '@/lib/api'
 
@@ -33,19 +31,5 @@ export function useDeleteRoleRule() {
   return useMutation({
     mutationFn: (id: number) => deleteRoleRule(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ROLE_SYNC }),
-  })
-}
-
-const NICKNAMES = [...ROLE_SYNC, 'nicknames'] as const
-
-export function useNicknameSetting() {
-  return useQuery({ queryKey: NICKNAMES, queryFn: getNicknameSetting })
-}
-
-export function useSetNicknameSetting() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (enabled: boolean) => setNicknameSetting(enabled),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: NICKNAMES }),
   })
 }

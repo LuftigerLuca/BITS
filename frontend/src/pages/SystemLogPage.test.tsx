@@ -85,13 +85,13 @@ describe('system log page', () => {
   })
 
   it('counts nicknames only for runs that changed some', async () => {
-    stubLog([{ ...run, sync: { ...run.sync!, trigger: 'SETTING_CHANGE', granted: 0, removed: 0, nicknames: 2 } }])
+    stubLog([{ ...run, sync: { ...run.sync!, trigger: 'ACCOUNT_CHANGE', granted: 0, removed: 0, nicknames: 2 } }])
 
     renderApp('/admin/system-log')
 
     expect(
       await screen.findByText(
-        'Sync nach Einschalten der Nicknames: 2 Mitglieder · 0 vergeben · 0 entzogen · 0 übersprungen · 0 fehlgeschlagen · 2 Nicknames',
+        'Sync nach Verknüpfung: 2 Mitglieder · 0 vergeben · 0 entzogen · 0 übersprungen · 0 fehlgeschlagen · 2 Nicknames',
       ),
     ).toBeInTheDocument()
   })

@@ -76,7 +76,7 @@ class VerifyCommand(
             val response = backend.checkVerification(event.user.id, code, event.member?.effectiveName ?: event.user.effectiveName)
             if (response != CheckVerificationResponse.Checking) {
                 pendingChecks.complete(code)
-                event.hook.sendMessage(checkMessage(response)).queue()
+                sendCheckResult(event.hook, response)
             }
         }
     }
@@ -84,7 +84,17 @@ class VerifyCommand(
     /** Answers the click on "Prüfen" that started the check. */
     fun onChecked(event: VerificationCheckedEvent) {
         val hook = pendingChecks.complete(event.code) ?: return log.info("No one waits for the check of user {}", event.discordUserId)
-        hook.sendMessage(checkMessage(event.result)).queue()
+        sendCheckResult(hook, event.result)
+    }
+
+    /** A new link comes with the offer to take the WarEra name as nickname. */
+    private fun sendCheckResult(
+        hook: InteractionHook,
+        response: CheckVerificationResponse,
+    ) {
+        val message = hook.sendMessage(checkMessage(response))
+        if (response is CheckVerificationResponse.Linked) message.addComponents(ActionRow.of(NicknameCommand.optInButton))
+        message.queue()
     }
 
     private fun respond(
@@ -172,7 +182,9 @@ class VerifyCommand(
             when (response) {
                 is CheckVerificationResponse.Linked ->
                     "Fertig! Dein Discord-Account ist jetzt mit **${escape(response.wareraUsername)}** verknüpft. Deine Rollen " +
-                        "bekommst du in den nächsten Minuten automatisch. Du kannst den Code wieder aus dem Firmennamen entfernen."
+                        "bekommst du in den nächsten Minuten automatisch. Du kannst den Code wieder aus dem Firmennamen entfernen.\n\n" +
+                        "Möchtest du deinen WarEra-Namen auch als Nickname tragen? Klicke auf „Nickname übernehmen“ oder nutze " +
+                        "jederzeit `/${NicknameCommand.NAME}`."
                 // Answered by the event, never shown.
                 CheckVerificationResponse.Checking -> "Ich prüfe deinen Code …"
                 CheckVerificationResponse.WareraUnavailable -> WARERA_UNAVAILABLE_MESSAGE

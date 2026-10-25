@@ -137,6 +137,7 @@ cd /srv/bits-staging          # DEPLOY_PATH
 docker compose exec -T postgres psql -U bits -d bits -v id='<discord id>' <<'SQL'
 SELECT * FROM account_link WHERE discord_user_id = :'id';
 SELECT * FROM account_verification WHERE discord_user_id = :'id';
+SELECT * FROM nickname_opt_in WHERE discord_user_id = :'id';
 SELECT * FROM ping_log WHERE discord_user_id = :'id';
 SELECT * FROM audit_entry WHERE actor_subject = 'discord:' || :'id';
 SELECT * FROM system_log_entry WHERE :'id' IN (discord_user_id, previous_discord_user_id);

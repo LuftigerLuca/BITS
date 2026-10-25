@@ -17,6 +17,7 @@ export const TRIGGERS: Record<SyncTrigger, string> = {
   HOURLY: 'stündlich',
   RULE_CHANGE: 'nach Regeländerung',
   ACCOUNT_CHANGE: 'nach Verknüpfung',
+  // No longer used; older runs still carry it.
   SETTING_CHANGE: 'nach Einschalten der Nicknames',
 }
 

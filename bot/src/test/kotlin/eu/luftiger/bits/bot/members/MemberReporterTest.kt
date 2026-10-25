@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.members
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.RoleExplanationResponse
@@ -187,6 +188,11 @@ class MemberReporterTest {
         ): CheckVerificationResponse = TODO()
 
         override suspend fun unlinkAccount(discordUserId: String): UnlinkAccountResponse = TODO()
+
+        override suspend fun setNicknamePreference(
+            discordUserId: String,
+            enabled: Boolean,
+        ): NicknamePreferenceResponse = TODO()
 
         override suspend fun profile(discordUserId: String): ProfileResponse = TODO()
 
