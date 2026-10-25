@@ -3,14 +3,22 @@ import {
   closeVote,
   createVote,
   getVoteAccess,
+  getPartyColors,
+  getResultSettings,
   getVoteManagerRoles,
   getVoteOptions,
   getVotes,
+  resetResultBackground,
+  setPartyColors,
   setVoteManagerRoles,
+  uploadResultBackground,
   type CreateVote,
 } from '@/lib/api'
 
 const VOTES = ['votes'] as const
+
+/** Settings of the result image; the country under "Verwaltung" invalidates them too. */
+export const RESULT_IMAGE = [...VOTES, 'result-image'] as const
 
 /** Whether the votes page shows up at all; asked by every user, so it is not under [VOTES]. */
 export function useVoteAccess() {
@@ -51,5 +59,31 @@ export function useSetVoteManagerRoles() {
   return useMutation({
     mutationFn: (roleIds: string[]) => setVoteManagerRoles(roleIds),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: VOTES }),
+  })
+}
+
+export function useResultSettings() {
+  return useQuery({ queryKey: [...RESULT_IMAGE, 'settings'], queryFn: getResultSettings })
+}
+
+export function usePartyColors() {
+  return useQuery({ queryKey: [...RESULT_IMAGE, 'party-colors'], queryFn: getPartyColors })
+}
+
+/** Uploads a file, or resets to the eagle with `null`. */
+export function useSetResultBackground() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File | null) => (file ? uploadResultBackground(file) : resetResultBackground()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RESULT_IMAGE }),
+  })
+}
+
+export function useSetPartyColors() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ colors, noPartyColor }: { colors: Record<string, string>; noPartyColor: string | null }) =>
+      setPartyColors(colors, noPartyColor),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RESULT_IMAGE }),
   })
 }

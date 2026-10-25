@@ -195,6 +195,11 @@ class VoteTest {
         // Nothing is left that ties a member to a vote.
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM vote_ballot", Int::class.java))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM vote_elector", Int::class.java))
+        // The party IDs, for the colours an admin picks.
+        assertEquals(
+            listOf("p-de", "p-fr", null),
+            jdbc.queryForList("SELECT party_id FROM vote_party_result ORDER BY position", String::class.java),
+        )
 
         api("/api/votes/$voteId/result/posted").andExpect { status { isNoContent() } }
         assertEquals(true, result(voteId).posted)

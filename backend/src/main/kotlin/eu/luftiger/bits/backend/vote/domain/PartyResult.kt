@@ -27,6 +27,9 @@ class PartyResult(
     /** Members of the party who could vote; at least those who did. */
     @Column(name = "eligible_count", nullable = false)
     val eligible: Int,
+    /** WarEra's ID of the party; `null` for those in no party and for votes evaluated before it was kept. */
+    @Column(name = "party_id")
+    val partyId: String? = null,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -4,9 +4,11 @@ import eu.luftiger.bits.backend.vote.domain.Ballot
 import eu.luftiger.bits.backend.vote.domain.DiscordChannel
 import eu.luftiger.bits.backend.vote.domain.Elector
 import eu.luftiger.bits.backend.vote.domain.NonVoter
+import eu.luftiger.bits.backend.vote.domain.PartyColor
 import eu.luftiger.bits.backend.vote.domain.PartyResult
 import eu.luftiger.bits.backend.vote.domain.Vote
 import eu.luftiger.bits.backend.vote.domain.VoteManagerRole
+import eu.luftiger.bits.backend.vote.domain.VoteResultSetting
 import eu.luftiger.bits.backend.vote.domain.VoteStatus
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
@@ -99,3 +101,20 @@ interface NonVoterRepository : JpaRepository<NonVoter, Long> {
 interface VoteManagerRoleRepository : JpaRepository<VoteManagerRole, String>
 
 interface DiscordChannelRepository : JpaRepository<DiscordChannel, String>
+
+interface VoteResultSettingRepository : JpaRepository<VoteResultSetting, Short> {
+    /** Without loading the picture. */
+    @Query("SELECT s.noPartyColor FROM VoteResultSetting s")
+    fun noPartyColor(): Int?
+
+    @Query("SELECT s.background FROM VoteResultSetting s")
+    fun background(): ByteArray?
+}
+
+interface PartyColorRepository : JpaRepository<PartyColor, String> {
+    fun findByCountryId(countryId: String): List<PartyColor>
+
+    @Modifying
+    @Query("DELETE FROM PartyColor c WHERE c.countryId = :countryId")
+    fun deleteByCountryId(countryId: String)
+}

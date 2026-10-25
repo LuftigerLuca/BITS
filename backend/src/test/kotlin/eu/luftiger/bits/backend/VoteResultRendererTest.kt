@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.vote.internal.VoteBackground
 import eu.luftiger.bits.backend.vote.internal.VotePalette
 import eu.luftiger.bits.backend.vote.internal.VoteResult
 import eu.luftiger.bits.backend.vote.internal.VoteResultRenderer
+import eu.luftiger.bits.backend.vote.internal.VoteResultStyle
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -73,6 +74,19 @@ class VoteResultRendererTest {
         assertTrue(pixels(image, colors[0]) > 2_000)
         // SKP_Katzen has no votes, so only its swatch shows.
         assertTrue(pixels(image, colors[1]) in 1..SWATCH_AREA)
+    }
+
+    @Test
+    fun `colours an admin picked replace the palette's, and the other parties keep theirs`() {
+        val parties =
+            listOf(
+                PartyResult(1, 0, "A", yes = 1, no = 0, abstain = 0, eligible = 1, partyId = "p-a"),
+                PartyResult(1, 1, "B", yes = 1, no = 0, abstain = 0, eligible = 1, partyId = "p-b"),
+                PartyResult(1, 2, null, yes = 1, no = 0, abstain = 0, eligible = 1),
+            )
+        val style = VoteResultStyle(partyColors = mapOf("p-a" to Color.RED), noPartyColor = Color.GREEN)
+
+        assertEquals(listOf(Color.RED, VotePalette.color(1), Color.GREEN), VoteResultRenderer.colors(parties, style))
     }
 
     @Test

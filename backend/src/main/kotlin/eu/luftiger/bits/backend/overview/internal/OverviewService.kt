@@ -5,6 +5,8 @@ import eu.luftiger.bits.backend.audit.api.AuditAction
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.members.api.GuildMembers
+import eu.luftiger.bits.backend.overview.api.OverviewCountry
+import eu.luftiger.bits.backend.overview.api.dto.SelectedCountry
 import eu.luftiger.bits.backend.overview.domain.OverviewSetting
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
@@ -29,7 +31,7 @@ class OverviewService(
     private val auditLog: AuditLog,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
-) {
+) : OverviewCountry {
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun overview(): OverviewResponse {
@@ -38,6 +40,9 @@ class OverviewService(
         val verified = members?.let { ids -> accountLinks.findAll().count { it.discordUserId in ids } }
         return OverviewResponse(members?.size, verified, settingRepository.findByIdOrNull(OverviewSetting.SINGLE_ROW_ID)?.let(::country))
     }
+
+    override fun selected(): SelectedCountry? =
+        settingRepository.findByIdOrNull(OverviewSetting.SINGLE_ROW_ID)?.let { SelectedCountry(it.countryId, it.countryName) }
 
     /**
      * @throws ResponseStatusException 400 if WarEra does not know the country

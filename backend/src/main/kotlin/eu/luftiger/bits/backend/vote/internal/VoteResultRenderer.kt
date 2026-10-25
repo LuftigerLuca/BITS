@@ -75,12 +75,13 @@ object VoteResultRenderer {
      */
     fun png(
         result: VoteResult,
-        background: BufferedImage = VoteBackground.default,
+        style: VoteResultStyle = VoteResultStyle.DEFAULT,
     ): ByteArray {
         // Drawn twice: once to measure the height, then for real.
         val scratch = BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB)
-        val height = scratch.createGraphics().let { g -> draw(g, result).also { g.dispose() } }
-        val image = VoteBackground.cover(background, WIDTH, height)
+        val colors = colors(result.parties, style)
+        val height = scratch.createGraphics().let { g -> draw(g, result, colors).also { g.dispose() } }
+        val image = VoteBackground.cover(style.background, WIDTH, height)
         val g = image.createGraphics()
         try {
             smooth(g)
@@ -98,7 +99,7 @@ object VoteResultRenderer {
             g.color = HAIRLINE
             g.stroke = BasicStroke(1f)
             g.draw(card)
-            draw(g, result)
+            draw(g, result, colors)
         } finally {
             g.dispose()
         }
@@ -108,10 +109,23 @@ object VoteResultRenderer {
         }
     }
 
-    /** One colour per party from the palette in their order, grey for those in no party. */
-    fun colors(parties: List<PartyResult>): List<Color> {
+    /**
+     * One colour per party: the one an admin picked for it, else the palette's in their order. A party with a colour of
+     * its own still takes its place in the palette, so the others keep theirs.
+     */
+    fun colors(
+        parties: List<PartyResult>,
+        style: VoteResultStyle = VoteResultStyle.DEFAULT,
+    ): List<Color> {
         var index = 0
-        return parties.map { if (it.partyName == null) VotePalette.noParty else VotePalette.color(index++) }
+        return parties.map { party ->
+            if (party.partyName == null) {
+                style.noPartyColor
+            } else {
+                val palette = VotePalette.color(index++)
+                party.partyId?.let(style.partyColors::get) ?: palette
+            }
+        }
     }
 
     private fun smooth(g: Graphics2D) {
@@ -125,6 +139,7 @@ object VoteResultRenderer {
     private fun draw(
         g: Graphics2D,
         result: VoteResult,
+        colors: List<Color>,
     ): Int {
         smooth(g)
         var y = MARGIN + PADDING
@@ -150,7 +165,6 @@ object VoteResultRenderer {
         y = participationMeter(g, y, result)
         y += SECTION_GAP
 
-        val colors = colors(result.parties)
         y = columns(g, y, result, colors)
         y = divider(g, y + SECTION_GAP)
         y = legend(g, y + SECTION_GAP, result.parties, colors)
