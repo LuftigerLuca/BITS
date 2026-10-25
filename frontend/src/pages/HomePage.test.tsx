@@ -54,7 +54,7 @@ describe('home page', () => {
   it('shows members no figures and does not ask for them', async () => {
     const fetch = stubFetch({
       'GET /web/me': () => json({ ...admin, role: 'USER' }),
-      'GET /web/votes/access': () => json({ canManage: false, canConfigure: false }),
+      'GET /web/votes/access': () => json({ canManage: false }),
     })
 
     renderApp('/')

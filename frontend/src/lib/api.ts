@@ -382,8 +382,6 @@ const VOTES = '/web/votes'
 export interface VoteAccess {
   /** Whether the user may see, start, end and cancel votes. */
   canManage: boolean
-  /** Whether the user may choose the roles that manage votes, i.e. is an admin. */
-  canConfigure: boolean
 }
 
 /** `COUNTING`: ended, the result is not posted yet. */
