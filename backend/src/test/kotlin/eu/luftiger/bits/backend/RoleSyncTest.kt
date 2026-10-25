@@ -210,6 +210,21 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `preview sends empty lists, which the dashboard reads`() {
+        link("1", "w1")
+        reportMembers(mapOf("1" to listOf("r-veteran")))
+
+        previewRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""").andExpect {
+            jsonPath("$.gains") { isArray() }
+            jsonPath("$.losses") { isArray() }
+            jsonPath("$.unknown") { isArray() }
+        }
+        // Without the members of the bot, the lists are empty as well.
+        memberService.forget()
+        previewRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""").andExpect { jsonPath("$.gains") { isArray() } }
+    }
+
+    @Test
     fun `preview without the members of the bot says so`() {
         link("1", "w1")
 
