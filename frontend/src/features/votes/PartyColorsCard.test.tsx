@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Me, PartyColors } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectToast } from '@/test/toast'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -63,6 +64,7 @@ describe('party colours', () => {
     await userEvent.click(colors.getByRole('button', { name: 'Speichern' }))
 
     await vi.waitFor(() => expect(request).toEqual({ colors: { p2: '#00FF00' }, noPartyColor: '#0000FF' }))
+    await expectToast('success', 'Parteifarben gespeichert')
   })
 
   it('asks for a country instead of listing parties', async () => {
@@ -74,6 +76,20 @@ describe('party colours', () => {
       await colors.findByText('Lege unter „Startseite“ ein Land fest, um die Farben seiner Parteien einzustellen.'),
     ).toBeInTheDocument()
     expect(colors.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument()
+  })
+
+  it('says in a toast when the colours cannot be saved', async () => {
+    stub(() => json({ countryName: 'Germany', parties: [], noPartyColor: null }), {
+      'PUT /web/admin/votes/result-settings/party-colors': () => status(409),
+    })
+    renderApp('/admin')
+
+    const colors = within(await card())
+    await userEvent.click(await colors.findByRole('checkbox', { name: 'Eigene Farbe' }))
+    await userEvent.click(colors.getByRole('button', { name: 'Speichern' }))
+
+    await expectToast('error', 'Unter „Startseite“ ist kein Land mehr eingestellt.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('says when WarEra cannot be reached', async () => {

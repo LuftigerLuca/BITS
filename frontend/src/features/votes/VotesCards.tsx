@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,11 +34,6 @@ export function OpenVotesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {closeVote.isError && (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(closeVote.error)}</AlertDescription>
-          </Alert>
-        )}
         {votes.isPending ? (
           <LoadingState label="Abstimmungen werden geladen …" />
         ) : votes.isError ? (

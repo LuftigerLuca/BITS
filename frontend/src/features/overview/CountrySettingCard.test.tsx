@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Me, Overview } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectToast } from '@/test/toast'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 const countries = [
@@ -58,6 +59,7 @@ describe('country of the start page', () => {
     await userEvent.click(saveButton())
 
     await vi.waitFor(() => expect(current).toBe('fr'))
+    await expectToast('success', 'Land gespeichert')
     // Loaded again after saving, so the start page shows the new country.
     await vi.waitFor(() =>
       expect(fetch.mock.calls.filter(([input]) => input.toString() === '/web/admin/overview')).toHaveLength(2),
@@ -72,6 +74,7 @@ describe('country of the start page', () => {
     await chooseCountry('Germany')
     await userEvent.click(saveButton())
 
-    expect(await screen.findByText('WarEra ist gerade nicht erreichbar. Bitte versuche es später erneut.')).toBeInTheDocument()
+    await expectToast('error', 'WarEra ist gerade nicht erreichbar. Bitte versuche es später erneut.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

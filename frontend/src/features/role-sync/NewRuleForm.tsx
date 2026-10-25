@@ -41,7 +41,8 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
   const [threshold, setThreshold] = useState('1')
   /** The rule waiting for confirmation. */
   const [pending, setPending] = useState<CreateRoleRule | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  /** Only the MU search reports here; the result of saving is a toast. */
+  const [searchError, setSearchError] = useState<string | null>(null)
   const createRule = useCreateRoleRule()
   const preview = useCreatePreview(pending)
 
@@ -68,25 +69,24 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
   }
 
   async function searchMu() {
-    setError(null)
+    setSearchError(null)
     setMuId(null)
     try {
       setMuResults(await searchMilitaryUnits(muQuery))
     } catch (e) {
-      setError(errorMessage(e))
+      setSearchError(errorMessage(e))
     }
   }
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    setError(null)
     setPending(rule())
   }
 
   function create() {
     if (!pending) return
     setPending(null)
-    createRule.mutate(pending, { onError: (e) => setError(errorMessage(e)) })
+    createRule.mutate(pending)
   }
 
   const roleItems = roles.map((r) => ({ value: r.id, label: r.name }))
@@ -98,9 +98,9 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
   return (
     <form className="flex flex-col gap-4 border-t pt-6" onSubmit={submit}>
       <p className="text-sm font-medium">Neue Regel</p>
-      {error && (
+      {searchError && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{searchError}</AlertDescription>
         </Alert>
       )}
       {countries.isError && (

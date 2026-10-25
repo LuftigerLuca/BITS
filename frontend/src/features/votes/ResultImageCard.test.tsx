@@ -1,9 +1,10 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { Me, PartyColors, ResultSettings } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectToast } from '@/test/toast'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 const noCountry: PartyColors = { countryName: null, parties: [], noPartyColor: null }
@@ -56,12 +57,14 @@ describe('background of the result image', () => {
     await userEvent.upload(result.getByLabelText('Hintergrundbild'), file)
 
     expect(await result.findByText('Hintergrund: eigenes Bild')).toBeInTheDocument()
+    await expectToast('success', 'Hintergrund gespeichert')
     expect(uploaded).toBe(file)
     // A new URL, so the browser loads the preview again.
     expect(preview.src).not.toBe(before)
 
     await userEvent.click(result.getByRole('button', { name: 'Auf Adler zurücksetzen' }))
     expect(await result.findByText('Hintergrund: BITS-Adler')).toBeInTheDocument()
+    await expectToast('success', 'Auf Adler zurückgesetzt')
   })
 
   it('rejects files that are too large before sending them', async () => {
@@ -71,7 +74,7 @@ describe('background of the result image', () => {
     const result = within(await card())
     await userEvent.upload(await result.findByLabelText('Hintergrundbild'), png(5 * 1024 * 1024 + 1))
 
-    expect(await result.findByText('Das Bild ist größer als 5 MB.')).toBeInTheDocument()
+    await expectToast('error', 'Das Bild ist größer als 5 MB.')
     expect(fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
   })
 
@@ -84,8 +87,7 @@ describe('background of the result image', () => {
     const result = within(await card())
     await userEvent.upload(await result.findByLabelText('Hintergrundbild'), png(10))
 
-    await vi.waitFor(() =>
-      expect(result.getByText('Die Datei ist kein PNG- oder JPEG-Bild, das BITS lesen kann.')).toBeInTheDocument(),
-    )
+    await expectToast('error', 'Die Datei ist kein PNG- oder JPEG-Bild, das BITS lesen kann.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getOverview, setOverviewCountry } from '@/lib/api'
+import { notify } from '@/lib/notify'
 import { RESULT_IMAGE } from '@/features/votes/queries'
+import { countryErrorMessage } from './labels'
 
 const OVERVIEW = ['overview'] as const
 
@@ -13,10 +15,13 @@ export function useSetOverviewCountry() {
   return useMutation({
     mutationFn: (countryId: string) => setOverviewCountry(countryId),
     // The party colours are those of the country's parties.
-    onSuccess: () =>
-      Promise.all([
+    onSuccess: () => {
+      notify.success('Land gespeichert')
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: OVERVIEW }),
         queryClient.invalidateQueries({ queryKey: RESULT_IMAGE }),
-      ]),
+      ])
+    },
+    onError: (error) => notify.error(countryErrorMessage(error)),
   })
 }

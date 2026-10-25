@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/context'
 import { getAccount, getAccountRoles, unlinkAccount } from '@/lib/api'
+import { notify } from '@/lib/notify'
+import { UNLINK_ERROR } from './labels'
 
 /** Link and roles change together: without a link, no role is met. */
 const ACCOUNT = ['account'] as const
@@ -20,6 +22,10 @@ export function useUnlinkAccount() {
   const { refresh } = useAuth()
   return useMutation({
     mutationFn: unlinkAccount,
-    onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: ACCOUNT }), refresh()]),
+    onSuccess: () => {
+      notify.success('Verknüpfung gelöst', 'Die Rollen, die BITS verwaltet, verlierst du beim folgenden Abgleich.')
+      return Promise.all([queryClient.invalidateQueries({ queryKey: ACCOUNT }), refresh()])
+    },
+    onError: () => notify.error(UNLINK_ERROR),
   })
 }

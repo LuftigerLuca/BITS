@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { Account, AccountRoles, Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectToast } from '@/test/toast'
 
 const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: 'Luftiger', discordUser: true }
 
@@ -108,7 +109,7 @@ describe('account page', () => {
     expect(confirm).toHaveTextContent('nicht mehr mit Luftiger verknüpft')
     await userEvent.click(within(confirm).getByRole('button', { name: 'Verknüpfung lösen' }))
 
-    expect(await screen.findByText(/Verknüpfung gelöst/)).toBeInTheDocument()
+    await expectToast('success', 'Verknüpfung gelöst')
     expect(await screen.findByText(/mit keinem WarEra-Account verknüpft/)).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/web/account/link', expect.objectContaining({ method: 'DELETE' }))
   })
@@ -126,7 +127,8 @@ describe('account page', () => {
     const dialog = await screen.findByRole('alertdialog')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Verknüpfung lösen' }))
 
-    expect(await screen.findByText(/Die Verknüpfung konnte nicht gelöst werden/)).toBeInTheDocument()
+    await expectToast('error', 'Die Verknüpfung konnte nicht gelöst werden. Bitte versuche es später erneut.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByText('Luftiger')).toBeInTheDocument()
   })
 

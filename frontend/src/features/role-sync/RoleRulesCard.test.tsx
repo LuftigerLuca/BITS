@@ -3,9 +3,11 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
+import { Toaster } from '@/components/ui/sonner'
 import { createQueryClient } from '@/lib/queryClient'
 import type { DiscordRole, RoleRule, RulePreview } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
+import { expectToast } from '@/test/toast'
 import { RoleRulesCard } from './RoleRulesCard'
 
 const veteran: DiscordRole = { id: 'r-veteran', name: 'Veteran', color: null, managed: true }
@@ -33,6 +35,7 @@ function renderCard(
   rules: RoleRule[] = [],
   onCreate: (body: unknown) => Response = () => json(rules[0], 201),
   rulePreview: RulePreview = preview(),
+  onDelete: () => Response = () => status(204),
 ) {
   const fetch = stubFetch({
     'GET /web/admin/role-sync/roles': () => json([citizen, veteran]),
@@ -41,13 +44,14 @@ function renderCard(
     'POST /web/admin/role-sync/rules': (init) => onCreate(JSON.parse(String(init?.body))),
     'POST /web/admin/role-sync/rules/preview': () => json(rulePreview),
     'GET /web/admin/role-sync/rules/1/deletion-preview': () => json(rulePreview),
-    'DELETE /web/admin/role-sync/rules/1': () => status(204),
+    'DELETE /web/admin/role-sync/rules/1': onDelete,
   })
   const queryClient = createQueryClient()
   queryClient.setDefaultOptions({ queries: { retry: false } })
   const { container } = render(
     <QueryClientProvider client={queryClient}>
       <RoleRulesCard />
+      <Toaster />
     </QueryClientProvider>,
   )
   return { fetch, container }
@@ -92,6 +96,7 @@ describe('rule form', () => {
     expect(created).toEqual([])
     await confirm('Regel anlegen')
     await expect.poll(() => created).toEqual([{ roleId: 'r-veteran', type: 'LEVEL', threshold: 5 }])
+    await expectToast('success', 'Regel angelegt')
   })
 
   it('needs a country for citizenship rules and confirms the first rule of a role', async () => {
@@ -153,7 +158,7 @@ describe('rule form', () => {
     expect(await screen.findByText(/Vorschau ungenau/)).toBeInTheDocument()
   })
 
-  it('explains a duplicate rule', async () => {
+  it('explains a duplicate rule in a toast', async () => {
     renderCard([], () => status(409))
     await screen.findByLabelText('Rolle')
 
@@ -162,7 +167,8 @@ describe('rule form', () => {
     await userEvent.click(submit())
     await confirm('Regel anlegen')
 
-    expect(await screen.findByText('Diese Regel gibt es für die Rolle schon.')).toBeInTheDocument()
+    await expectToast('error', 'Diese Regel gibt es für die Rolle schon.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('names every field', async () => {
@@ -221,6 +227,17 @@ describe('rule table', () => {
     await expect
       .poll(() => fetch.mock.calls.some(([url, init]) => String(url).endsWith('/rules/1') && init?.method === 'DELETE'))
       .toBe(true)
+    await expectToast('success', 'Regel gelöscht')
+  })
+
+  it('says in a toast when a rule cannot be deleted', async () => {
+    renderCard([rule(1, veteran, 'Level ab 10')], undefined, preview(), () => status(500))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Regel „Level ab 10“ löschen' }))
+    await confirm('Regel löschen')
+
+    await expectToast('error', 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('shows from whom deleting the rule takes the role', async () => {

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { VoteOptions } from '@/lib/api'
@@ -58,11 +57,6 @@ function ManagerRolesForm({ roles, saved }: { roles: VoteOptions['roles']; saved
         setManagerRoles.mutate([...selected])
       }}
     >
-      {setManagerRoles.isError && (
-        <Alert variant="destructive">
-          <AlertDescription>{errorMessage(setManagerRoles.error)}</AlertDescription>
-        </Alert>
-      )}
       <fieldset className="flex max-h-72 flex-col gap-2 overflow-y-auto">
         <legend className="sr-only">Rollen</legend>
         {roles.map((role) => (

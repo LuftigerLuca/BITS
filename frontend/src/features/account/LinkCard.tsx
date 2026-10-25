@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +12,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ACCOUNT_ERROR, UNLINK_ERROR, formatTime } from './labels'
+import { ACCOUNT_ERROR, formatTime } from './labels'
 import { useAccount, useUnlinkAccount } from './queries'
 
 /** The WarEra account the member linked with `/verify`, and the way to undo it like `/unverify`. */
@@ -29,18 +28,6 @@ export function LinkCard() {
         <CardDescription>Der WarEra-Account, nach dem BITS deine Rollen vergibt.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 text-sm">
-        {unlink.isError && (
-          <Alert variant="destructive">
-            <AlertDescription>{UNLINK_ERROR}</AlertDescription>
-          </Alert>
-        )}
-        {unlink.isSuccess && (
-          <Alert>
-            <AlertDescription>
-              Verknüpfung gelöst. Die Rollen, die BITS verwaltet, verlierst du beim folgenden Abgleich.
-            </AlertDescription>
-          </Alert>
-        )}
         {account.isPending ? (
           <LoadingState />
         ) : account.isError ? (
