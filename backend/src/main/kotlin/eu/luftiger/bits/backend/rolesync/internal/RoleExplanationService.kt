@@ -2,7 +2,7 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
-import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
 import eu.luftiger.bits.shared.RoleExplanationResponse
@@ -49,25 +49,33 @@ class RoleExplanationService(
         return RoleExplanationResponse.Explained(user.username, roles)
     }
 
-    /** What the user lacks, in German; `null` if the rule is met. */
+    /**
+     * What the user lacks, in German: the conditions that fail, or if none fails, those that cannot be checked; `null`
+     * if the rule is met.
+     */
     private fun detail(
         check: RuleCheck,
         user: WareraUser,
     ): String? {
-        val rule = check.rule
+        val decisive = check.conditions.filter { it.met == check.met }
         return when (check.met) {
             true -> null
-            null -> "Regierung von ${rule.targetName} gerade nicht abrufbar"
-            false ->
-                when (rule.type) {
-                    ConditionType.CITIZENSHIP -> "keine Staatsbürgerschaft ${rule.targetName}"
-                    ConditionType.GOVERNMENT_OFFICE -> "nicht ${rule.office?.label} in ${rule.targetName}"
-                    ConditionType.MILITARY_UNIT -> "nicht Mitglied der MU ${rule.targetName}"
-                    ConditionType.LEVEL -> "Level ${user.leveling.level} von ${threshold(rule)}"
-                    ConditionType.MILITARY_RANK -> "Militärrang ${user.militaryRank} von ${threshold(rule)}"
-                }
+            null -> decisive.joinToString(" und ") { "Regierung von ${it.condition.targetName} gerade nicht abrufbar" }
+            false -> decisive.joinToString(" und ") { missing(it.condition, user) }
         }
     }
 
-    private fun threshold(rule: RoleRule) = requireNotNull(rule.threshold)
+    private fun missing(
+        condition: RuleCondition,
+        user: WareraUser,
+    ): String =
+        when (condition.type) {
+            ConditionType.CITIZENSHIP -> "keine Staatsbürgerschaft ${condition.targetName}"
+            ConditionType.GOVERNMENT_OFFICE -> "nicht ${condition.office?.label} in ${condition.targetName}"
+            ConditionType.MILITARY_UNIT -> "nicht Mitglied der MU ${condition.targetName}"
+            ConditionType.LEVEL -> "Level ${user.leveling.level} von ${threshold(condition)}"
+            ConditionType.MILITARY_RANK -> "Militärrang ${user.militaryRank} von ${threshold(condition)}"
+        }
+
+    private fun threshold(condition: RuleCondition) = requireNotNull(condition.threshold)
 }

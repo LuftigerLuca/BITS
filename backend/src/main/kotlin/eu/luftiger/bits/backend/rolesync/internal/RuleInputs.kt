@@ -27,7 +27,7 @@ class RuleInputs(
     }
 
     /**
-     * One call per country that office rules refer to. A country whose government cannot be loaded is left out and
+     * One call per country that office conditions refer to. A country whose government cannot be loaded is left out and
      * reported to [onUnavailable] with its ID and name.
      */
     fun governments(
@@ -35,15 +35,16 @@ class RuleInputs(
         onUnavailable: (countryId: String, countryName: String?) -> Unit = { _, _ -> },
     ): Map<String, WareraGovernment> =
         rules
+            .flatMap { it.conditions }
             .filter { it.type == ConditionType.GOVERNMENT_OFFICE && it.countryId != null }
             .distinctBy { it.countryId }
-            .mapNotNull { rule ->
-                val countryId = requireNotNull(rule.countryId)
+            .mapNotNull { condition ->
+                val countryId = requireNotNull(condition.countryId)
                 try {
                     countryId to wareraClient.getGovernment(countryId)
                 } catch (e: WareraApiException) {
-                    log.warn("Government of country {} could not be loaded, its office rules are skipped", countryId, e)
-                    onUnavailable(countryId, rule.targetName)
+                    log.warn("Government of country {} could not be loaded, its office conditions are undecided", countryId, e)
+                    onUnavailable(countryId, condition.targetName)
                     null
                 }
             }.toMap()

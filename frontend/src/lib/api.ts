@@ -94,9 +94,17 @@ export interface RoleRule {
   status: RuleStatus
 }
 
-/** Which of the optional fields are needed depends on `type`. */
+/** All of the conditions must be met; between one and `MAX_CONDITIONS`. */
 export interface CreateRoleRule {
   roleId: string
+  conditions: CreateCondition[]
+}
+
+/** The backend takes at most this many conditions per rule. */
+export const MAX_CONDITIONS = 10
+
+/** Which of the optional fields are needed depends on `type`. */
+export interface CreateCondition {
   type: ConditionType
   countryId?: string
   office?: GovernmentOffice
