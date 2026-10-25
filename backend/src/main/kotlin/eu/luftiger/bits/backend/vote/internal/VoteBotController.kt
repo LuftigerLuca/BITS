@@ -14,6 +14,7 @@ import eu.luftiger.bits.shared.OpenVote
 import eu.luftiger.bits.shared.OpenVotesResponse
 import eu.luftiger.bits.shared.ParticipationRequest
 import eu.luftiger.bits.shared.ParticipationResponse
+import eu.luftiger.bits.shared.PartyResultDto
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.VoteActor
@@ -143,7 +144,9 @@ class VoteBotController(
     ): VoteResultDto {
         val (vote, result) = voteService.result(id)
         return VoteResultDto(
-            text = VoteResultRenderer.text(result, markdown = true),
+            question = result.question,
+            parties = result.parties.map { PartyResultDto(it.partyName, it.yes, it.no, it.abstain, it.eligible) },
+            nonVoters = result.nonVoters,
             image = Base64.getEncoder().encodeToString(VoteResultRenderer.png(result, settingsService.style())),
             posted = vote.resultPostedAt != null,
         )

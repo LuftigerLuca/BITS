@@ -13,6 +13,7 @@ import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.CloseVoteResponse
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.ParticipationResponse
+import eu.luftiger.bits.shared.PartyResultDto
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.VoteChoice
 import eu.luftiger.bits.shared.VoteClosedEvent
@@ -179,19 +180,16 @@ class VoteTest {
         assertEquals(VoteState.EVALUATED, vote(voteId).state)
         assertEquals(listOf(voteId), streamEvents().filterIsInstance<VoteEvaluatedEvent>().map { it.voteId })
         val result = result(voteId)
+        assertEquals("Neue Steuern?", result.question)
         assertEquals(
-            """
-            **Ergebnis:** Neue Steuern?
-            Gesamt: 1 Ja · 1 Nein · 0 Enthaltung · 2 von 4 haben abgestimmt (50 %)
-
-            Deutsche Partei: 1 Ja · 0 Nein · 0 Enthaltung · 1 von 2 haben abgestimmt (50 %)
-            Parti: 0 Ja · 1 Nein · 0 Enthaltung · 1 von 1 haben abgestimmt (100 %)
-            Parteilos: 0 Ja · 0 Nein · 0 Enthaltung · 0 von 1 haben abgestimmt (0 %)
-
-            Nicht abgestimmt (2): Clara, Dora
-            """.trimIndent(),
-            result.text,
+            listOf(
+                PartyResultDto("Deutsche Partei", yes = 1, no = 0, abstain = 0, eligible = 2),
+                PartyResultDto("Parti", yes = 0, no = 1, abstain = 0, eligible = 1),
+                PartyResultDto(null, yes = 0, no = 0, abstain = 0, eligible = 1),
+            ),
+            result.parties,
         )
+        assertEquals(listOf("Clara", "Dora"), result.nonVoters)
         assertTrue(Base64.getDecoder().decode(result.image).take(4) == PNG_SIGNATURE)
         assertEquals(false, result.posted)
         // Nothing is left that ties a member to a vote.
@@ -218,7 +216,7 @@ class VoteTest {
         reportElectorate(voteId, "1" to "Anna", "2" to "Bernd")
         evaluator.awaitIdle()
 
-        assertTrue(result(voteId).text.endsWith("Nicht abgestimmt (1): Anna"))
+        assertEquals(listOf("Anna"), result(voteId).nonVoters)
     }
 
     @Test
@@ -308,7 +306,7 @@ class VoteTest {
 
         mockMvc.get("/web/votes/access") { cookie(user) }.andExpect {
             jsonPath("$.canManage") { value(true) }
-            jsonPath("$.canConfigure") { value(false) }
+            jsonPath("$.canConfigure") { doesNotExist() }
         }
         val options = mockMvc.get("/web/votes/options") { cookie(user) }
         assertEquals(listOf("r-congress", "r-speaker"), options.read<List<String>>("$.roles[*].id"))

@@ -42,7 +42,7 @@ const evaluated: Vote = {
   resultText: 'Ergebnis: Steuern senken?\nGesamt: 2 Ja · 0 Nein · 0 Enthaltung · 2 von 2 haben abgestimmt (100 %)',
 }
 
-function stubVotes(me: Me, access = { canManage: true, canConfigure: false }, routes = {}) {
+function stubVotes(me: Me, access = { canManage: true }, routes = {}) {
   return stubFetch({
     'GET /web/me': () => json(me),
     'GET /web/votes/access': () => json(access),
@@ -75,8 +75,6 @@ describe('votes page', () => {
     await userEvent.click(within(archived).getByText('Ergebnis anzeigen'))
     expect(within(archived).getByText(/2 von 2 haben abgestimmt \(100 %\)/)).toBeInTheDocument()
     expect(within(archived).getByRole('img')).toHaveAttribute('src', '/web/votes/2/result.png')
-    // Only admins choose who may manage votes.
-    expect(screen.queryByText('Wer Abstimmungen verwalten darf')).not.toBeInTheDocument()
   })
 
   it('starts a vote with the chosen role, channel and end', async () => {
@@ -112,28 +110,16 @@ describe('votes page', () => {
     expect(fetch).toHaveBeenCalledWith('/web/votes/1/end', expect.objectContaining({ method: 'POST' }))
   })
 
-  it('lets admins choose the roles that may manage votes', async () => {
-    const saved: unknown[] = []
-    stubVotes({ ...member, role: 'ADMIN' }, { canManage: true, canConfigure: true }, {
-      'GET /web/admin/votes/manager-roles': () => json({ roleIds: ['r-congress'] }),
-      'PUT /web/admin/votes/manager-roles': (init?: RequestInit) => {
-        saved.push(JSON.parse(String(init?.body)))
-        return status(204)
-      },
-    })
+  it('leaves the choice of who may manage votes to the admin page, also for admins', async () => {
+    stubVotes({ ...member, role: 'ADMIN' })
     renderApp('/votes')
 
-    const card = (await screen.findByText('Wer Abstimmungen verwalten darf')).closest('[data-slot=card]') as HTMLElement
-    const congress = await within(card).findByRole('checkbox', { name: 'Kongress' })
-    expect(congress).toBeChecked()
-    await userEvent.click(within(card).getByRole('checkbox', { name: 'Bürger' }))
-    await userEvent.click(within(card).getByRole('button', { name: 'Speichern' }))
-
-    await expect.poll(() => saved).toEqual([{ roleIds: ['r-congress', 'r-citizen'] }])
+    expect(await screen.findByText('Krieg erklären?')).toBeInTheDocument()
+    expect(screen.queryByText('Wer Abstimmungen verwalten darf')).not.toBeInTheDocument()
   })
 
   it('keeps members out who may not manage votes', async () => {
-    stubVotes(member, { canManage: false, canConfigure: false })
+    stubVotes(member, { canManage: false })
     const router = renderApp('/votes')
 
     expect(await screen.findByText('Willkommen, Luca')).toBeInTheDocument()

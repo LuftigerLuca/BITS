@@ -80,18 +80,18 @@ class VoteEvents(
             backend.markVoteResultPosted(vote.id)
             return
         }
-        val parts = VoteMessages.split(result.text)
-        val image = FileUpload.fromData(Base64.getDecoder().decode(result.image), "abstimmung-${vote.id}.png")
+        val imageName = "abstimmung-${vote.id}.png"
+        val embeds = VoteResultMessages.embeds(result, imageName)
         channel
-            .sendMessage(parts.first())
-            .addFiles(image)
+            .sendMessageEmbeds(embeds.first())
+            .addFiles(FileUpload.fromData(Base64.getDecoder().decode(result.image), imageName))
             .setAllowedMentions(emptyList())
             .apply { vote.messageId?.let { setMessageReference(it).failOnInvalidReply(false) } }
             .submit()
             .await()
-        parts.drop(1).forEach {
+        embeds.drop(1).forEach {
             channel
-                .sendMessage(it)
+                .sendMessageEmbeds(it)
                 .setAllowedMentions(emptyList())
                 .submit()
                 .await()

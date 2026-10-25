@@ -17,6 +17,8 @@ function stub(overview: Overview, setCountry: (init?: RequestInit) => Response) 
     'GET /web/admin/role-sync/countries': () => json(countries),
     'GET /web/admin/overview': () => json(overview),
     'PUT /web/admin/overview/country': setCountry,
+    'GET /web/votes/options': () => json({ roles: [], channels: [] }),
+    'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/votes/result-settings': () => json({ customBackground: false, updatedAt: null }),
     'GET /web/admin/votes/result-settings/party-colors': () =>
       json({ countryName: 'Germany', parties: [{ id: 'p1', name: 'Partei', color: null }], noPartyColor: null }),
