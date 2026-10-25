@@ -52,6 +52,8 @@ export function Layout() {
   // Whether the user may manage votes depends on their Discord roles, which only the backend knows.
   const voteAccess = useVoteAccess()
   if (!user) return null
+  const isAdmin = user.role === 'ADMIN'
+  const canManageVotes = voteAccess.data?.canManage === true
 
   return (
     // On the desktop the sidebar is always open; the open state only applies there, so changes are ignored.
@@ -70,11 +72,6 @@ export function Layout() {
                     <NavItem to="/" end icon={<HouseIcon />}>
                       Start
                     </NavItem>
-                    {voteAccess.data?.canManage && (
-                      <NavItem to="/votes" icon={<VoteIcon />}>
-                        Abstimmungen
-                      </NavItem>
-                    )}
                     {user.discordUser && (
                       <NavItem to="/account" icon={<CircleUserIcon />}>
                         Mein Account
@@ -83,20 +80,40 @@ export function Layout() {
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
-              {user.role === 'ADMIN' && (
+              {/* Members of the roles that may manage votes see the group too, with the votes only. */}
+              {(isAdmin || canManageVotes) && (
                 <SidebarGroup>
                   <SidebarGroupLabel>Admin</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {/* Only the page itself, so the pages below do not mark it as well. */}
+                      {isAdmin && (
+                        <>
+                          <NavItem to="/admin/roles" icon={<ShieldIcon />}>
+                            Rollen
+                          </NavItem>
+                          <NavItem to="/admin/embassies" icon={<LandmarkIcon />}>
+                            Botschaften
+                          </NavItem>
+                        </>
+                      )}
+                      {canManageVotes && (
+                        <NavItem to="/votes" icon={<VoteIcon />}>
+                          Abstimmungen
+                        </NavItem>
+                      )}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
+              {/* Settings and logs of BITS itself, apart from the features they configure and record. */}
+              {isAdmin && (
+                <SidebarGroup>
+                  <SidebarGroupLabel>System</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {/* Only the page itself, so the pages below it in the path do not mark it as well. */}
                       <NavItem to="/admin" end icon={<SettingsIcon />}>
                         Verwaltung
-                      </NavItem>
-                      <NavItem to="/admin/roles" icon={<ShieldIcon />}>
-                        Rollen
-                      </NavItem>
-                      <NavItem to="/admin/embassies" icon={<LandmarkIcon />}>
-                        Botschaften
                       </NavItem>
                       <NavItem to="/admin/audit-log" icon={<HistoryIcon />}>
                         Audit-Log

@@ -166,7 +166,8 @@ export const MANUAL_PAGES: ManualPage[] = [
     summary: 'Abstimmungen starten, vorzeitig beenden oder abbrechen.',
     intro:
       'Abstimmungen starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins unter „Verwaltung“ ' +
-      'dafür freigeben. Das geht in Discord und im Dashboard unter „Abstimmungen“.',
+      'dafür freigeben. Das geht in Discord und im Dashboard unter „Abstimmungen“ im Bereich „Admin“ der ' +
+      'Seitenleiste.',
     buildsOn: ['mitglieder'],
     topics: [
       {
@@ -226,8 +227,9 @@ export const MANUAL_PAGES: ManualPage[] = [
     title: 'Admins',
     summary: 'Rollenregeln, Botschaften, Einstellungen und Logs im Dashboard.',
     intro:
-      'Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, ist im Dashboard Admin und sieht den ' +
-      'Bereich „Admin“ in der Seitenleiste.',
+      'Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, ist im Dashboard Admin und sieht in ' +
+      'der Seitenleiste die Bereiche „Admin“ mit Rollen, Botschaften und Abstimmungen und „System“ mit Verwaltung ' +
+      'und den Logs.',
     buildsOn: ['mitglieder', 'abstimmungen'],
     topics: [
       {
