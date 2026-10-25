@@ -495,7 +495,19 @@ class RoleSyncTest {
             companyName = ""
         }
 
-        override fun getAllCountries() = available { listOf(WareraCountry("de", "Germany", "de"), WareraCountry("fr", "France", "fr")) }
+        override fun getAllCountries() =
+            available {
+                listOf(
+                    WareraCountry(
+                        "de",
+                        "Germany",
+                        "de",
+                        currentPopulation = 982,
+                        rankings = WareraCountry.Rankings(WareraCountry.Ranking(925)),
+                    ),
+                    WareraCountry("fr", "France", "fr"),
+                )
+            }
 
         override fun searchUserIds(text: String) = available { users.values.filter { it.username == text }.map { it.id } }
 

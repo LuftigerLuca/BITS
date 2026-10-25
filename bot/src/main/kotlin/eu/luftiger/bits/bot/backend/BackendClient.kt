@@ -31,6 +31,17 @@ interface BackendClient {
     /** Replaces the roles of the guild known to the backend. */
     suspend fun reportRoles(roles: List<DiscordRoleDto>)
 
+    /** Replaces the members of the guild known to the backend, which deletes the links of everybody missing. */
+    suspend fun reportMembers(discordUserIds: List<String>)
+
+    suspend fun reportMemberJoined(discordUserId: String)
+
+    /** The backend deletes the member's link; [memberName] is for its system log. */
+    suspend fun reportMemberLeft(
+        discordUserId: String,
+        memberName: String,
+    )
+
     /** Tells the backend's system log what the bot changed for the sync [syncId]. */
     suspend fun reportRoleSync(
         syncId: Long,

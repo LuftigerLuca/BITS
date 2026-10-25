@@ -3,6 +3,8 @@ package eu.luftiger.bits.bot.backend
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationRequest
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.DiscordMemberChange
+import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.DiscordRolesReport
 import eu.luftiger.bits.shared.PingRequest
@@ -79,6 +81,30 @@ class KtorBackendClient(
         http.put("api/discord-roles") {
             contentType(ContentType.Application.Json)
             setBody(DiscordRolesReport(roles))
+        }
+    }
+
+    override suspend fun reportMembers(discordUserIds: List<String>) {
+        http.put("api/discord-members") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordMembersReport(discordUserIds))
+        }
+    }
+
+    override suspend fun reportMemberJoined(discordUserId: String) {
+        http.post("api/discord-members/joined") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordMemberChange(discordUserId))
+        }
+    }
+
+    override suspend fun reportMemberLeft(
+        discordUserId: String,
+        memberName: String,
+    ) {
+        http.post("api/discord-members/left") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordMemberChange(discordUserId, memberName))
         }
     }
 

@@ -12,4 +12,5 @@ import org.springframework.modulith.NamedInterface
 enum class AuditAction {
     ROLE_RULE_CREATED,
     ROLE_RULE_DELETED,
+    OVERVIEW_COUNTRY_SET,
 }

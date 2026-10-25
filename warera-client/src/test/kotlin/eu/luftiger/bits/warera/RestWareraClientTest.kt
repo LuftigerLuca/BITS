@@ -260,6 +260,23 @@ class RestWareraClientTest {
     }
 
     @Test
+    fun `countries carry their population and active population`() {
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(
+                withSuccess(
+                    """{"result":{"data":[{"_id":"c1","name":"Germany","currentPopulation":982,""" +
+                        """"rankings":{"countryActivePopulation":{"value":925,"rank":1,"tier":"master"},"other":{}}}]}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val country = client.getAllCountries().single()
+        assertEquals(982, country.currentPopulation)
+        assertEquals(925, country.activePopulation)
+    }
+
+    @Test
     fun `rejected input is its own error and not retried`() {
         server
             .expect(times(1), requestTo("https://warera.test/trpc/mu.getById?input=%7B%22muId%22%3A%22bad%22%7D"))

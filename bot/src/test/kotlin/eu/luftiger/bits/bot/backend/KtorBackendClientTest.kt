@@ -122,6 +122,31 @@ class KtorBackendClientTest {
         }
 
     @Test
+    fun `members are reported with PUT, joins and departures with POST`() =
+        runTest {
+            val requests = mutableListOf<Triple<HttpMethod, String, String>>()
+            val engine =
+                MockEngine { request ->
+                    requests += Triple(request.method, request.url.encodedPath, request.body.toByteArray().decodeToString())
+                    respond("", HttpStatusCode.NoContent)
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            client.reportMembers(listOf("1", "2"))
+            client.reportMemberJoined("3")
+            client.reportMemberLeft("1", "Luca")
+
+            assertEquals(
+                listOf(
+                    Triple(HttpMethod.Put, "/api/discord-members", """{"discordUserIds":["1","2"]}"""),
+                    Triple(HttpMethod.Post, "/api/discord-members/joined", """{"discordUserId":"3"}"""),
+                    Triple(HttpMethod.Post, "/api/discord-members/left", """{"discordUserId":"1","memberName":"Luca"}"""),
+                ),
+                requests,
+            )
+        }
+
+    @Test
     fun `a backend that does not answer in time is reported as its own exception`() =
         runTest {
             val engine =

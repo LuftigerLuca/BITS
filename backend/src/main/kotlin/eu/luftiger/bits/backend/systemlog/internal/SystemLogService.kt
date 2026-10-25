@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.systemlog.internal
 
 import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
+import eu.luftiger.bits.backend.systemlog.api.AccountRemovalRecord
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -63,6 +64,20 @@ class SystemLogService(
                 previousDiscordName = previous?.let { latestNames(listOf(it))[it] },
                 wareraUserId = link.wareraUserId,
                 wareraUsername = link.wareraUsername,
+            ),
+        )
+    }
+
+    @Transactional
+    override fun recordAccountRemoved(removal: AccountRemovalRecord) {
+        entries.save(
+            SystemLogEntry(
+                clock.instant(),
+                EntryKind.ACCOUNT_REMOVED,
+                discordUserId = removal.discordUserId,
+                discordName = removal.discordName ?: latestNames(listOf(removal.discordUserId))[removal.discordUserId],
+                wareraUserId = removal.wareraUserId,
+                wareraUsername = removal.wareraUsername,
             ),
         )
     }
@@ -133,6 +148,17 @@ class SystemLogService(
                         message =
                             "${problem.count} Events für den Bot warten seit über 10 Minuten auf die Zustellung. Redis ist " +
                                 "vermutlich nicht erreichbar; sie werden zugestellt, sobald es wieder geht.",
+                    ),
+                )
+            is SystemProblem.MemberReportRefused ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.MEMBER_REPORT_REFUSED,
+                        message =
+                            "Laut der Mitgliederliste des Bots hätten ${problem.departedCount} von ${problem.linkedCount} " +
+                                "verknüpften Mitgliedern den Server verlassen. Das sieht nach einer fehlerhaften Liste aus, " +
+                                "daher wurde keine Verknüpfung gelöscht.",
                     ),
                 )
         }

@@ -61,6 +61,9 @@ export function describe(entry: SystemLogEntry): string {
     const previous = entry.previousMember ? name(entry.previousMember) : 'einem anderen Account'
     return `${member} hat den WarEra-Account ${entry.wareraUsername} von ${previous} übernommen.`
   }
+  if (entry.type === 'ACCOUNT_REMOVED') {
+    return `${member} hat den Server verlassen, die Verknüpfung mit ${entry.wareraUsername} wurde entfernt.`
+  }
   const role = entry.role ? `Rolle ${name(entry.role)}: ` : ''
   return `${role}${entry.message ?? ''}`
 }

@@ -84,6 +84,9 @@ enum class EntryKind(
 
     /** A WarEra account moved from one Discord account to another. */
     ACCOUNT_RELINKED(Category.ACCOUNT),
+
+    /** The link of a member who left the guild was deleted. */
+    ACCOUNT_REMOVED(Category.ACCOUNT),
     WARERA_USERS_UNAVAILABLE(Category.ERROR),
     GOVERNMENT_UNAVAILABLE(Category.ERROR),
     ROLE_NOT_ASSIGNABLE(Category.ERROR),
@@ -94,6 +97,9 @@ enum class EntryKind(
 
     /** Events could not be written to Redis for a while. */
     OUTBOX_STUCK(Category.ERROR),
+
+    /** A member list from the bot would have deleted too many links at once. */
+    MEMBER_REPORT_REFUSED(Category.ERROR),
     ;
 
     enum class Category {

@@ -33,6 +33,16 @@ sealed interface SystemProblem {
         val error: String,
     ) : SystemProblem
 
+    /**
+     * A member list from the bot would have deleted [departedCount] of [linkedCount] links at once, which looks more
+     * like a broken list than like that many members leaving; nothing was deleted.
+     */
+    @NamedInterface("api")
+    data class MemberReportRefused(
+        val departedCount: Int,
+        val linkedCount: Int,
+    ) : SystemProblem
+
     /** Events for the bot could not be written to Redis for a while. */
     @NamedInterface("api")
     data class OutboxStuck(

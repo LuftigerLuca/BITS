@@ -1,6 +1,7 @@
 import { ActivityIcon, HistoryIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { buttonVariants } from '@/components/ui/button'
+import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
 import { RoleRulesCard } from '@/features/role-sync/RoleRulesCard'
 
 export function AdminPage() {
@@ -20,6 +21,7 @@ export function AdminPage() {
         </div>
       </div>
       <RoleRulesCard />
+      <CountrySettingCard />
     </div>
   )
 }

@@ -199,5 +199,14 @@ class RoleReporterTest {
         ) = TODO()
 
         override suspend fun reportUndeliveredEvent(report: UndeliveredEventReport) = TODO()
+
+        override suspend fun reportMembers(discordUserIds: List<String>) = TODO()
+
+        override suspend fun reportMemberJoined(discordUserId: String) = TODO()
+
+        override suspend fun reportMemberLeft(
+            discordUserId: String,
+            memberName: String,
+        ) = TODO()
     }
 }
