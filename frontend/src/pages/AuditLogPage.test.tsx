@@ -68,7 +68,7 @@ describe('audit log page', () => {
     expect(auditLogCalls().at(-1)).toBe('actor=discord%3A42&action=ROLE_RULE_DELETED')
   })
 
-  it('is linked from the admin area', async () => {
+  it('is linked from the sidebar', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
       'GET /web/admin/role-sync/roles': () => json([]),
@@ -78,7 +78,8 @@ describe('audit log page', () => {
     })
     const router = renderApp('/admin')
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Audit-Log' }))
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    await userEvent.click(within(navigation).getByRole('link', { name: 'Audit-Log' }))
 
     expect(await screen.findByRole('heading', { name: 'Audit-Log' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/admin/audit-log')

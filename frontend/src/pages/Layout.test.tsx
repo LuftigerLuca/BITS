@@ -33,6 +33,47 @@ describe('layout', () => {
     expect(within(navigation).getByRole('link', { name: 'Start' })).not.toHaveAttribute('aria-current')
   })
 
+  it('marks only the log page that is open, not the admin area above it', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/audit-log': () => json({ entries: [], nextBefore: null }),
+      'GET /web/admin/audit-log/actors': () => json([]),
+    })
+
+    renderApp('/admin/audit-log')
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    const current = within(navigation)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-current') === 'page')
+    expect(current.map((link) => link.textContent)).toEqual(['Audit-Log'])
+  })
+
+  it('shows admins the admin group with the admin area and both logs', async () => {
+    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json({}) })
+
+    renderApp('/')
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    expect(within(navigation).getByText('Admin')).toBeInTheDocument()
+    expect(within(navigation).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Start', '/'],
+      ['Verwaltung', '/admin'],
+      ['Audit-Log', '/admin/audit-log'],
+      ['System-Log', '/admin/system-log'],
+    ])
+  })
+
+  it('shows members neither the admin group nor its pages', async () => {
+    stubFetch({ 'GET /web/me': () => json({ ...admin, role: 'USER' }) })
+
+    renderApp('/')
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    expect(within(navigation).queryByText('Admin')).not.toBeInTheDocument()
+    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Start'])
+  })
+
   it('applies and keeps the theme picked in the user menu', async () => {
     stubFetch({ 'GET /web/me': () => json(admin) })
     renderApp('/')
@@ -81,6 +122,40 @@ describe('layout', () => {
 
     expect(router.state.location.pathname).toBe('/admin')
     await expect.poll(() => screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('closes the sidebar on small screens after opening a log', async () => {
+    window.innerWidth = 500
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview': () => json({}),
+      'GET /web/admin/system-log': () => json({ entries: [], nextBefore: null }),
+      'GET /web/admin/system-log/roles': () => json([]),
+    })
+    const router = renderApp('/')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Menü öffnen' }))
+    const sidebar = await screen.findByRole('dialog', { name: 'Navigation' })
+    await userEvent.click(within(sidebar).getByRole('link', { name: 'System-Log' }))
+
+    expect(await screen.findByRole('heading', { name: 'System-Log' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/admin/system-log')
+    await expect.poll(() => screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('has no accessibility violations axe can find without a browser on a log page', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/audit-log': () => json({ entries: [], nextBefore: null }),
+      'GET /web/admin/audit-log/actors': () => json([]),
+    })
+    renderApp('/admin/audit-log')
+    await screen.findByText('Noch keine Einträge.')
+
+    // jsdom does not lay out the page, so contrast is left to the browser.
+    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
+
+    expect(results.violations.map((violation) => violation.id)).toEqual([])
   })
 
   it('has no accessibility violations axe can find without a browser with the user menu open', async () => {
