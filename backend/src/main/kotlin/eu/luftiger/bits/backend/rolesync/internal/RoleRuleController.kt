@@ -147,10 +147,16 @@ data class PreviewMember(
     val name: String?,
 )
 
-/** Which of the optional fields are needed depends on [type]. */
+/** All of the [conditions] must be met, at least one and at most [RoleRuleService.MAX_CONDITIONS]. */
 @Serializable
 data class CreateRuleRequest(
     val roleId: String,
+    val conditions: List<ConditionRequest>,
+)
+
+/** Which of the optional fields are needed depends on [type]. */
+@Serializable
+data class ConditionRequest(
     val type: RuleType,
     val countryId: String? = null,
     val office: Office? = null,

@@ -44,10 +44,13 @@ enum class ManagedRoleOutcome {
 
 @Serializable
 data class RuleExplanation(
-    /** German description of the rule, as in the dashboard. */
+    /** German description of the rule, as in the dashboard; its conditions joined with "und", all of which must be met. */
     val label: String,
     /** `null` if the WarEra data to decide is missing. */
     val met: Boolean?,
-    /** German description of what is missing, e.g. "Level 8 von 10"; `null` if the rule is met. */
+    /**
+     * German description of what is missing, e.g. "Level 8 von 10": the conditions that fail joined with "und", or if
+     * none fails, those that cannot be checked; `null` if the rule is met.
+     */
     val detail: String?,
 )

@@ -8,6 +8,7 @@ import { createQueryClient } from '@/lib/queryClient'
 import type { DiscordRole, RoleRule, RulePreview } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { expectToast } from '@/test/toast'
+import { NewRuleCard } from './NewRuleCard'
 import { RoleRulesCard } from './RoleRulesCard'
 
 const veteran: DiscordRole = { id: 'r-veteran', name: 'Veteran', color: null, managed: true }
@@ -51,6 +52,7 @@ function renderCard(
   const { container } = render(
     <QueryClientProvider client={queryClient}>
       <RoleRulesCard />
+      <NewRuleCard />
       <Toaster />
     </QueryClientProvider>,
   )
@@ -81,7 +83,7 @@ describe('rule form', () => {
     await screen.findByLabelText('Rolle')
 
     await choose('Rolle', 'Veteran')
-    await choose('Bedingung', 'Level')
+    await choose('Art', 'Level')
     const threshold = screen.getByLabelText('Level ab')
     await userEvent.clear(threshold)
     await userEvent.type(threshold, '0')
@@ -95,7 +97,7 @@ describe('rule form', () => {
     expect(within(await screen.findByRole('alertdialog')).getByText('Regel anlegen?')).toBeInTheDocument()
     expect(created).toEqual([])
     await confirm('Regel anlegen')
-    await expect.poll(() => created).toEqual([{ roleId: 'r-veteran', type: 'LEVEL', threshold: 5 }])
+    await expect.poll(() => created).toEqual([{ roleId: 'r-veteran', conditions: [{ type: 'LEVEL', threshold: 5 }] }])
     await expectToast('success', 'Regel angelegt')
   })
 
@@ -116,7 +118,61 @@ describe('rule form', () => {
     expect(within(dialog).getByText('Rolle an BITS übergeben?')).toBeInTheDocument()
     expect(created).toEqual([])
     await confirm('Regel anlegen')
-    await expect.poll(() => created).toEqual([{ roleId: 'r-citizen', type: 'CITIZENSHIP', countryId: 'de' }])
+    await expect.poll(() => created).toEqual([{ roleId: 'r-citizen', conditions: [{ type: 'CITIZENSHIP', countryId: 'de' }] }])
+  })
+
+  it('combines several conditions in one rule and removes them again', async () => {
+    const created: unknown[] = []
+    renderCard([], (body) => {
+      created.push(body)
+      return json(rule(9, citizen, 'Staatsbürgerschaft Germany und Level ab 10'), 201)
+    })
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Bürger')
+    await choose('Land', 'Germany')
+    expect(screen.queryByRole('button', { name: 'Bedingung 1 entfernen' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Bedingung hinzufügen' }))
+    // A new condition asks for a country first, so the rule is incomplete.
+    expect(submit()).toBeDisabled()
+
+    const second = screen.getByRole('group', { name: 'Bedingung 2' })
+    await userEvent.click(within(second).getByLabelText('Art'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Level' }))
+    const threshold = within(second).getByLabelText('Level ab')
+    await userEvent.clear(threshold)
+    await userEvent.type(threshold, '10')
+    await userEvent.click(screen.getByRole('button', { name: 'Bedingung hinzufügen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Bedingung 3 entfernen' }))
+    await userEvent.click(submit())
+
+    await confirm('Regel anlegen')
+    await expect.poll(() => created).toEqual([
+      {
+        roleId: 'r-citizen',
+        conditions: [
+          { type: 'CITIZENSHIP', countryId: 'de' },
+          { type: 'LEVEL', threshold: 10 },
+        ],
+      },
+    ])
+  })
+
+  it('does not take the same condition twice', async () => {
+    renderCard()
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Veteran')
+    await choose('Land', 'Germany')
+    await userEvent.click(screen.getByRole('button', { name: 'Bedingung hinzufügen' }))
+    const second = screen.getByRole('group', { name: 'Bedingung 2' })
+    await userEvent.click(within(second).getByLabelText('Land'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Germany' }))
+
+    expect(screen.getByText('Eine Bedingung steht doppelt in der Regel.')).toBeInTheDocument()
+    expect(submit()).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Bedingung 1 entfernen' }))
+    expect(submit()).toBeEnabled()
   })
 
   it('shows whom the rule gives and takes the role, with names on request', async () => {
@@ -135,7 +191,7 @@ describe('rule form', () => {
     await screen.findByLabelText('Rolle')
 
     await choose('Rolle', 'Veteran')
-    await choose('Bedingung', 'Level')
+    await choose('Art', 'Level')
     await userEvent.click(submit())
 
     const dialog = await screen.findByRole('alertdialog')
@@ -152,7 +208,7 @@ describe('rule form', () => {
     renderCard([], undefined, preview({ usersLoaded: false }))
     await screen.findByLabelText('Rolle')
     await choose('Rolle', 'Veteran')
-    await choose('Bedingung', 'Level')
+    await choose('Art', 'Level')
     await userEvent.click(submit())
 
     expect(await screen.findByText(/Vorschau ungenau/)).toBeInTheDocument()
@@ -163,7 +219,7 @@ describe('rule form', () => {
     await screen.findByLabelText('Rolle')
 
     await choose('Rolle', 'Veteran')
-    await choose('Bedingung', 'Level')
+    await choose('Art', 'Level')
     await userEvent.click(submit())
     await confirm('Regel anlegen')
 
@@ -174,7 +230,7 @@ describe('rule form', () => {
   it('names every field', async () => {
     const { container } = renderCard()
     await screen.findByLabelText('Rolle')
-    await choose('Bedingung', 'Regierungsamt')
+    await choose('Art', 'Regierungsamt')
 
     const results = await axe.run(container, { runOnly: ['label', 'button-name', 'select-name', 'aria-input-field-name'] })
 

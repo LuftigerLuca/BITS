@@ -72,8 +72,8 @@ class SystemLogTest {
     fun reset() {
         awaitBackgroundWork()
         jdbc.execute(
-            "TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication, system_log_entry, " +
-                "system_log_item, audit_entry, nickname_opt_in",
+            "TRUNCATE account_link, account_verification, role_rule, role_rule_condition, discord_role, event_publication, " +
+                "system_log_entry, system_log_item, audit_entry, nickname_opt_in",
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
@@ -88,7 +88,7 @@ class SystemLogTest {
     fun `every sync is a run with its trigger, also without changes`() {
         syncTrigger.hourly()
         awaitBackgroundWork()
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
         verify("1", "Luftiger", "Luca")
         awaitBackgroundWork()
@@ -104,7 +104,7 @@ class SystemLogTest {
 
     @Test
     fun `the run shows what the bot changed once it reports back`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
         val syncId = syncIds().single()
 
@@ -140,7 +140,7 @@ class SystemLogTest {
 
     @Test
     fun `nickname changes are items of the run, the ones that did not work count as skipped and failed`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
         val syncId = syncIds().single()
 
@@ -172,9 +172,9 @@ class SystemLogTest {
 
     @Test
     fun `a run without answer is pending, then has no response, and a stale one is skipped`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
-        createRule("""{"roleId":"r-citizen","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
         val (first, second) = syncIds()
 
@@ -224,8 +224,8 @@ class SystemLogTest {
 
     @Test
     fun `missing WarEra data and governments, roles the bot cannot give and lost events are errors`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
-        createRule("""{"roleId":"r-citizen","type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""")
         verify("1", "Luftiger", "Luca")
         awaitBackgroundWork()
         warera.failingUsers += "w1"
@@ -283,9 +283,9 @@ class SystemLogTest {
 
     @Test
     fun `filters by member, role and type work across runs and combine`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
-        createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
         awaitBackgroundWork()
         verify("1", "Luftiger", "Luca")
         awaitBackgroundWork()
@@ -318,7 +318,7 @@ class SystemLogTest {
 
     @Test
     fun `entries older than 30 days are deleted with their items`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         awaitBackgroundWork()
         report(syncIds().single(), listOf(change("1", "Luca", "r-veteran", "Veteran")))
         insertEntry(clock.now + Duration.ofDays(25))

@@ -69,7 +69,7 @@ class AccountVerificationTest {
     @BeforeTest
     fun reset() {
         jdbc.awaitOutbox()
-        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, discord_role, event_publication")
+        jdbc.execute("TRUNCATE account_link, account_verification, role_rule, role_rule_condition, discord_role, event_publication")
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")

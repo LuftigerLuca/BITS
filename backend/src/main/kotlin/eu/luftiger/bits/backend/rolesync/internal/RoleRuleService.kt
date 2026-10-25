@@ -6,6 +6,7 @@ import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.DiscordRole
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraNotFoundException
@@ -62,8 +63,8 @@ class RoleRuleService(
     }
 
     /**
-     * @throws ResponseStatusException 400 if the role cannot be given or the condition is incomplete or unknown, 409 if
-     * the role has a rule with the same condition already
+     * @throws ResponseStatusException 400 if the role cannot be given or a condition is incomplete or unknown, 409 if
+     * the role has a rule with the same conditions already
      */
     fun create(
         request: CreateRuleRequest,
@@ -77,8 +78,8 @@ class RoleRuleService(
                         try {
                             ruleRepository.saveAndFlush(rule)
                         } catch (_: DataIntegrityViolationException) {
-                            // The unique index on role and condition; the CHECK constraints cannot fail after the
-                            // checks of newRule.
+                            // The unique index on role and conditions; the CHECK constraints and the index on the
+                            // conditions of a rule cannot fail after the checks of newRule.
                             throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
                         }
                     auditLog.record(actor, AuditAction.ROLE_RULE_CREATED, describe(role.id, role.name, created))
@@ -92,50 +93,59 @@ class RoleRuleService(
     /**
      * The rule [request] asks for, not saved yet, with its role.
      *
-     * @throws ResponseStatusException 400 if the role cannot be given or the condition is incomplete or unknown
+     * @throws ResponseStatusException 400 if the role cannot be given, there are no or too many conditions, one is
+     * incomplete or unknown, or the same condition is given twice
      */
     fun newRule(request: CreateRuleRequest): Pair<DiscordRole, RoleRule> {
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
-        val rule =
-            when (request.type.condition) {
-                ConditionType.CITIZENSHIP ->
-                    RoleRule(
-                        role.id,
-                        request.type.condition,
-                        countryId = countryId(request),
-                        targetName = countryName(request),
-                        createdAt = now(),
-                    )
-                ConditionType.GOVERNMENT_OFFICE ->
-                    RoleRule(
-                        role.id,
-                        request.type.condition,
-                        countryId = countryId(request),
-                        office = request.office?.office ?: throw badRequest("Office missing"),
-                        targetName = countryName(request),
-                        createdAt = now(),
-                    )
-                ConditionType.MILITARY_UNIT -> {
-                    val muId = request.muId?.takeIf { it.isNotBlank() } ?: throw badRequest("Military unit missing")
-                    val mu =
-                        try {
-                            wareraClient.getMilitaryUnit(muId)
-                        } catch (_: WareraNotFoundException) {
-                            // Without the cause, which would let the 503 handler for WarEra errors take over.
-                            throw badRequest("Unknown military unit $muId")
-                        } catch (_: WareraBadRequestException) {
-                            // An ID in a format WarEra does not accept.
-                            throw badRequest("Unknown military unit $muId")
-                        }
-                    RoleRule(role.id, request.type.condition, muId = mu.id, targetName = mu.name, createdAt = now())
-                }
-                ConditionType.LEVEL, ConditionType.MILITARY_RANK -> {
-                    val threshold = request.threshold?.takeIf { it >= 1 } ?: throw badRequest("Threshold must be at least 1")
-                    RoleRule(role.id, request.type.condition, threshold = threshold, createdAt = now())
-                }
+        if (request.conditions.isEmpty()) throw badRequest("Conditions missing")
+        if (request.conditions.size > MAX_CONDITIONS) throw badRequest("At most $MAX_CONDITIONS conditions")
+        // The countries for every condition at once, and only if needed.
+        val countries by lazy { wareraClient.getAllCountries().associate { it.id to it.name } }
+        val conditions = request.conditions.map { condition(it) { countryId -> countries[countryId] } }
+        if (conditions.distinctBy { it.key }.size < conditions.size) throw badRequest("The same condition twice")
+        return role to RoleRule(role.id, conditions, createdAt = now())
+    }
+
+    private fun condition(
+        request: ConditionRequest,
+        countryName: (countryId: String) -> String?,
+    ): RuleCondition {
+        val type = request.type.condition
+        return when (type) {
+            ConditionType.CITIZENSHIP -> {
+                val countryId = countryId(request)
+                RuleCondition(type, countryId = countryId, targetName = knownCountry(countryId, countryName))
             }
-        return role to rule
+            ConditionType.GOVERNMENT_OFFICE -> {
+                val countryId = countryId(request)
+                RuleCondition(
+                    type,
+                    countryId = countryId,
+                    office = request.office?.office ?: throw badRequest("Office missing"),
+                    targetName = knownCountry(countryId, countryName),
+                )
+            }
+            ConditionType.MILITARY_UNIT -> {
+                val muId = request.muId?.takeIf { it.isNotBlank() } ?: throw badRequest("Military unit missing")
+                val mu =
+                    try {
+                        wareraClient.getMilitaryUnit(muId)
+                    } catch (_: WareraNotFoundException) {
+                        // Without the cause, which would let the 503 handler for WarEra errors take over.
+                        throw badRequest("Unknown military unit $muId")
+                    } catch (_: WareraBadRequestException) {
+                        // An ID in a format WarEra does not accept.
+                        throw badRequest("Unknown military unit $muId")
+                    }
+                RuleCondition(type, muId = mu.id, targetName = mu.name)
+            }
+            ConditionType.LEVEL, ConditionType.MILITARY_RANK -> {
+                val threshold = request.threshold?.takeIf { it >= 1 } ?: throw badRequest("Threshold must be at least 1")
+                RuleCondition(type, threshold = threshold)
+            }
+        }
     }
 
     /** @return the deleted rule, for the log */
@@ -170,15 +180,18 @@ class RoleRuleService(
             .map { OptionResponse(it.id, it.name) }
     }
 
-    private fun countryId(request: CreateRuleRequest): String =
+    private fun countryId(request: ConditionRequest): String =
         request.countryId?.takeIf { it.isNotBlank() } ?: throw badRequest("Country missing")
 
-    private fun countryName(request: CreateRuleRequest): String {
-        val countryId = countryId(request)
-        return wareraClient.getAllCountries().firstOrNull { it.id == countryId }?.name ?: throw badRequest("Unknown country $countryId")
-    }
+    private fun knownCountry(
+        countryId: String,
+        countryName: (countryId: String) -> String?,
+    ): String = countryName(countryId) ?: throw badRequest("Unknown country $countryId")
 
-    /** A snapshot for the audit log, readable after the rule and the role are gone; e.g. "Rolle @Bürger: Level ab 10". */
+    /**
+     * A snapshot for the audit log, readable after the rule and the role are gone; e.g. "Rolle @Bürger:
+     * Staatsbürgerschaft Germany und Level ab 10".
+     */
     private fun describe(
         roleId: String,
         roleName: String?,
@@ -193,7 +206,10 @@ class RoleRuleService(
 
     private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 
-    private companion object {
-        const val MAX_SEARCH_RESULTS = 5
+    companion object {
+        /** More would hardly be met by anybody, and keeps the key of the conditions short enough for its index. */
+        const val MAX_CONDITIONS = 10
+
+        private const val MAX_SEARCH_RESULTS = 5
     }
 }

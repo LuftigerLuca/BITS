@@ -3,6 +3,7 @@ package eu.luftiger.bits.backend
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.backend.rolesync.internal.RoleOutcome
 import eu.luftiger.bits.backend.rolesync.internal.RuleEvaluator
 import eu.luftiger.bits.shared.MemberRoles
@@ -76,6 +77,55 @@ class RuleEvaluatorTest {
     }
 
     @Test
+    fun `rule with several conditions is met only if all of them are`() {
+        val germanVeteran =
+            RoleRule(
+                "veteran",
+                listOf(
+                    condition(ConditionType.CITIZENSHIP, countryId = "de", targetName = "Germany"),
+                    condition(ConditionType.LEVEL, threshold = 20),
+                ),
+                Instant.EPOCH,
+            )
+        val evaluator = RuleEvaluator(listOf(germanVeteran), governments)
+
+        assertEquals(
+            MemberRoles(grants = listOf(RoleGrant("veteran", "BITS: Staatsbürgerschaft Germany und Level ab 20"))),
+            evaluator.evaluate(WareraUser(id = "u1", username = "A", country = "de", leveling = WareraUser.Leveling(20))),
+        )
+        assertNull(evaluator.evaluate(WareraUser(id = "u1", username = "A", country = "de", leveling = WareraUser.Leveling(19))))
+        assertNull(evaluator.evaluate(WareraUser(id = "u1", username = "A", country = "fr", leveling = WareraUser.Leveling(20))))
+    }
+
+    @Test
+    fun `condition with missing data leaves its rule undecided unless another condition fails`() {
+        val presidentVeteran =
+            RoleRule(
+                "president",
+                listOf(
+                    condition(ConditionType.GOVERNMENT_OFFICE, countryId = "de", office = GovernmentOffice.PRESIDENT),
+                    condition(ConditionType.LEVEL, threshold = 20),
+                ),
+                Instant.EPOCH,
+            )
+        val evaluator = RuleEvaluator(listOf(presidentVeteran), emptyMap())
+
+        val veteran = WareraUser(id = "u1", username = "A", leveling = WareraUser.Leveling(20))
+        assertEquals(MemberRoles(grants = emptyList(), keepRoleIds = listOf("president")), evaluator.evaluate(veteran))
+        assertEquals(RoleOutcome.UNDECIDED, evaluator.check(veteran).single().outcome)
+        assertNull(evaluator.evaluate(veteran.copy(leveling = WareraUser.Leveling(19))))
+        assertEquals(
+            listOf(
+                null,
+                false,
+            ),
+            evaluator.check(veteran.copy(leveling = WareraUser.Leveling(19))).single().rules.single().conditions.map {
+                it.met
+            },
+        )
+    }
+
+    @Test
     fun `checks of the rules agree with the target roles of the sync`() {
         val evaluator = RuleEvaluator(listOf(german, president, congress, marine, level, rank), mapOf("de" to governments.getValue("de")))
         val users =
@@ -107,5 +157,14 @@ class RuleEvaluatorTest {
         muId: String? = null,
         threshold: Int? = null,
         targetName: String? = null,
-    ) = RoleRule(roleId, type, countryId, office, muId, threshold, targetName, Instant.EPOCH)
+    ) = RoleRule(roleId, listOf(condition(type, countryId, office, muId, threshold, targetName)), Instant.EPOCH)
+
+    private fun condition(
+        type: ConditionType,
+        countryId: String? = null,
+        office: GovernmentOffice? = null,
+        muId: String? = null,
+        threshold: Int? = null,
+        targetName: String? = null,
+    ) = RuleCondition(type, countryId, office, muId, threshold, targetName)
 }

@@ -1,5 +1,9 @@
 package eu.luftiger.bits.backend
 
+import eu.luftiger.bits.backend.rolesync.domain.ConditionType
+import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
+import eu.luftiger.bits.backend.rolesync.internal.RoleRuleRepository
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.ProfileDetail
@@ -14,6 +18,7 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
+import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +34,9 @@ class ProfileTest {
     lateinit var jdbc: JdbcTemplate
 
     @Autowired
+    lateinit var ruleRepository: RoleRuleRepository
+
+    @Autowired
     lateinit var syncTrigger: RoleSyncTrigger
 
     @Autowired
@@ -38,7 +46,7 @@ class ProfileTest {
     fun reset() {
         jdbc.awaitOutbox()
         syncTrigger.awaitIdle()
-        jdbc.execute("TRUNCATE account_link, role_rule, discord_role, event_publication")
+        jdbc.execute("TRUNCATE account_link, role_rule, role_rule_condition, discord_role, event_publication")
         warera.reset()
     }
 
@@ -98,10 +106,14 @@ class ProfileTest {
                 "('r-low', 'Low', NULL, 1, TRUE), ('r-high', 'High', NULL, 5, TRUE), " +
                 "('r-unmanaged', 'Unmanaged', NULL, 3, TRUE), ('r-unassignable', 'Above the bot', NULL, 9, FALSE)",
         )
-        jdbc.update(
-            "INSERT INTO role_rule (role_id, type, threshold, created_at) VALUES " +
-                "('r-low', 'LEVEL', 1, now()), ('r-high', 'LEVEL', 10, now()), ('r-high', 'MILITARY_RANK', 10, now()), " +
-                "('r-unassignable', 'LEVEL', 1, now()), ('r-deleted', 'LEVEL', 1, now())",
+        ruleRepository.saveAll(
+            listOf(
+                "r-low" to ConditionType.LEVEL,
+                "r-high" to ConditionType.LEVEL,
+                "r-high" to ConditionType.MILITARY_RANK,
+                "r-unassignable" to ConditionType.LEVEL,
+                "r-deleted" to ConditionType.LEVEL,
+            ).map { (roleId, type) -> RoleRule(roleId, listOf(RuleCondition(type, threshold = 1)), Instant.EPOCH) },
         )
 
         assertEquals(listOf("r-high", "r-low"), (profile("1") as ProfileResponse.Found).managedRoleIds)

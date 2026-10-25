@@ -17,14 +17,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { RoleRule } from '@/lib/api'
-import { NewRuleForm } from './NewRuleForm'
 import { STATUS, errorMessage } from './labels'
 import { RulePreview } from './RulePreview'
-import { useDeleteRoleRule, useDeletionPreview, useRoleRules, useRoles } from './queries'
+import { useDeleteRoleRule, useDeletionPreview, useRoleRules } from './queries'
 
 /** Rules that tie Discord roles to WarEra data; BITS gives and takes these roles on its own. */
 export function RoleRulesCard() {
-  const roles = useRoles()
   const rules = useRoleRules()
   const deleteRule = useDeleteRoleRule()
   const [ruleToDelete, setRuleToDelete] = useState<RoleRule | null>(null)
@@ -35,7 +33,7 @@ export function RoleRulesCard() {
         <CardTitle>Automatische Rollen</CardTitle>
         <CardDescription>
           BITS vergibt diese Rollen anhand der WarEra-Daten verknüpfter Accounts und entzieht sie allen, die keine
-          ihrer Regeln erfüllen. Mehrere Regeln für dieselbe Rolle reichen einzeln aus.
+          ihrer Regeln erfüllen. Mehrere Regeln für dieselbe Rolle reichen einzeln aus, die Bedingungen einer Regel müssen alle erfüllt sein.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -50,7 +48,7 @@ export function RoleRulesCard() {
             <TableHeader>
               <TableRow>
                 <TableHead>Rolle</TableHead>
-                <TableHead>Bedingung</TableHead>
+                <TableHead>Bedingungen</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-0" />
               </TableRow>
@@ -93,13 +91,6 @@ export function RoleRulesCard() {
           }}
           onCancel={() => setRuleToDelete(null)}
         />
-        {roles.isPending ? (
-          <LoadingState label="Rollen werden geladen …" />
-        ) : roles.isError ? (
-          <ErrorState message={errorMessage(roles.error)} onRetry={() => roles.refetch()} />
-        ) : (
-          <NewRuleForm roles={roles.data} />
-        )}
       </CardContent>
     </Card>
   )

@@ -59,7 +59,7 @@ class AuditLogTest {
         jdbc.awaitOutbox()
         syncTrigger.awaitIdle()
         jdbc.awaitOutbox()
-        jdbc.execute("TRUNCATE audit_entry, role_rule, discord_role, event_publication")
+        jdbc.execute("TRUNCATE audit_entry, role_rule, role_rule_condition, discord_role, event_publication")
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
         jdbc.update(
             "INSERT INTO discord_role (id, name, color, position, assignable) VALUES (?, ?, NULL, 1, TRUE), (?, ?, NULL, 2, TRUE)",
@@ -72,7 +72,7 @@ class AuditLogTest {
 
     @Test
     fun `creating and deleting a rule records one entry each`() {
-        val id = ruleId(createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""", discordAdmin))
+        val id = ruleId(createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""", discordAdmin))
         clock.now = Instant.parse("2026-01-01T12:05:00Z")
         mockMvc.delete("/web/admin/role-sync/rules/$id") { cookie(session(envAdmin)) }.andExpect { status { isNoContent() } }
 
@@ -94,7 +94,7 @@ class AuditLogTest {
 
     @Test
     fun `the description stays readable after the role is deleted in Discord`() {
-        val id = ruleId(createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""", discordAdmin))
+        val id = ruleId(createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""", discordAdmin))
         jdbc.update("DELETE FROM discord_role WHERE id = 'r-veteran'")
 
         mockMvc.delete("/web/admin/role-sync/rules/$id") { cookie(session(discordAdmin)) }
@@ -107,10 +107,19 @@ class AuditLogTest {
 
     @Test
     fun `failed actions record nothing`() {
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""", discordAdmin).andExpect { status { isCreated() } }
+        createRule(
+            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""",
+            discordAdmin,
+        ).andExpect { status { isCreated() } }
 
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":0}""", discordAdmin).andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""", discordAdmin).andExpect { status { isConflict() } }
+        createRule(
+            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":0}]}""",
+            discordAdmin,
+        ).andExpect { status { isBadRequest() } }
+        createRule(
+            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""",
+            discordAdmin,
+        ).andExpect { status { isConflict() } }
         mockMvc.delete("/web/admin/role-sync/rules/999999") { cookie(session(discordAdmin)) }.andExpect { status { isNotFound() } }
 
         assertEquals(1, entryCount())
@@ -123,7 +132,7 @@ class AuditLogTest {
 
         // MockMvc hands the unexpected error on instead of answering with 500 as the server does.
         assertFailsWith<ServletException> {
-            createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""", admin)
+            createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""", admin)
         }
 
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
