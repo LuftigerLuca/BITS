@@ -171,6 +171,20 @@ class EmbassySyncHandlerTest {
         }
 
     @Test
+    fun `a member who may not see the channel is reported with what the admins need to change`() =
+        runTest {
+            guild.addMember("1")
+            val thread = guild.addThread("t-pl")
+            thread.blind += "1"
+
+            handler.handle(sync(target("t-pl", "1" to "x")))
+
+            val change = reports.single().changes.single()
+            assertEquals(RoleChangeOutcome.FAILED, change.outcome)
+            assertEquals("Sieht #botschaft nicht: Die Botschafter-Rolle braucht dort „Kanal ansehen“.", change.reason)
+        }
+
+    @Test
     fun `a role above the bot is skipped and reported`() =
         runTest {
             guild.addMember("1")
@@ -271,6 +285,7 @@ class EmbassySyncHandlerTest {
             override var archived: Boolean,
         ) : EmbassyThreadChannel {
             val managers = mutableSetOf("bot")
+            val blind = mutableSetOf<String>()
             override var manageable = true
             override val name = "Botschaft $id"
 
@@ -284,6 +299,7 @@ class EmbassySyncHandlerTest {
             }
 
             override suspend fun add(discordUserId: String) {
+                if (discordUserId in blind) throw MemberCannotViewException("botschaft", IllegalStateException())
                 apply("+$id@$discordUserId")
                 members += discordUserId
             }

@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.channel.ChannelType
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel
 import net.dv8tion.jda.api.events.channel.ChannelCreateEvent
 import net.dv8tion.jda.api.events.channel.ChannelDeleteEvent
 import net.dv8tion.jda.api.events.channel.update.GenericChannelUpdateEvent
@@ -83,19 +84,31 @@ class ThreadReporter(
         private fun toDto(
             guild: Guild,
             thread: ThreadChannel,
-        ) = DiscordThreadDto(
-            id = thread.id,
-            name = thread.name,
-            parentChannelId = thread.parentChannel.id,
-            parentChannelName = thread.parentChannel.name,
-            archived = thread.isArchived,
-            manageable =
-                guild.selfMember.hasPermission(
-                    thread.parentChannel,
-                    Permission.VIEW_CHANNEL,
-                    Permission.MANAGE_THREADS,
-                    Permission.MESSAGE_SEND_IN_THREADS,
-                ),
-        )
+        ): DiscordThreadDto {
+            val parent = thread.parentChannel
+            val everyoneCanView = guild.publicRole.hasPermission(parent, Permission.VIEW_CHANNEL)
+            return DiscordThreadDto(
+                id = thread.id,
+                name = thread.name,
+                parentChannelId = parent.id,
+                parentChannelName = parent.name,
+                archived = thread.isArchived,
+                manageable =
+                    guild.selfMember.hasPermission(
+                        parent,
+                        Permission.VIEW_CHANNEL,
+                        Permission.MANAGE_THREADS,
+                        Permission.MESSAGE_SEND_IN_THREADS,
+                    ),
+                everyoneCanView = everyoneCanView,
+                viewerRoleIds = if (everyoneCanView) emptyList() else viewerRoleIds(guild, parent),
+            )
+        }
+
+        /** With the permissions of @everyone and the channel's overwrites for @everyone and the role. */
+        private fun viewerRoleIds(
+            guild: Guild,
+            channel: GuildChannel,
+        ) = guild.roles.filter { !it.isPublicRole && it.hasPermission(channel, Permission.VIEW_CHANNEL) }.map { it.id }
     }
 }

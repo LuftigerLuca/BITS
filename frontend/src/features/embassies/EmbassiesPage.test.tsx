@@ -140,4 +140,20 @@ describe('embassies', () => {
 
     await expectToast('error', 'WarEra ist gerade nicht erreichbar. Bitte versuche es später erneut.')
   })
+
+  it('says when a member may not see the channel of the thread', async () => {
+    stub({
+      'GET /web/admin/embassies/member-search': () => json([{ discordUserId: '7', name: 'Diplomat' }]),
+      'POST /web/admin/embassies/threads/t-fr/members': () => status(422),
+    })
+    renderApp('/admin/embassies')
+
+    await userEvent.type(await screen.findByLabelText('Mitglied hinzufügen'), 'Dipl')
+    await userEvent.click(await screen.findByRole('button', { name: 'Diplomat zu France hinzufügen' }))
+
+    await expectToast(
+      'error',
+      'Das Mitglied darf den Kanal des Threads in Discord nicht sehen, auch nicht mit der Botschafter-Rolle. Erlaube der Botschafter-Rolle dort „Kanal ansehen“.',
+    )
+  })
 })

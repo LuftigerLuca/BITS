@@ -28,6 +28,8 @@ class EmbassyBotController(
             BotInput.channelName(it.name)
             BotInput.channelId(it.parentChannelId)
             BotInput.channelName(it.parentChannelName)
+            BotInput.roleCount(it.viewerRoleIds.size)
+            it.viewerRoleIds.forEach(BotInput::roleId)
         }
         reportService.replaceThreads(report.threads)
     }

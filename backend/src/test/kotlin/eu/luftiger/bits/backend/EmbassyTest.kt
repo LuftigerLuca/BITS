@@ -374,6 +374,32 @@ class EmbassyTest {
     }
 
     @Test
+    fun `roles and members who may not see the channel are refused, since Discord would not add them`() {
+        reportThreads(
+            """{"id":"t-fr","name":"botschaft-frankreich","parentChannelId":"c-1","parentChannelName":"diplomatie",""" +
+                """"archived":false,"manageable":true,"everyoneCanView":false,"viewerRoleIds":["r-gov"]}""",
+        )
+        reportMembers(mapOf("3" to emptyList(), "5" to listOf("r-gov")))
+        setSettings("""{"offices":[],"ambassadorRoleId":"r-amb","hostRoleIds":[]}""")
+
+        assign("t-fr", "fr").andExpect { status { isUnprocessableContent() } }
+        setSettings("""{"offices":[],"ambassadorRoleId":null,"hostRoleIds":["r-gov"]}""")
+        assign("t-fr", "fr").andExpect { status { isCreated() } }
+        setSettingsRequest("""{"offices":[],"ambassadorRoleId":"r-amb","hostRoleIds":[]}""")
+            .andExpect { status { isUnprocessableContent() } }
+        addMember("t-fr", "3").andExpect { status { isUnprocessableContent() } }
+        addMember("t-fr", "5").andExpect { status { isCreated() } }
+
+        // Once the ambassador role may see the channel, it takes everybody in.
+        reportThreads(
+            """{"id":"t-fr","name":"botschaft-frankreich","parentChannelId":"c-1","parentChannelName":"diplomatie",""" +
+                """"archived":false,"manageable":true,"everyoneCanView":false,"viewerRoleIds":["r-gov","r-amb"]}""",
+        )
+        setSettings("""{"offices":[],"ambassadorRoleId":"r-amb","hostRoleIds":[]}""")
+        addMember("t-fr", "3").andExpect { status { isCreated() } }
+    }
+
+    @Test
     fun `members are found by name or ID`() {
         reportMembers("3", "5")
 
@@ -451,13 +477,16 @@ class EmbassyTest {
             }.andExpect { status { isNoContent() } }
     }
 
-    private fun reportMembers(vararg discordUserIds: String) {
-        val members = discordUserIds.map { ReportedMember(it, "Member $it", emptyList()) }
+    private fun reportMembers(vararg discordUserIds: String) = reportMembers(discordUserIds.associateWith { emptyList() })
+
+    private fun reportMembers(roleIdsByMember: Map<String, List<String>>) {
+        val discordUserIds = roleIdsByMember.keys.toList()
+        val members = roleIdsByMember.map { (id, roleIds) -> ReportedMember(id, "Member $id", roleIds) }
         mockMvc
             .put("/api/discord-members") {
                 header("Authorization", BOT_TOKEN)
                 contentType = MediaType.APPLICATION_JSON
-                content = BitsJson.encodeToString(DiscordMembersReport.serializer(), DiscordMembersReport(discordUserIds.toList(), members))
+                content = BitsJson.encodeToString(DiscordMembersReport.serializer(), DiscordMembersReport(discordUserIds, members))
             }.andExpect { status { isNoContent() } }
     }
 

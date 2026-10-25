@@ -30,7 +30,8 @@ The embassy sync follows the role sync. Without WarEra, a thread whose governmen
 its members keep the ambassador role, and the system log records it once per sync; members added by hand and the
 members of the host roles are still added. Without the bot, the syncs wait in the stream and the dashboard shows the
 members of the last report. A thread that was deleted, or in whose channel the bot may not manage threads, is recorded
-in the system log and skipped, and a change Discord refuses is logged and skipped; the other threads are synced, and
+in the system log and skipped, and a change Discord refuses is logged and skipped, for a member who may not see the
+channel with that reason; the other threads are synced, and
 the next sync tries again, at the latest after an hour. Without the backend, the bot keeps reporting its private threads
 with backoff, so new threads show up for picking once it is back.
 

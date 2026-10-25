@@ -71,7 +71,14 @@ interface EmbassyThreadChannel {
 
     suspend fun unarchive(reason: String)
 
+    /** @throws MemberCannotViewException if Discord refuses since the member may not see the thread's channel */
     suspend fun add(discordUserId: String)
 
     suspend fun remove(discordUserId: String)
 }
+
+/** Discord adds only members who may see the channel of a private thread. */
+class MemberCannotViewException(
+    val channelName: String,
+    cause: Throwable,
+) : Exception("Member may not see #$channelName", cause)

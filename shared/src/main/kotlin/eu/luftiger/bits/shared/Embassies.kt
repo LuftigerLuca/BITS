@@ -53,6 +53,13 @@ data class DiscordThreadDto(
     val archived: Boolean,
     /** Whether the bot may add and remove members, i.e. manage threads and send messages in threads there. */
     val manageable: Boolean,
+    /**
+     * Whether @everyone may see the parent channel. Discord adds only members who may see it to a private thread. The
+     * default stands for a bot that does not tell, so the backend checks nothing then.
+     */
+    val everyoneCanView: Boolean = true,
+    /** Roles that may see the parent channel; empty if [everyoneCanView]. */
+    val viewerRoleIds: List<String> = emptyList(),
 )
 
 /** What the bot did with an [EmbassySyncEvent], with the names as Discord shows them right now. */

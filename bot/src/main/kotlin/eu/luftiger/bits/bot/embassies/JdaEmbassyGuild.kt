@@ -8,6 +8,8 @@ import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.UserSnowflake
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel
+import net.dv8tion.jda.api.exceptions.ErrorResponseException
+import net.dv8tion.jda.api.requests.ErrorResponse
 
 /** [EmbassyGuild] on the guild [guildId], whose members JDA keeps in its cache. */
 class JdaEmbassyGuild(
@@ -102,8 +104,14 @@ class JdaEmbassyGuild(
                 .await()
         }
 
+        /** The bot may see the channel, see [manageable], so Missing Access is about the member. */
         override suspend fun add(discordUserId: String) {
-            thread.addThreadMemberById(discordUserId).submit().await()
+            try {
+                thread.addThreadMemberById(discordUserId).submit().await()
+            } catch (e: ErrorResponseException) {
+                if (e.errorResponse == ErrorResponse.MISSING_ACCESS) throw MemberCannotViewException(parent.name, e)
+                throw e
+            }
         }
 
         override suspend fun remove(discordUserId: String) {

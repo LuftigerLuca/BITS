@@ -10,7 +10,7 @@ import {
   type EmbassySettings,
 } from '@/lib/api'
 import { notify } from '@/lib/notify'
-import { errorMessage } from './labels'
+import { CANNOT_VIEW, errorMessage } from './labels'
 
 const EMBASSIES = ['embassies'] as const
 
@@ -30,7 +30,7 @@ export function useMemberSearch(query: string) {
 }
 
 /** A mutation of the embassy page that reloads it and tells the result in a toast. */
-function useEmbassyMutation<T>(mutationFn: (variables: T) => Promise<void>, success: string) {
+function useEmbassyMutation<T>(mutationFn: (variables: T) => Promise<void>, success: string, cannotView?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn,
@@ -38,7 +38,7 @@ function useEmbassyMutation<T>(mutationFn: (variables: T) => Promise<void>, succ
       notify.success(success, 'Discord wird gleich abgeglichen.')
       return queryClient.invalidateQueries({ queryKey: EMBASSIES })
     },
-    onError: (error) => notify.error(errorMessage(error)),
+    onError: (error) => notify.error(errorMessage(error, cannotView)),
   })
 }
 
@@ -61,6 +61,7 @@ export function useAddMember() {
   return useEmbassyMutation(
     ({ threadId, discordUserId }: { threadId: string; discordUserId: string }) => addEmbassyMember(threadId, discordUserId),
     'Mitglied hinzugefügt',
+    CANNOT_VIEW.member,
   )
 }
 

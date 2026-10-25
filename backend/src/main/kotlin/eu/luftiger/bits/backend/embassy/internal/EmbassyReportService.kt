@@ -30,7 +30,18 @@ class EmbassyReportService(
     fun replaceThreads(threads: List<DiscordThreadDto>) {
         discordThreadRepository.deleteAllInBatch()
         discordThreadRepository.saveAll(
-            threads.map { DiscordThread(it.id, it.name, it.parentChannelId, it.parentChannelName, it.archived, it.manageable) },
+            threads.map {
+                DiscordThread(
+                    it.id,
+                    it.name,
+                    it.parentChannelId,
+                    it.parentChannelName,
+                    it.archived,
+                    it.manageable,
+                    it.everyoneCanView,
+                    it.viewerRoleIds.toSet(),
+                )
+            },
         )
     }
 

@@ -104,7 +104,9 @@ entarchiviert einen Thread nur, wenn sich etwas ändert, und meldet per `POST /a
 den Threads ist; das zeigt die Seite mit Grund. Ist eine Regierung nicht ladbar, entfernt der Abgleich aus deren Thread
 niemanden. Damit Admins Threads auswählen können, meldet der Bot die privaten Threads per `PUT /api/discord-threads`.
 Dafür braucht der Bot im Botschafts-Kanal die Rechte „Threads verwalten“ und „Nachrichten in Threads senden“, und die
-Botschafter-Rolle muss den Kanal sehen dürfen; diese Kanalrechte richten Admins selbst ein.
+Botschafter-Rolle muss den Kanal sehen dürfen; diese Kanalrechte richten Admins selbst ein. Darf die Botschafter-Rolle
+oder eine Gastgeber-Rolle den Kanal nicht sehen, lehnt das Dashboard die Zuordnung und die Einstellungen ab, ebenso ein
+Mitglied, das ihn auch mit der Botschafter-Rolle nicht sehen darf.
 
 Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
 verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür

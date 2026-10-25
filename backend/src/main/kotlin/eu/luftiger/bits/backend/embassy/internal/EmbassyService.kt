@@ -3,6 +3,7 @@ package eu.luftiger.bits.backend.embassy.internal
 import eu.luftiger.bits.backend.audit.api.AuditAction
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
+import eu.luftiger.bits.backend.embassy.domain.DiscordThread
 import eu.luftiger.bits.backend.embassy.domain.EmbassyHostRole
 import eu.luftiger.bits.backend.embassy.domain.EmbassyManualMember
 import eu.luftiger.bits.backend.embassy.domain.EmbassyOffice
@@ -98,7 +99,8 @@ class EmbassyService(
 
     /**
      * @throws ResponseStatusException 400 for a thread the bot has not reported, a country WarEra does not know or the
-     * country under "Verwaltung"; 409 if the thread or the country has one already
+     * country under "Verwaltung"; 409 if the thread or the country has one already; 422 if the ambassador role or a
+     * host role may not see the thread's channel, since Discord would refuse to add their members
      * @throws WareraApiException if WarEra cannot be reached, which the dashboard gets as 503
      */
     fun assign(
@@ -108,6 +110,8 @@ class EmbassyService(
     ) {
         val thread = discordThreadRepository.findByIdOrNull(threadId) ?: throw badRequest("Unknown thread $threadId")
         if (countryId == overviewCountry.selected()?.id) throw badRequest("Own country $countryId")
+        val blind = blindRoles(listOf(thread), settings())
+        if (blind.isNotEmpty()) throw cannotView("Roles $blind cannot see the channel of thread $threadId")
         val country = wareraClient.getAllCountries().firstOrNull { it.id == countryId } ?: throw badRequest("Unknown country $countryId")
         change {
             if (threadRepository.existsById(threadId) || threadRepository.existsByCountryId(countryId)) {
@@ -132,7 +136,10 @@ class EmbassyService(
         )
     }
 
-    /** @throws ResponseStatusException 404 for an unknown thread, 400 for a malformed ID, 409 if added already */
+    /**
+     * @throws ResponseStatusException 404 for an unknown thread, 400 for a malformed ID, 409 if added already, 422 if
+     * the member may not see the thread's channel even with the ambassador role, since Discord would refuse to add them
+     */
     fun addMember(
         threadId: String,
         discordUserId: String,
@@ -140,6 +147,11 @@ class EmbassyService(
     ) {
         if (!DISCORD_ID.matches(discordUserId)) throw badRequest("Malformed Discord ID")
         val name = memberNames()[discordUserId]
+        val reported = discordThreadRepository.findByIdOrNull(threadId)
+        val roleIds = guildMembers.members()?.firstOrNull { it.discordUserId == discordUserId }?.roleIds
+        if (reported != null && roleIds != null && !reported.visibleWith(roleIds + listOfNotNull(settings().ambassadorRoleId))) {
+            throw cannotView("Member $discordUserId cannot see the channel of thread $threadId")
+        }
         change {
             val thread = threadRepository.findByIdOrNull(threadId) ?: throw notFound()
             if (manualMemberRepository.findByThreadIdAndDiscordUserId(threadId, discordUserId) != null) {
@@ -173,7 +185,10 @@ class EmbassyService(
         }
     }
 
-    /** @throws ResponseStatusException 400 for roles the bot has not reported */
+    /**
+     * @throws ResponseStatusException 400 for roles the bot has not reported, 422 if the ambassador role or a host role
+     * may not see the channel of a thread, since Discord would refuse to add their members
+     */
     fun setSettings(
         request: EmbassySettingsRequest,
         actor: AuditActor,
@@ -182,6 +197,9 @@ class EmbassyService(
         val roleIds = request.hostRoleIds.distinct() + listOfNotNull(request.ambassadorRoleId)
         val unknown = roleIds.filter { it !in roles }
         if (unknown.isNotEmpty()) throw badRequest("Unknown roles $unknown")
+        val reported = discordThreadRepository.findAllById(threadRepository.findAll().map { it.threadId })
+        val blind = blindRoles(reported, request)
+        if (blind.isNotEmpty()) throw cannotView("Roles $blind cannot see the channel of every embassy thread")
         val offices = request.offices.distinct().sortedBy { it.ordinal }
         change {
             officeRepository.deleteAllInBatch()
@@ -217,6 +235,15 @@ class EmbassyService(
             hostRoleIds = hostRoleRepository.findAll().map { it.roleId }.sorted(),
         )
 
+    /** The ambassador and host roles of [settings] that may not see the channel of one of [threads]. */
+    private fun blindRoles(
+        threads: Collection<DiscordThread>,
+        settings: EmbassySettingsRequest,
+    ): List<String> =
+        (listOfNotNull(settings.ambassadorRoleId) + settings.hostRoleIds)
+            .distinct()
+            .filter { roleId -> threads.any { !it.visibleWith(listOf(roleId)) } }
+
     private fun memberNames(): Map<String, String> =
         guildMembers
             .members()
@@ -231,6 +258,8 @@ class EmbassyService(
     }
 
     private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
+
+    private fun cannotView(reason: String) = ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, reason)
 
     private fun notFound() = ResponseStatusException(HttpStatus.NOT_FOUND)
 

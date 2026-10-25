@@ -127,14 +127,14 @@ class EmbassySyncHandler(
         }
         val members = current.toMutableSet()
         additions.forEach { id ->
-            val ok = attempt { thread.add(id) } != null
-            if (ok) members += id
-            changes += threadChange(id, target, thread, ok, add = true, reason = wanted.getValue(id))
+            val refusal = add(thread, id)
+            if (refusal == null) members += id
+            changes += threadChange(id, target, thread, refusal == null, add = true, reason = refusal ?: wanted.getValue(id))
         }
         removals.forEach { id ->
             val ok = attempt { thread.remove(id) } != null
             if (ok) members -= id
-            changes += threadChange(id, target, thread, ok, add = false, reason = "Weder Amt noch manuell hinzugefügt")
+            changes += threadChange(id, target, thread, ok, add = false, reason = if (ok) "Weder Amt noch manuell hinzugefügt" else REFUSED)
         }
         return synced(target, thread, members, wanted)
     }
@@ -167,6 +167,7 @@ class EmbassySyncHandler(
         thread: EmbassyThreadChannel,
         ok: Boolean,
         add: Boolean,
+        /** Why it was done, or why Discord refused. */
         reason: String,
     ) = ReportedEmbassyChange(
         discordUserId = discordUserId,
@@ -179,8 +180,26 @@ class EmbassySyncHandler(
                 add -> RoleChangeOutcome.GRANTED
                 else -> RoleChangeOutcome.REMOVED
             },
-        reason = if (ok) reason else "Discord hat die Änderung abgelehnt",
+        reason = reason,
     )
+
+    /** `null` if [discordUserId] was added, otherwise why not, in German. */
+    private suspend fun add(
+        thread: EmbassyThreadChannel,
+        discordUserId: String,
+    ): String? =
+        try {
+            thread.add(discordUserId)
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: MemberCannotViewException) {
+            log.warn("Member {} may not see #{}, so Discord refused to add them to an embassy thread", discordUserId, e.channelName)
+            "Sieht #${e.channelName} nicht: Die Botschafter-Rolle braucht dort „Kanal ansehen“."
+        } catch (e: Exception) {
+            log.error("Discord refused a change of the embassy sync", e)
+            REFUSED
+        }
 
     private suspend fun grantRole(
         target: RoleTarget,
@@ -220,7 +239,7 @@ class EmbassySyncHandler(
         val ok =
             attempt { if (add) guild.grantRole(member.id, target.id, reason) else guild.removeRole(member.id, target.id, reason) } != null
         return when {
-            !ok -> change.copy(outcome = RoleChangeOutcome.FAILED, reason = "Discord hat die Änderung abgelehnt")
+            !ok -> change.copy(outcome = RoleChangeOutcome.FAILED, reason = REFUSED)
             add -> change.copy(outcome = RoleChangeOutcome.GRANTED, reason = reason.removePrefix("BITS: "))
             else -> change.copy(outcome = RoleChangeOutcome.REMOVED, reason = reason.removePrefix("BITS: "))
         }
@@ -240,6 +259,7 @@ class EmbassySyncHandler(
         }
 
     private companion object {
+        const val REFUSED = "Discord hat die Änderung abgelehnt"
         const val REMOVE_ROLE_REASON = "BITS: in keinem Botschafts-Thread mehr"
         const val UNARCHIVE_REASON = "BITS: Abgleich des Botschafts-Threads"
         const val NOT_ASSIGNABLE = "Die Botschafter-Rolle fehlt in Discord oder steht über der Rolle des Bots."
