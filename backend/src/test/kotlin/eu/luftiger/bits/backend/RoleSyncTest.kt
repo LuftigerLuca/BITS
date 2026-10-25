@@ -351,7 +351,7 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-minister","type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}""")
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
         createRule("""{"roleId":"r-veteran","type":"MILITARY_RANK","threshold":50}""")
-        awaitEvents(4)
+        awaitBackgroundWork()
 
         assertEquals(
             RoleExplanationResponse.Explained(
@@ -389,13 +389,15 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
         createRule("""{"roleId":"r-minister","type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}""")
         createRule("""{"roleId":"r-veteran","type":"MILITARY_RANK","threshold":40}""")
-        awaitEvents(3)
+        // Rule changes right after one another may be merged into one sync, so only the syncs after them are counted.
+        awaitBackgroundWork()
 
-        listOf(false, true).forEachIndexed { index, governmentDown ->
+        listOf(false, true).forEach { governmentDown ->
             warera.governmentDown = governmentDown
             val explanations = listOf("1", "2").associateWith { (explain(it) as RoleExplanationResponse.Explained).roles }
+            val before = roleSyncEvents().size
             syncService.syncMembers(listOf("1", "2"))
-            val sync = awaitEvents(4 + index).last() as RoleSyncEvent
+            val sync = awaitEvents(before + 1).last() as RoleSyncEvent
 
             explanations.forEach { (discordUserId, roles) ->
                 val member = sync.members[discordUserId] ?: MemberRoles(emptyList())
@@ -421,11 +423,12 @@ class RoleSyncTest {
         createRule("""{"roleId":"r-citizen","type":"CITIZENSHIP","countryId":"de"}""")
         createRule("""{"roleId":"r-veteran","type":"LEVEL","threshold":10}""")
         reportRoles("""{"id":"r-veteran","name":"Veteran","color":null,"position":1,"assignable":true}""")
-        awaitEvents(2)
+        awaitBackgroundWork()
+        val before = roleSyncEvents().size
 
         assertEquals(listOf("r-veteran"), (explain("1") as RoleExplanationResponse.Explained).roles.map { it.roleId })
         assertEquals(RoleExplanationResponse.NotLinked, explain("9"))
-        awaitEvents(2)
+        awaitEvents(before)
     }
 
     @Test
