@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useCountries } from '@/lib/countries'
 import {
   searchMilitaryUnits,
   type ConditionType,
@@ -25,7 +26,7 @@ import {
 } from '@/lib/api'
 import { CONDITION_TYPES, OFFICES, errorMessage } from './labels'
 import { RoleName } from './RoleName'
-import { useCountries, useCreateRoleRule } from './queries'
+import { useCreateRoleRule } from './queries'
 
 /** Form for a new rule; the first rule of a role asks first, since it hands the role over to BITS. */
 export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {

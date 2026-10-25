@@ -162,12 +162,14 @@ enum class LogEntryType {
     SYNC_RUN,
     ACCOUNT_LINKED,
     ACCOUNT_RELINKED,
+    ACCOUNT_REMOVED,
     WARERA_USERS_UNAVAILABLE,
     GOVERNMENT_UNAVAILABLE,
     ROLE_NOT_ASSIGNABLE,
     SYNC_ABORTED,
     EVENT_UNDELIVERED,
     OUTBOX_STUCK,
+    MEMBER_REPORT_REFUSED,
     ;
 
     companion object {
@@ -176,12 +178,14 @@ enum class LogEntryType {
                 EntryKind.SYNC_RUN -> SYNC_RUN
                 EntryKind.ACCOUNT_LINKED -> ACCOUNT_LINKED
                 EntryKind.ACCOUNT_RELINKED -> ACCOUNT_RELINKED
+                EntryKind.ACCOUNT_REMOVED -> ACCOUNT_REMOVED
                 EntryKind.WARERA_USERS_UNAVAILABLE -> WARERA_USERS_UNAVAILABLE
                 EntryKind.GOVERNMENT_UNAVAILABLE -> GOVERNMENT_UNAVAILABLE
                 EntryKind.ROLE_NOT_ASSIGNABLE -> ROLE_NOT_ASSIGNABLE
                 EntryKind.SYNC_ABORTED -> SYNC_ABORTED
                 EntryKind.EVENT_UNDELIVERED -> EVENT_UNDELIVERED
                 EntryKind.OUTBOX_STUCK -> OUTBOX_STUCK
+                EntryKind.MEMBER_REPORT_REFUSED -> MEMBER_REPORT_REFUSED
             }
     }
 }

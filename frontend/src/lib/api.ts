@@ -140,7 +140,7 @@ export async function searchMilitaryUnits(query: string): Promise<Option[]> {
 
 const AUDIT_LOG = '/web/admin/audit-log'
 
-export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED'
+export type AuditAction = 'ROLE_RULE_CREATED' | 'ROLE_RULE_DELETED' | 'OVERVIEW_COUNTRY_SET'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
@@ -195,12 +195,14 @@ export type LogEntryType =
   | 'SYNC_RUN'
   | 'ACCOUNT_LINKED'
   | 'ACCOUNT_RELINKED'
+  | 'ACCOUNT_REMOVED'
   | 'WARERA_USERS_UNAVAILABLE'
   | 'GOVERNMENT_UNAVAILABLE'
   | 'ROLE_NOT_ASSIGNABLE'
   | 'SYNC_ABORTED'
   | 'EVENT_UNDELIVERED'
   | 'OUTBOX_STUCK'
+  | 'MEMBER_REPORT_REFUSED'
 
 export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE'
 
@@ -292,6 +294,39 @@ export async function getSystemLogItems(
 /** Every role that appears in the system log. */
 export async function getSystemLogRoles(): Promise<NamedRef[]> {
   return (await request(`${SYSTEM_LOG}/roles`)).json()
+}
+
+const OVERVIEW = '/web/admin/overview'
+
+export interface CountryOverview {
+  id: string
+  name: string
+  /** Whether WarEra could be reached; if not, the counts are `null`. */
+  available: boolean
+  citizens: number | null
+  activeCitizens: number | null
+}
+
+export interface Overview {
+  /** Members of the Discord without bots; `null` while the bot has not reported them since the backend started. */
+  members: number | null
+  /** Of `members`, those with a linked WarEra account. */
+  verifiedMembers: number | null
+  /** `null` while no country is set. */
+  country: CountryOverview | null
+}
+
+export async function getOverview(): Promise<Overview> {
+  return (await request(OVERVIEW)).json()
+}
+
+export async function setOverviewCountry(countryId: string): Promise<Option> {
+  const response = await request(`${OVERVIEW}/country`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ countryId }),
+  })
+  return response.json()
 }
 
 export const DISCORD_LOGIN_URL = '/auth/oauth2/authorization/discord'

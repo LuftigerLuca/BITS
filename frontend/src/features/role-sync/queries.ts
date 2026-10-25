@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createRoleRule,
   deleteRoleRule,
-  getCountries,
   getRoleRules,
   getRoles,
   type CreateRoleRule,
@@ -17,11 +16,6 @@ export function useRoles() {
 
 export function useRoleRules() {
   return useQuery({ queryKey: [...ROLE_SYNC, 'rules'], queryFn: getRoleRules })
-}
-
-/** The countries of WarEra hardly ever change, so they are loaded once per visit, and only when needed. */
-export function useCountries(enabled: boolean) {
-  return useQuery({ queryKey: ['countries'], queryFn: getCountries, enabled, staleTime: Infinity })
 }
 
 export function useCreateRoleRule() {

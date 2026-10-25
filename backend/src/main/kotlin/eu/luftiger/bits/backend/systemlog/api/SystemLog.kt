@@ -22,5 +22,7 @@ interface SystemLog {
 
     fun recordAccountLinked(link: AccountLinkRecord)
 
+    fun recordAccountRemoved(removal: AccountRemovalRecord)
+
     fun recordProblem(problem: SystemProblem)
 }

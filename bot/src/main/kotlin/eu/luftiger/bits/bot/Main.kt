@@ -9,6 +9,7 @@ import eu.luftiger.bits.bot.commands.VerifyCommand
 import eu.luftiger.bits.bot.events.EventHandler
 import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
+import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
 import eu.luftiger.bits.bot.systemlog.SystemLogReporter
@@ -49,22 +50,24 @@ fun main() {
     val backend = KtorBackendClient(config.backendUrl, config.serviceToken)
     val redis = RedisClient.create(config.redisUrl)
     val roleReporter = RoleReporter(config.guildId, backend, scope)
+    val memberReporter = MemberReporter(config.guildId, backend, scope)
     val verifyCommand = VerifyCommand(backend, scope)
 
-    // The role sync needs all members, which takes the privileged GUILD_MEMBERS intent.
+    // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent.
     val jda =
         JDABuilder
             .createLight(config.discordToken)
             .enableIntents(GatewayIntent.GUILD_MEMBERS)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .setChunkingFilter(ChunkingFilter.ALL)
-            .addEventListeners(PingCommand(backend, scope), verifyCommand, UnverifyCommand(backend, scope), roleReporter)
+            .addEventListeners(PingCommand(backend, scope), verifyCommand, UnverifyCommand(backend, scope), roleReporter, memberReporter)
             .build()
             .awaitReady()
 
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
     guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data, UnverifyCommand.data).queue()
     roleReporter.reportPeriodically(guild)
+    memberReporter.reportPeriodically(guild)
 
     val logging = LoggingEventHandler()
     val systemLog = SystemLogReporter(backend, scope)

@@ -30,7 +30,8 @@ Mit `/verify <WarEra-Name>` verknüpft ein Nutzer seinen Discord-Account mit sei
 einen Einmal-Code, der 15 Minuten gültig ist, schreibt ihn in den Namen einer seiner WarEra-Firmen und klickt auf
 „Prüfen“. Das Backend sucht den Code über die öffentliche API, speichert die Verknüpfung und publiziert ein
 `AccountLinkedEvent`. Der Code zählt nur in Firmen, die dem Nutzer gehören. Mit `/unverify` löst er die Verknüpfung
-wieder.
+wieder. Wer den Server verlässt, verliert seine Verknüpfung und muss sich nach einem erneuten Beitritt neu
+verifizieren.
 
 Im Dashboard legen Admins unter „Verwaltung“ Regeln an, die eine Discord-Rolle an ein WarEra-Merkmal koppeln:
 Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer Military Unit, Level oder Militärrang ab
@@ -43,6 +44,13 @@ Sekunde. Kann ein Nutzer oder eine Regierung nicht geladen werden, bleiben die b
 Bot meldet die Rollen des Servers per `PUT /api/discord-roles` beim Start und bei jeder Änderung; Regeln für
 gelöschte Rollen gelten als verwaist und werden nicht ausgeführt. Dafür braucht der Bot den privilegierten
 Server-Members-Intent und die Berechtigung „Rollen verwalten“.
+
+Admins sehen auf der Startseite des Dashboards, wie viele Mitglieder der Server ohne Bots hat, wie viele davon
+verifiziert sind und wie viele Bürger (gesamt und aktiv) das Land hat, das sie unter „Verwaltung“ einstellen. Dafür
+meldet der Bot die Mitglieder per `PUT /api/discord-members`, sobald alle geladen sind, beim Start und stündlich,
+dazu jeden Beitritt und Austritt. Das Backend hält die Liste nur im Speicher und löscht die Verknüpfungen aller, die
+darin fehlen. Würde eine Liste mehr als die Hälfte und mindestens 10 Verknüpfungen auf einmal löschen, verweigert
+es sie als vermutlich fehlerhaft und vermerkt das im System-Log.
 
 Im Dashboard melden sich Mitglieder des Discord-Servers mit Discord an (OAuth2, Scopes `identify guilds`).
 Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, bekommt die Rolle `ADMIN` und sieht
@@ -59,7 +67,8 @@ BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
 
 | Daten                                            | Wo                         | Wozu                              | Wie lange                                                                   |
 |--------------------------------------------------|----------------------------|-----------------------------------|-----------------------------------------------------------------------------|
-| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten vergeben | bis `/unverify` oder bis eine neue Verknüpfung sie ersetzt                  |
+| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten vergeben | bis `/unverify`, zum Verlassen des Servers oder zu einer neuen Verknüpfung  |
+| Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links    | bis zur nächsten Meldung des Bots oder zum Neustart                         |
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung              | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                           | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard            | unbegrenzt                                                                  |
@@ -70,8 +79,9 @@ BITS speichert nur, was es für die Verknüpfung und die Rollen braucht:
 
 WarEra-Daten der Nutzer hält das Backend nur im Speicher. Ein Hinweis in `/verify` sagt, was gespeichert wird.
 Mit `/unverify` löscht ein Nutzer seine Verknüpfung und einen offenen Code; die Rollen, die BITS verwaltet, verliert
-er beim folgenden Abgleich. Abgelaufene Codes und alte Pings löscht ein Job jede Stunde. Wie Admins Auskunft geben
-oder für jemanden löschen, steht in [deploy/README.md](deploy/README.md#data-protection-requests).
+er beim folgenden Abgleich. Wer den Server verlässt, verliert beides ebenso, spätestens beim nächsten Start des Bots.
+Abgelaufene Codes und alte Pings löscht ein Job jede Stunde. Wie Admins Auskunft geben oder für jemanden löschen,
+steht in [deploy/README.md](deploy/README.md#data-protection-requests).
 
 Verifiziert sich ein anderer Discord-Account für einen schon verknüpften WarEra-Account, ersetzt die neue
 Verknüpfung die alte. Der vorherige Account bekommt dann eine Direktnachricht vom Bot, falls er welche annimmt.

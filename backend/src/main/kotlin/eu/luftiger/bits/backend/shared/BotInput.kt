@@ -24,6 +24,9 @@ object BotInput {
 
     /** A sync of a large guild reports one change per member and role at most; anything beyond is a bug. */
     private const val MAX_REPORTED_CHANGES = 100_000
+
+    /** Far above any guild BITS serves; a list beyond is a bug. */
+    private const val MAX_MEMBERS = 1_000_000
     private const val MAX_REASON_LENGTH = 1_000
     private val STREAM_ID = Regex("[0-9]{1,20}-[0-9]{1,20}")
     private val EVENT_TYPE = Regex("[a-z_]{1,64}")
@@ -44,6 +47,8 @@ object BotInput {
     fun roleCount(count: Int) = check(count <= MAX_ROLES, "number of roles")
 
     fun memberName(value: String) = check(value.length <= MAX_MEMBER_NAME_LENGTH, "member name")
+
+    fun memberCount(count: Int) = check(count <= MAX_MEMBERS, "number of members")
 
     fun reportedChangeCount(count: Int) = check(count <= MAX_REPORTED_CHANGES, "number of changes")
 
