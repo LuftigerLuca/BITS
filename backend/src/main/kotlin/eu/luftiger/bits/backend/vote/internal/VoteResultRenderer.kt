@@ -30,30 +30,26 @@ class VoteResult(
 }
 
 /**
- * Turns a [VoteResult] into the text and the image BITS posts and the dashboard shows. Both name parties and
- * non-voters, never who voted what.
+ * Turns a [VoteResult] into the image BITS posts and the dashboard shows, and the text of the dashboard. Both name
+ * parties and non-voters, never who voted what.
  */
 object VoteResultRenderer {
     const val NO_PARTY = "Parteilos"
 
-    /** Plain text for the dashboard, or Discord markdown with names escaped if [markdown]. */
-    fun text(
-        result: VoteResult,
-        markdown: Boolean,
-    ): String {
-        val escape: (String) -> String = if (markdown) ::escapeMarkdown else { it -> it }
-        val title = if (markdown) "**Ergebnis:** ${escape(result.question)}" else "Ergebnis: ${result.question}"
+    /** Plain text for the dashboard. */
+    fun text(result: VoteResult): String {
+        val title = "Ergebnis: ${result.question}"
         if (result.eligible == 0) return "$title\n\nNiemand mit der Rolle und einem verknüpften WarEra-Account konnte abstimmen."
         val total = "Gesamt: " + counts(result.yes, result.no, result.abstain, result.voted, result.eligible)
         val parties =
             result.parties.joinToString("\n") { party ->
-                "${escape(party.partyName ?: NO_PARTY)}: " + counts(party.yes, party.no, party.abstain, party.voted, party.eligible)
+                "${party.partyName ?: NO_PARTY}: " + counts(party.yes, party.no, party.abstain, party.voted, party.eligible)
             }
         val nonVoters =
             if (result.nonVoters.isEmpty()) {
                 "Alle haben abgestimmt."
             } else {
-                "Nicht abgestimmt (${result.nonVoters.size}): ${result.nonVoters.joinToString(", ", transform = escape)}"
+                "Nicht abgestimmt (${result.nonVoters.size}): ${result.nonVoters.joinToString(", ")}"
             }
         return "$title\n$total\n\n$parties\n\n$nonVoters"
     }
@@ -71,12 +67,6 @@ object VoteResultRenderer {
         part: Int,
         whole: Int,
     ): Int = if (whole == 0) 0 else (part * 100.0 / whole).roundToInt()
-
-    /** Escapes everything Discord reads as markdown or as a mention. */
-    fun escapeMarkdown(text: String): String =
-        text
-            .replace(Regex("""([\\*_~`|>#\-\[\]()])"""), """\\$1""")
-            .replace("@", "@​")
 
     /**
      * A card before [background], which is cropped and darkened, with the question and the participation, three

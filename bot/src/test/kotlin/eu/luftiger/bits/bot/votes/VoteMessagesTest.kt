@@ -62,12 +62,4 @@ class VoteMessagesTest {
         assertEquals("Abstimmung abgebrochen", cancelled.title)
         assertTrue(cancelled.fields.none { it.name == "Beteiligung" })
     }
-
-    @Test
-    fun `a long result is split at line breaks into messages Discord takes`() {
-        val line = "x".repeat(900)
-        val parts = VoteMessages.split(listOf(line, line, line).joinToString("\n"))
-
-        assertEquals(listOf("$line\n$line", line), parts)
-    }
 }

@@ -39,10 +39,7 @@ class VoteWebController(
     @GetMapping("/access")
     fun access(
         @AuthenticationPrincipal session: Jwt,
-    ): VoteAccessResponse {
-        val manager = manager(session)
-        return VoteAccessResponse(canManage = voteService.mayManage(manager), canConfigure = manager.admin)
-    }
+    ): VoteAccessResponse = VoteAccessResponse(canManage = voteService.mayManage(manager(session)))
 
     @GetMapping
     fun votes(
@@ -58,7 +55,7 @@ class VoteWebController(
                     it.toResponse(
                         resultText =
                             results[it.id]?.let { result ->
-                                VoteResultRenderer.text(result, markdown = false)
+                                VoteResultRenderer.text(result)
                             },
                     )
                 },
@@ -185,8 +182,6 @@ class VoteAdminController(
 data class VoteAccessResponse(
     /** Whether the user may see, start, end and cancel votes. */
     val canManage: Boolean,
-    /** Whether the user may choose the roles that manage votes, i.e. is an admin. */
-    val canConfigure: Boolean,
 )
 
 @Serializable
