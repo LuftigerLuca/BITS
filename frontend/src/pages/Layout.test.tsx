@@ -65,31 +65,58 @@ describe('layout', () => {
     expect(current.map((link) => link.textContent)).toEqual(['Audit-Log'])
   })
 
-  it('shows admins the admin group with the admin area, the roles, the embassies and both logs', async () => {
-    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json({}) })
+  it('shows admins the roles, embassies and votes, and apart from them the admin area with both logs', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview': () => json({}),
+      'GET /web/votes/access': () => json({ canManage: true }),
+    })
 
     renderApp('/')
 
     const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    // Whether the votes show up depends on a request of their own.
+    await within(navigation).findByRole('link', { name: 'Abstimmungen' })
     expect(within(navigation).getByText('Admin')).toBeInTheDocument()
+    expect(within(navigation).getByText('System')).toBeInTheDocument()
     expect(within(navigation).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Start', '/'],
       ['Mein Account', '/account'],
-      ['Verwaltung', '/admin'],
       ['Rollen', '/admin/roles'],
       ['Botschaften', '/admin/embassies'],
+      ['Abstimmungen', '/votes'],
+      ['Verwaltung', '/admin'],
       ['Audit-Log', '/admin/audit-log'],
       ['System-Log', '/admin/system-log'],
     ])
   })
 
-  it('shows members neither the admin group nor its pages', async () => {
+  it('shows members who may manage votes only the votes in the admin group', async () => {
+    stubFetch({
+      'GET /web/me': () => json({ ...admin, role: 'USER' }),
+      'GET /web/votes/access': () => json({ canManage: true }),
+    })
+
+    renderApp('/')
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    await within(navigation).findByText('Admin')
+    expect(within(navigation).queryByText('System')).not.toBeInTheDocument()
+    expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Start',
+      'Mein Account',
+      'Abstimmungen',
+    ])
+  })
+
+  it('shows members neither the admin groups nor their pages', async () => {
     stubFetch({ 'GET /web/me': () => json({ ...admin, role: 'USER' }) })
 
     renderApp('/')
 
     const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
     expect(within(navigation).queryByText('Admin')).not.toBeInTheDocument()
+    expect(within(navigation).queryByText('System')).not.toBeInTheDocument()
     expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Start', 'Mein Account'])
   })
 
@@ -118,6 +145,17 @@ describe('layout', () => {
     // The test setup reports a light system setting.
     expect(document.documentElement).not.toHaveClass('dark')
     expect(localStorage.getItem('theme')).toBeNull()
+  })
+
+  it('opens the manual from the user menu', async () => {
+    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json({}) })
+    const router = renderApp('/')
+
+    await openUserMenu()
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Handbuch' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Handbuch' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/docs')
   })
 
   it('logs out from the user menu and goes to the login page', async () => {

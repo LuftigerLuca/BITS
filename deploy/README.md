@@ -40,7 +40,7 @@ a test server, so testing never touches the real WarEra Discord.
    | `DISCORD_CLIENT_SECRET`    | secret   | OAuth2 client secret from step 1                                                                    |
    | `BITS_SERVICE_TOKEN`       | secret   | Random secret, e.g. `openssl rand -hex 32`                                                          |
    | `BITS_JWT_SECRET`          | secret   | Random secret for the dashboard sessions, e.g. `openssl rand -hex 32`                               |
-   | `BITS_ADMIN_PASSWORD_HASH` | secret   | BCrypt hash of the admin password (optional), e.g. `htpasswd -nbBC 12 "" 'password' \| cut -d: -f2` |
+   | `BITS_ADMIN_PASSWORD_HASH` | secret   | Admin password as BCrypt hash, cost ≥ 10, optional, e.g. `htpasswd -nbBC 12 "" 'pw' \| cut -d: -f2` |
    | `POSTGRES_PASSWORD`        | secret   | Random secret; keep it, the database is created with it on the first run                            |
 
 The dashboard sets its session cookie with `Secure`, so it has to be served over HTTPS (a TLS proxy in front of

@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import { BookOpenIcon } from 'lucide-react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import backgroundLarge from '@/assets/login-background-1672.webp'
 import backgroundSmall from '@/assets/login-background-1280.webp'
 import { useAuth } from '@/auth/context'
@@ -84,6 +85,13 @@ export function LoginPage() {
             <DiscordIcon data-icon="inline-start" />
             Mit Discord anmelden
           </Button>
+          <Link
+            to="/docs"
+            className="inline-flex items-center gap-1.5 self-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            <BookOpenIcon className="size-4" aria-hidden />
+            Was kann BITS? Zum Handbuch
+          </Link>
         </CardContent>
         {adminLoginEnabled && (
           <CardFooter className="flex-col items-stretch gap-4 border-t">
