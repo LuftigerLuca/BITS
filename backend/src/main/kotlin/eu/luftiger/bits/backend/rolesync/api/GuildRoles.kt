@@ -8,4 +8,7 @@ import org.springframework.modulith.NamedInterface
 interface GuildRoles {
     /** Highest first, without `@everyone`. */
     fun all(): List<GuildRole>
+
+    /** IDs of the roles BITS manages, i.e. those with an active rule, highest first. */
+    fun managedIds(): List<String>
 }

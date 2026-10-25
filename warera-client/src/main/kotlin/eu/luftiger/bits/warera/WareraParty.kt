@@ -10,4 +10,6 @@ data class WareraParty(
     val name: String,
     /** User IDs of all members, the leader included. */
     val members: List<String> = emptyList(),
+    /** User ID of the leader, `null` if the party has none. */
+    val leader: String? = null,
 )

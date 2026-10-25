@@ -2,8 +2,8 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
-import eu.luftiger.bits.backend.rolesync.domain.GovernmentOffice
 import eu.luftiger.bits.warera.WareraApiException
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory

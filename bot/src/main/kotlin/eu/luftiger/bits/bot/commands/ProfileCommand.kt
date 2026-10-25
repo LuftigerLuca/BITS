@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.commands
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.BackendTimeoutException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
+import eu.luftiger.bits.shared.ProfileDetail
 import eu.luftiger.bits.shared.ProfileResponse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -34,13 +35,16 @@ class ProfileCommand(
 
     override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
         if (event.name != NAME) return
-        val target = event.getOption(OPTION_USER)?.asUser ?: event.user
+        val option = event.getOption(OPTION_USER)
+        val target = option?.asUser ?: event.user
         val own = target.id == event.user.id
+        // `null` if the member is not (or no longer) on the server.
+        val roleIds = (if (option == null) event.member else option.asMember)?.roles?.mapTo(HashSet()) { it.id }
         event.deferReply().queue()
         scope.launch {
             val answer =
                 try {
-                    answer(backend.profile(target.id), own, target.asMention)
+                    answer(backend.profile(target.id), own, target.asMention, roleIds)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -99,14 +103,18 @@ class ProfileCommand(
                 .slash(NAME, "Zeigt das WarEra-Profil eines verknüpften Accounts")
                 .addOption(OptionType.USER, OPTION_USER, "Wessen Profil; ohne Angabe dein eigenes", false)
 
-        /** [own] if the user asked for their own profile; [mention] is the member whose profile was asked for. */
+        /**
+         * [own] if the user asked for their own profile; [mention] is the member whose profile was asked for, [roleIds]
+         * their Discord roles, `null` if they are not on the server.
+         */
         internal fun answer(
             response: ProfileResponse,
             own: Boolean,
             mention: String,
+            roleIds: Set<String>?,
         ): Answer =
             when (response) {
-                is ProfileResponse.Found -> Answer.Profile(embed(response, mention))
+                is ProfileResponse.Found -> Answer.Profile(embed(response, mention, roleIds))
                 ProfileResponse.NotLinked ->
                     Answer.Hint(
                         if (own) {
@@ -128,15 +136,35 @@ class ProfileCommand(
         private fun embed(
             profile: ProfileResponse.Found,
             mention: String,
-        ): MessageEmbed =
-            EmbedBuilder()
+            roleIds: Set<String>?,
+        ): MessageEmbed {
+            fun detail(
+                detail: ProfileDetail,
+                value: () -> String,
+            ) = if (detail in profile.unavailable) "nicht verfügbar" else value()
+            val party =
+                detail(ProfileDetail.PARTY) {
+                    profile.party?.let { MarkdownSanitizer.escape(it.name) + if (it.leader) " (Vorsitz)" else "" } ?: "parteilos"
+                }
+            val offices = detail(ProfileDetail.OFFICES) { profile.offices.joinToString(", ").ifEmpty { "keins" } }
+            val companies = detail(ProfileDetail.COMPANIES) { profile.companyCount.toString() }
+            return EmbedBuilder()
                 .setTitle(MarkdownSanitizer.escape(profile.wareraUsername), profile.profileUrl)
-                // Mentions in embeds do not notify anyone.
+                // Mentions in embeds do not notify anyone, neither of users nor of roles.
                 .setDescription("WarEra-Profil von $mention")
                 .addField("Level", profile.level.toString(), true)
                 .addField("Militärrang", profile.militaryRank.toString(), true)
                 .addField("Staatsbürgerschaft", profile.countryName?.let(MarkdownSanitizer::escape) ?: "unbekannt", true)
                 .addField("Military Unit", profile.militaryUnitName?.let(MarkdownSanitizer::escape) ?: "keine", true)
-                .build()
+                .addField("Partei", party, true)
+                .addField("Regierungsamt", offices, true)
+                .addField("Firmen", companies, true)
+                .apply {
+                    if (roleIds != null) {
+                        val roles = profile.managedRoleIds.filter { it in roleIds }
+                        addField("Rollen", roles.joinToString(" ") { "<@&$it>" }.ifEmpty { "keine" }, false)
+                    }
+                }.build()
+        }
     }
 }

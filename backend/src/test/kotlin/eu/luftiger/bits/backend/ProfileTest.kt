@@ -2,7 +2,10 @@ package eu.luftiger.bits.backend
 
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsJson
+import eu.luftiger.bits.shared.ProfileDetail
+import eu.luftiger.bits.shared.ProfileParty
 import eu.luftiger.bits.shared.ProfileResponse
+import eu.luftiger.bits.warera.WareraParty
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -35,7 +38,7 @@ class ProfileTest {
     fun reset() {
         jdbc.awaitOutbox()
         syncTrigger.awaitIdle()
-        jdbc.execute("TRUNCATE account_link, event_publication")
+        jdbc.execute("TRUNCATE account_link, role_rule, discord_role, event_publication")
         warera.reset()
     }
 
@@ -52,9 +55,69 @@ class ProfileTest {
                 countryName = "Germany",
                 militaryUnitName = "Deutsche Marine",
                 profileUrl = "https://app.warera.io/user/w1",
+                companyCount = 1,
             ),
             profile("1"),
         )
+    }
+
+    @Test
+    fun `profile shows the party in the country of citizenship and whether the user leads it`() {
+        link("1", "w1")
+        link("2", "w2")
+        link("3", "w3")
+        warera.users["w3"] = warera.users.getValue("w1").copy(id = "w3")
+        // w2 is a citizen of France, but listed in a German party only.
+        warera.parties["de"] =
+            listOf(
+                WareraParty("p-de", "Deutsche Partei", listOf("w1", "w3"), leader = "w1"),
+                WareraParty("p-other", "Andere", listOf("w2")),
+            )
+        warera.parties["fr"] = listOf(WareraParty("p-fr", "Parti", listOf("w9")))
+
+        assertEquals(ProfileParty("Deutsche Partei", leader = true), (profile("1") as ProfileResponse.Found).party)
+        assertEquals(ProfileParty("Deutsche Partei", leader = false), (profile("3") as ProfileResponse.Found).party)
+        assertEquals(null, (profile("2") as ProfileResponse.Found).party)
+    }
+
+    @Test
+    fun `profile shows the offices in the government of the country of citizenship`() {
+        link("1", "w1")
+        link("2", "w2")
+        warera.users["w2"] = warera.users.getValue("w2").copy(country = "de")
+
+        assertEquals(emptyList(), (profile("1") as ProfileResponse.Found).offices)
+        assertEquals(listOf("Präsident"), (profile("2") as ProfileResponse.Found).offices)
+    }
+
+    @Test
+    fun `profile lists the managed roles, highest first`() {
+        link("1", "w1")
+        jdbc.update(
+            "INSERT INTO discord_role (id, name, color, position, assignable) VALUES " +
+                "('r-low', 'Low', NULL, 1, TRUE), ('r-high', 'High', NULL, 5, TRUE), " +
+                "('r-unmanaged', 'Unmanaged', NULL, 3, TRUE), ('r-unassignable', 'Above the bot', NULL, 9, FALSE)",
+        )
+        jdbc.update(
+            "INSERT INTO role_rule (role_id, type, threshold, created_at) VALUES " +
+                "('r-low', 'LEVEL', 1, now()), ('r-high', 'LEVEL', 10, now()), ('r-high', 'MILITARY_RANK', 10, now()), " +
+                "('r-unassignable', 'LEVEL', 1, now()), ('r-deleted', 'LEVEL', 1, now())",
+        )
+
+        assertEquals(listOf("r-high", "r-low"), (profile("1") as ProfileResponse.Found).managedRoleIds)
+    }
+
+    @Test
+    fun `profile comes without the details WarEra cannot deliver`() {
+        link("1", "w1")
+        warera.partiesDown = true
+        warera.governmentDown = true
+        warera.companiesDown = true
+
+        val profile = profile("1") as ProfileResponse.Found
+
+        assertEquals("Luftiger", profile.wareraUsername)
+        assertEquals(setOf(ProfileDetail.PARTY, ProfileDetail.OFFICES, ProfileDetail.COMPANIES), profile.unavailable)
     }
 
     @Test

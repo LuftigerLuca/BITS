@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.rolesync.domain
 
+import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -61,15 +62,4 @@ enum class ConditionType {
     MILITARY_UNIT,
     LEVEL,
     MILITARY_RANK,
-}
-
-enum class GovernmentOffice(
-    val label: String,
-) {
-    PRESIDENT("Präsident"),
-    VICE_PRESIDENT("Vizepräsident"),
-    MINISTER_OF_ECONOMY("Wirtschaftsminister"),
-    MINISTER_OF_DEFENSE("Verteidigungsminister"),
-    MINISTER_OF_FOREIGN_AFFAIRS("Außenminister"),
-    CONGRESS("Kongressmitglied"),
 }

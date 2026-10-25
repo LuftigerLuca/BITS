@@ -13,7 +13,8 @@ import org.springframework.stereotype.Service
 
 /**
  * Explains to a member which managed roles they meet and why, for `/rollen`. It judges with the [RuleEvaluator] of the
- * role sync, but always with fresh WarEra data, and changes nothing: the next sync brings the roles in line.
+ * role sync, but always with a fresh WarEra user (the governments may be cached for a few minutes), and changes
+ * nothing: the next sync brings the roles in line.
  */
 @Service
 class RoleExplanationService(

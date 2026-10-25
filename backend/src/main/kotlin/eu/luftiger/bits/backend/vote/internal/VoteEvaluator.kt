@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit
  *
  * Eligible are the members of the role at the end who are linked, or who voted while they were; the ballots of members
  * who lost the role are dropped. Everybody counts for the party of their country of citizenship they are a member of,
- * as WarEra lists them now, or as in no party.
+ * as WarEra listed them up to ten minutes ago (the parties come from the cache of the WarEra client), or as in no party.
  *
  * The parties' counts and the names of the non-voters are stored, and the ballots and the role members deleted, in the
  * transaction that publishes the [VoteEvaluatedEvent]. If WarEra cannot be reached, nothing changes and
