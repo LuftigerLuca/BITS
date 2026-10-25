@@ -1,5 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import backgroundLarge from '@/assets/login-background-1672.webp'
+import backgroundSmall from '@/assets/login-background-1280.webp'
 import { useAuth } from '@/auth/context'
 import { DiscordIcon } from '@/components/DiscordIcon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -22,6 +24,9 @@ const DISCORD_ERRORS: Record<string, string> = {
   discord_unavailable: 'Discord ist gerade nicht erreichbar. Bitte versuche es später erneut.',
 }
 
+/** Darkens the background image so it stays in the background. */
+const BACKGROUND_DIM = 'linear-gradient(rgb(0 0 0 / 55%), rgb(0 0 0 / 55%))'
+
 export function LoginPage() {
   const { user, sessionExpired } = useAuth()
   const [searchParams] = useSearchParams()
@@ -40,8 +45,19 @@ export function LoginPage() {
     ? (DISCORD_ERRORS[errorCode] ?? 'Die Anmeldung mit Discord ist fehlgeschlagen.')
     : null
 
+  // Phones load only the small image. On wide landscape screens the card moves to the right, and the image
+  // shifts left so the eagle in its centre stays clear of the card, down to 1024 × 768; from 1280 px the card
+  // keeps a tenth of the width from the edge, as far as the eagle leaves room down to 1366 × 768.
   return (
-    <main className="flex min-h-svh items-center justify-center p-4">
+    <main
+      style={
+        {
+          '--login-background-small': `${BACKGROUND_DIM}, url(${backgroundSmall})`,
+          '--login-background-large': `${BACKGROUND_DIM}, url(${backgroundLarge})`,
+        } as CSSProperties
+      }
+      className="flex min-h-svh items-center justify-center bg-black bg-(image:--login-background-small) bg-cover bg-center bg-no-repeat p-4 lg:bg-(image:--login-background-large) lg:landscape:justify-end lg:landscape:bg-[80%_center] lg:landscape:pr-16 xl:landscape:pr-[10vw]"
+    >
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>BITS Dashboard</CardTitle>
