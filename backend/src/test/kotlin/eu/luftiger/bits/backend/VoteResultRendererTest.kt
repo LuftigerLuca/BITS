@@ -23,12 +23,10 @@ class VoteResultRendererTest {
         )
 
     @Test
-    fun `markdown escapes names, plain text does not`() {
-        val markdown = VoteResultRenderer.text(result, markdown = true)
-        val plain = VoteResultRenderer.text(result, markdown = false)
+    fun `the text shows the total and each party`() {
+        val plain = VoteResultRenderer.text(result)
 
-        assertTrue(markdown.startsWith("**Ergebnis:** Soll der \\*Kongress\\* die Steuern senken?\n"), markdown)
-        assertTrue("SKP\\_Katzen: 0 Ja · 0 Nein · 0 Enthaltung · 0 von 2 haben abgestimmt (0 %)" in markdown, markdown)
+        assertTrue("SKP_Katzen: 0 Ja · 0 Nein · 0 Enthaltung · 0 von 2 haben abgestimmt (0 %)" in plain, plain)
         assertTrue(plain.startsWith("Ergebnis: Soll der *Kongress* die Steuern senken?\n"), plain)
         assertTrue("Gesamt: 11 Ja · 4 Nein · 1 Enthaltung · 16 von 26 haben abgestimmt (62 %)" in plain, plain)
         assertTrue("Parteilos: 1 Ja · 1 Nein · 0 Enthaltung · 2 von 4 haben abgestimmt (50 %)" in plain, plain)
@@ -36,12 +34,7 @@ class VoteResultRendererTest {
 
     @Test
     fun `the text lists every non-voter`() {
-        assertTrue(VoteResultRenderer.text(result, markdown = false).endsWith("Mitglied Nummer 79, Mitglied Nummer 80"))
-    }
-
-    @Test
-    fun `mentions in names are defused`() {
-        assertEquals("@​everyone", VoteResultRenderer.escapeMarkdown("@everyone"))
+        assertTrue(VoteResultRenderer.text(result).endsWith("Mitglied Nummer 79, Mitglied Nummer 80"))
     }
 
     @Test
@@ -49,11 +42,7 @@ class VoteResultRendererTest {
         val empty = VoteResult("Frage?", emptyList(), emptyList())
 
         assertTrue(
-            VoteResultRenderer
-                .text(
-                    empty,
-                    markdown = false,
-                ).endsWith("Niemand mit der Rolle und einem verknüpften WarEra-Account konnte abstimmen."),
+            VoteResultRenderer.text(empty).endsWith("Niemand mit der Rolle und einem verknüpften WarEra-Account konnte abstimmen."),
         )
         assertEquals(1100, ImageIO.read(ByteArrayInputStream(VoteResultRenderer.png(empty))).width)
     }

@@ -173,14 +173,29 @@ data class Elector(
     val name: String,
 )
 
+/** The counts the bot builds the result message from; names are plain text, the bot escapes them. */
 @Serializable
 data class VoteResultDto(
-    /** Discord markdown; may be longer than one message. */
-    val text: String,
+    val question: String,
+    /** By size, those in no party last; empty if nobody could vote. */
+    val parties: List<PartyResultDto>,
+    /** As Discord showed them when the vote ended. */
+    val nonVoters: List<String>,
     /** PNG, Base64-encoded. */
     val image: String,
     /** Whether the bot has posted it already. */
     val posted: Boolean,
+)
+
+@Serializable
+data class PartyResultDto(
+    /** `null` for those in no party. */
+    val name: String?,
+    val yes: Int,
+    val no: Int,
+    val abstain: Int,
+    /** Members of the party who could vote; at least those who did. */
+    val eligible: Int,
 )
 
 /** A vote was started; the bot posts it. */
