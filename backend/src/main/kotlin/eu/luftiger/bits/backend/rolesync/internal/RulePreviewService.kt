@@ -56,6 +56,9 @@ class RulePreviewService(
                 managed = rules.isNotEmpty(),
                 membersReported = members != null,
                 usersLoaded = syncService.loadedAll(),
+                gains = emptyList(),
+                losses = emptyList(),
+                unknown = emptyList(),
             )
         }
         val evaluator = RuleEvaluator(rules, ruleInputs.governments(rules))
