@@ -4,6 +4,7 @@ import eu.luftiger.bits.bot.accounts.JdaDirectMessages
 import eu.luftiger.bits.bot.accounts.RelinkNotifier
 import eu.luftiger.bits.bot.backend.KtorBackendClient
 import eu.luftiger.bits.bot.commands.PingCommand
+import eu.luftiger.bits.bot.commands.ProfileCommand
 import eu.luftiger.bits.bot.commands.UnverifyCommand
 import eu.luftiger.bits.bot.commands.VerifyCommand
 import eu.luftiger.bits.bot.events.EventHandler
@@ -60,12 +61,18 @@ fun main() {
             .enableIntents(GatewayIntent.GUILD_MEMBERS)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .setChunkingFilter(ChunkingFilter.ALL)
-            .addEventListeners(PingCommand(backend, scope), verifyCommand, UnverifyCommand(backend, scope), roleReporter, memberReporter)
-            .build()
+            .addEventListeners(
+                PingCommand(backend, scope),
+                verifyCommand,
+                UnverifyCommand(backend, scope),
+                ProfileCommand(backend, scope),
+                roleReporter,
+                memberReporter,
+            ).build()
             .awaitReady()
 
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
-    guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data, UnverifyCommand.data).queue()
+    guild.updateCommands().addCommands(PingCommand.data, VerifyCommand.data, UnverifyCommand.data, ProfileCommand.data).queue()
     roleReporter.reportPeriodically(guild)
     memberReporter.reportPeriodically(guild)
 

@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.PingResponse
+import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.UnlinkAccountResponse
 import io.ktor.client.engine.mock.MockEngine
@@ -60,6 +61,20 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
             assertEquals(UnlinkAccountResponse(wareraUsername = "Luftiger"), client.unlinkAccount("42"))
+        }
+
+    @Test
+    fun `profile posts the user and decodes the outcome by its type`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals("http://backend:8080/api/profiles", request.url.toString())
+                    assertEquals("""{"discordUserId":"42"}""", request.body.toByteArray().decodeToString())
+                    respond("""{"type":"not_linked"}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(ProfileResponse.NotLinked, client.profile("42"))
         }
 
     @Test

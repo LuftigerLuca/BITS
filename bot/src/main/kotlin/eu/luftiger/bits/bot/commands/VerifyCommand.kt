@@ -159,7 +159,8 @@ class VerifyCommand(
         /** What the data protection section of the README says, in short. */
         internal const val PRIVACY_NOTICE =
             "BITS speichert deine Discord-ID zusammen mit deinem WarEra-Account, um dir passende Rollen zu geben. Mit " +
-                "`/${UnverifyCommand.NAME}` löschst du die Verknüpfung jederzeit."
+                "`/${ProfileCommand.NAME}` können Mitglieder des Servers dein WarEra-Profil sehen. Mit `/${UnverifyCommand.NAME}` " +
+                "löschst du die Verknüpfung jederzeit."
 
         /** The code proves who renamed the company, not who asked for it; see VerificationService in the backend. */
         internal const val SOCIAL_ENGINEERING_WARNING =
