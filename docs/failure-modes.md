@@ -40,6 +40,9 @@ answer after a start everything is on; while the backend is down, the bot keeps 
 at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;
 switching them on again syncs everybody.
 
+The bot's status and activity reach it as an event; while the bot is down, the event waits in the stream, and the bot
+also asks the backend for them on start, with backoff until it answers. Until then it shows as online without activity.
+
 Admins see most of this in the system log of the dashboard: members and governments whose WarEra data is missing,
 role and nickname changes Discord refused or the bot could not make, events moved to `bits:events:dead`, and events that wait more than 10 minutes for Redis.
 A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or

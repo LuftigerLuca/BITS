@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.events
 
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.BitsEvent
+import eu.luftiger.bits.shared.BotPresenceChangedEvent
 import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
@@ -27,6 +28,7 @@ class LoggingEventHandler : EventHandler {
             is VoteClosedEvent -> log.info("Vote {} closed", event.voteId)
             is VoteEvaluatedEvent -> log.info("Vote {} evaluated", event.voteId)
             is EmbassySyncEvent -> log.info("Embassy sync {} for {} threads", event.syncId, event.threads.size)
+            is BotPresenceChangedEvent -> log.info("Bot presence changed to {}", event.presence.status)
         }
     }
 }

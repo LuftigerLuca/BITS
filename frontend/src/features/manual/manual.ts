@@ -262,6 +262,19 @@ export const MANUAL_PAGES: ManualPage[] = [
         tips: ['Jedes Umschalten steht im Audit-Log.'],
       },
       {
+        id: 'bot-presence',
+        title: 'Status des Bots',
+        intro:
+          'Unter „Verwaltung“ legst du fest, wie Discord den Bot in der Mitgliederliste zeigt: Online, Abwesend, Bitte ' +
+          'nicht stören oder Unsichtbar, dazu auf Wunsch eine Aktivität.',
+        points: [
+          'Aktivitäten sind „Spielt …“, „Schaut …“, „Hört …“, „Tritt an in …“ oder ein eigener Status-Text, jeweils bis ' +
+            '128 Zeichen.',
+          'Discord zeigt die Änderung nach wenigen Sekunden. Nach einem Neustart setzt der Bot sie wieder.',
+        ],
+        tips: ['Jede Änderung steht im Audit-Log.'],
+      },
+      {
         id: 'rules',
         title: 'Rollen nach WarEra-Daten',
         intro:
