@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
@@ -73,7 +73,7 @@ describe('account page', () => {
     expect(screen.getByRole('link', { name: 'Daten herunterladen' })).toHaveAttribute('href', '/web/account/export')
   })
 
-  it('shows no roles while the role sync is off, and the link can still be removed', async () => {
+  it('says that the role sync is off, and the link can still be removed', async () => {
     stubFetch({
       'GET /web/me': () => json(member),
       'GET /web/features': () => features('ROLE_SYNC', 'VERIFICATION'),
@@ -83,10 +83,8 @@ describe('account page', () => {
     renderApp('/account')
 
     expect(await screen.findByRole('button', { name: 'Verknüpfung lösen' })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(screen.queryByText('Rollen', { selector: '[data-slot=card-title]' })).not.toBeInTheDocument(),
-    )
-    expect(screen.queryByText('Bürger Deutschland')).not.toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('Deine Rollen auf dem Server bleiben, wie sie sind')
+    expect(await screen.findByText('Bürger Deutschland')).toBeInTheDocument()
   })
 
   it('points members without link to /verify', async () => {
