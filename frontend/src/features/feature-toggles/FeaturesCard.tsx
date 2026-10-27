@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch'
 import { FEATURES } from './labels'
 import { useFeatures, useSetFeature } from './queries'
 
-/** Admins only: switches each feature on or off; the pages of those that are off disappear from the navigation. */
+/** Admins only: switches each feature on or off; the pages of those that are off say so but stay editable. */
 export function FeaturesCard() {
   const features = useFeatures()
   const setFeature = useSetFeature()
@@ -15,9 +15,9 @@ export function FeaturesCard() {
       <CardHeader>
         <CardTitle>Funktionen</CardTitle>
         <CardDescription>
-          Ausgeschaltete Funktionen pausieren: Ihre Befehle antworten in Discord mit einem Hinweis, ihre Seiten
-          verschwinden aus dem Dashboard, und nichts wird gelöscht. Der Bot übernimmt eine Änderung innerhalb von 30
-          Sekunden.
+          Ausgeschaltete Funktionen pausieren: Ihre Befehle antworten in Discord mit einem Hinweis, ihre Seiten im
+          Dashboard zeigen ihn auch, und ihre Einstellungen lassen sich weiter ändern. Gelöscht wird nichts. Der Bot
+          übernimmt eine Änderung innerhalb von 30 Sekunden.
         </CardDescription>
       </CardHeader>
       <CardContent>

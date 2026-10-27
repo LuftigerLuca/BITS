@@ -40,7 +40,6 @@ describe('features', () => {
     const votes = await screen.findByRole('switch', { name: 'Abstimmungen' })
     expect(within(card()).getAllByRole('switch')).toHaveLength(6)
     expect(votes).toBeChecked()
-    expect(await screen.findByRole('link', { name: 'Abstimmungen' })).toBeInTheDocument()
 
     await userEvent.click(votes)
 
@@ -50,8 +49,8 @@ describe('features', () => {
       expect.objectContaining({ method: 'PUT', body: JSON.stringify({ enabled: false }) }),
     )
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Abstimmungen' })).not.toBeChecked())
-    // Its page leaves the navigation with it.
-    expect(screen.queryByRole('link', { name: 'Abstimmungen' })).not.toBeInTheDocument()
+    // Its page stays, so its settings can be prepared while it is paused.
+    expect(screen.getByRole('link', { name: 'Abstimmungen' })).toBeInTheDocument()
   })
 
   it('says in a toast when the switch cannot be saved', async () => {
@@ -64,24 +63,40 @@ describe('features', () => {
     expect(screen.getByRole('switch', { name: 'Abstimmungen' })).toBeChecked()
   })
 
-  it('hides the pages of features that are off and sends their links back to the start', async () => {
+  it('keeps the pages of features that are off and says so on them, with their settings still editable', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
       'GET /web/features': () => features('ROLE_SYNC', 'EMBASSIES'),
       'GET /web/votes/access': () => json({ canManage: true }),
-      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/role-sync/countries': () => json([]),
+      'GET /web/admin/role-sync/roles': () => json([]),
     })
     renderApp('/admin/roles')
 
-    expect(await screen.findByText('Willkommen, Luca')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('Diese Funktion ist gerade ausgeschaltet.')
+    expect(screen.getByRole('heading', { name: 'Rollen' })).toBeInTheDocument()
     const navigation = screen.getByRole('navigation', { name: 'Hauptnavigation' })
-    expect(within(navigation).getByRole('link', { name: 'Start' })).toHaveAttribute('aria-current', 'page')
-    await within(navigation).findByRole('link', { name: 'Abstimmungen' })
-    expect(within(navigation).queryByRole('link', { name: 'Rollen' })).not.toBeInTheDocument()
-    expect(within(navigation).queryByRole('link', { name: 'Botschaften' })).not.toBeInTheDocument()
+    expect(within(navigation).getByRole('link', { name: 'Rollen' })).toHaveAttribute('aria-current', 'page')
+    expect(within(navigation).getByRole('link', { name: 'Botschaften' })).toBeInTheDocument()
   })
 
-  it('hides the votes from members who may manage them while votes are off', async () => {
+  it('shows no notice on the pages of features that are on', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/features': () => features('EMBASSIES'),
+      'GET /web/votes/access': () => json({ canManage: true }),
+      'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/role-sync/countries': () => json([]),
+      'GET /web/admin/role-sync/roles': () => json([]),
+    })
+    renderApp('/admin/roles')
+
+    expect(await screen.findByRole('heading', { name: 'Rollen' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+  })
+
+  it('keeps the votes for members who may manage them while votes are off', async () => {
     stubFetch({
       'GET /web/me': () => json({ ...admin, role: 'USER' }),
       'GET /web/features': () => features('VOTES'),
@@ -89,10 +104,8 @@ describe('features', () => {
     })
     renderApp('/votes')
 
-    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
-    await waitFor(() =>
-      expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual(['Start', 'Mein Account']),
-    )
-    expect(within(navigation).queryByText('Admin')).not.toBeInTheDocument()
+    expect(await screen.findByText(/Neue Abstimmungen lassen sich erst wieder starten/)).toBeInTheDocument()
+    const navigation = screen.getByRole('navigation', { name: 'Hauptnavigation' })
+    expect(within(navigation).getByRole('link', { name: 'Abstimmungen' })).toHaveAttribute('aria-current', 'page')
   })
 })

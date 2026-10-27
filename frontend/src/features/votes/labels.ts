@@ -45,6 +45,7 @@ export function errorMessage(error: unknown, conflict = 'Die Abstimmung läuft n
     if (error.status === 400) return 'Die Abstimmung ist unvollständig, oder ihr Ende liegt in der Vergangenheit.'
     if (error.status === 403) return 'Abstimmungen verwalten dürfen nur Admins und die dafür freigegebenen Rollen.'
     if (error.status === 409) return conflict
+    if (error.status === 423) return 'Abstimmungen sind gerade ausgeschaltet.'
   }
   return 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'
 }

@@ -251,8 +251,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         points: [
           'Ihre Befehle antworten in Discord mit „Diese Funktion ist gerade ausgeschaltet.“ Der Bot übernimmt eine ' +
             'Änderung innerhalb von 30 Sekunden.',
-          'Ihre Seiten verschwinden aus der Seitenleiste des Dashboards; ohne Rollen-Sync zeigt „Mein Account“ keine ' +
-            'Rollen.',
+          'Ihre Seiten im Dashboard bleiben und zeigen oben einen Hinweis. Regeln und Einstellungen kannst du weiter ' +
+            'ändern; sie wirken, sobald die Funktion wieder an ist.',
           '/unverify, „Verknüpfung lösen“ und der Datenexport gehen immer.',
           'Ohne Rollen-Sync und ohne Botschaften bleiben Rollen und Threads, wie sie sind. Schaltest du sie wieder ' +
             'ein, gleicht BITS sofort alle Mitglieder ab.',

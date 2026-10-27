@@ -5,7 +5,7 @@ import { ERROR_MESSAGE, FEATURES } from './labels'
 
 const FEATURES_KEY = ['features'] as const
 
-/** Asked by every user, since the navigation hides the pages of features that are off. */
+/** Asked by every user, since the pages of features that are off say so. */
 export function useFeatures() {
   return useQuery({ queryKey: FEATURES_KEY, queryFn: getFeatures })
 }

@@ -103,6 +103,19 @@ describe('votes page', () => {
     ])
   })
 
+  it('says in a toast that votes are off when the backend refuses to start one', async () => {
+    stubVotes(member, undefined, { 'POST /web/votes': () => status(423) })
+    renderApp('/votes')
+
+    await userEvent.type(await screen.findByLabelText('Frage'), 'Krieg erklären?')
+    await choose('Stimmberechtigte Rolle', 'Kongress')
+    await choose('Kanal', '#abstimmungen (Politik)')
+    await userEvent.click(screen.getByLabelText('Ohne Enddatum, bis jemand sie beendet'))
+    await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
+
+    await expectToast('error', 'Abstimmungen sind gerade ausgeschaltet.')
+  })
+
   it('starts a vote that ends at a threshold of 1 to 99 percent for Yes or No', async () => {
     const created: unknown[] = []
     stubVotes(member, undefined, {
