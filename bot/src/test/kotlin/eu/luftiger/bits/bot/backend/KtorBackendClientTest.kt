@@ -1,5 +1,9 @@
 package eu.luftiger.bits.bot.backend
 
+import eu.luftiger.bits.shared.BotActivity
+import eu.luftiger.bits.shared.BotActivityType
+import eu.luftiger.bits.shared.BotPresence
+import eu.luftiger.bits.shared.BotStatus
 import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
@@ -45,6 +49,22 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
             assertEquals(PingResponse(pingCount = 3, wareraCountryCount = null), client.ping("42"))
+        }
+
+    @Test
+    fun `the presence is read from the backend`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals("http://backend:8080/api/bot-presence", request.url.toString())
+                    respond(
+                        """{"status":"IDLE","activity":{"type":"WATCHING","text":"WarEra"}}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(BotPresence(BotStatus.IDLE, BotActivity(BotActivityType.WATCHING, "WarEra")), client.botPresence())
         }
 
     @Test

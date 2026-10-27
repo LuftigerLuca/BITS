@@ -17,6 +17,7 @@ function stub(overview: Overview, setCountry: (init?: RequestInit) => Response) 
     'GET /web/me': () => json(admin),
     'GET /web/admin/role-sync/countries': () => json(countries),
     'GET /web/admin/overview': () => json(overview),
+    'GET /web/admin/bot-presence': () => json({}),
     'PUT /web/admin/overview/country': setCountry,
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),

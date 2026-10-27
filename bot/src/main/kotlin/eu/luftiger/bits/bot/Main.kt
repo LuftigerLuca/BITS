@@ -17,6 +17,7 @@ import eu.luftiger.bits.bot.events.EventHandler
 import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import eu.luftiger.bits.bot.members.MemberReporter
+import eu.luftiger.bits.bot.presence.PresenceUpdater
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
 import eu.luftiger.bits.bot.systemlog.SystemLogReporter
@@ -24,6 +25,7 @@ import eu.luftiger.bits.bot.votes.VoteButtons
 import eu.luftiger.bits.bot.votes.VoteCommand
 import eu.luftiger.bits.bot.votes.VoteEvents
 import eu.luftiger.bits.shared.AccountLinkedEvent
+import eu.luftiger.bits.shared.BotPresenceChangedEvent
 import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
@@ -108,6 +110,8 @@ fun main() {
     memberReporter.reportPeriodically(guild)
     channelReporter.reportPeriodically(guild)
     threadReporter.reportPeriodically(guild)
+    val presence = PresenceUpdater(jda, backend, scope)
+    presence.loadOnStart()
 
     val logging = LoggingEventHandler()
     val systemLog = SystemLogReporter(backend, scope, backend)
@@ -126,6 +130,7 @@ fun main() {
                 is VoteClosedEvent -> votes.onClosed(event)
                 is VoteEvaluatedEvent -> votes.onEvaluated(event)
                 is EmbassySyncEvent -> embassies.handle(event)
+                is BotPresenceChangedEvent -> presence.handle(event)
                 else -> Unit
             }
         }

@@ -1,3 +1,4 @@
+import { BotPresenceCard } from '@/features/bot-presence/BotPresenceCard'
 import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
 import { ManagerRolesCard } from '@/features/votes/ManagerRolesCard'
 import { PartyColorsCard } from '@/features/votes/PartyColorsCard'
@@ -8,6 +9,7 @@ export function AdminPage() {
     <div className="flex flex-col gap-4">
       <h1 className="font-heading text-xl font-semibold">Verwaltung</h1>
       <CountrySettingCard />
+      <BotPresenceCard />
       <ManagerRolesCard />
       <ResultImageCard />
       <PartyColorsCard />

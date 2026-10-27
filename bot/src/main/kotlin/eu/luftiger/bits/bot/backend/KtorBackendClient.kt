@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.BitsJson
+import eu.luftiger.bits.shared.BotPresence
 import eu.luftiger.bits.shared.CastVoteRequest
 import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.CheckVerificationRequest
@@ -64,7 +65,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import java.time.Duration
 
-/** [BackendClient], [VoteBackend] and [EmbassyBackend] that authenticate with the service token of the bot. */
+/** [BackendClient], [VoteBackend], [EmbassyBackend] and [PresenceBackend] that authenticate with the service token of the bot. */
 class KtorBackendClient(
     baseUrl: String,
     serviceToken: String,
@@ -73,6 +74,7 @@ class KtorBackendClient(
 ) : BackendClient,
     VoteBackend,
     EmbassyBackend,
+    PresenceBackend,
     AutoCloseable {
     private val http =
         HttpClient(engine) {
@@ -190,6 +192,8 @@ class KtorBackendClient(
             setBody(report)
         }
     }
+
+    override suspend fun botPresence(): BotPresence = http.get("api/bot-presence").body()
 
     override suspend fun startVote(request: StartVoteRequest): StartVoteResponse = post("api/votes", request)
 

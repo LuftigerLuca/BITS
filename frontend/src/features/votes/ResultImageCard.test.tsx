@@ -14,6 +14,7 @@ function stub(settings: () => ResultSettings, routes: Record<string, (init?: Req
     'GET /web/me': () => json(admin),
     'GET /web/admin/role-sync/countries': () => json([]),
     'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+    'GET /web/admin/bot-presence': () => json({}),
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/votes/result-settings': () => json(settings()),

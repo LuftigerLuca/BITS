@@ -35,6 +35,9 @@ channel with that reason; the other threads are synced, and
 the next sync tries again, at the latest after an hour. Without the backend, the bot keeps reporting its private threads
 with backoff, so new threads show up for picking once it is back.
 
+The bot's status and activity reach it as an event; while the bot is down, the event waits in the stream, and the bot
+also asks the backend for them on start, with backoff until it answers. Until then it shows as online without activity.
+
 Admins see most of this in the system log of the dashboard: members and governments whose WarEra data is missing,
 role and nickname changes Discord refused or the bot could not make, events moved to `bits:events:dead`, and events that wait more than 10 minutes for Redis.
 A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or

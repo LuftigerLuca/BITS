@@ -24,6 +24,7 @@ describe('roles that may manage votes', () => {
       'GET /web/votes/access': () => json({ canManage: true }),
       'GET /web/admin/role-sync/countries': () => json([]),
       'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/bot-presence': () => json({}),
       'GET /web/votes/options': () => json(options),
       'GET /web/admin/votes/manager-roles': () => json({ roleIds: ['r-congress'] }),
       'PUT /web/admin/votes/manager-roles': (init?: RequestInit) => {
