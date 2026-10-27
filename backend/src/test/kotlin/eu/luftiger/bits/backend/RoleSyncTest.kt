@@ -103,10 +103,13 @@ class RoleSyncTest {
     fun reset() {
         awaitBackgroundWork()
         jdbc.execute(
-            "TRUNCATE account_link, account_verification, role_rule, role_rule_condition, discord_role, event_publication, nickname_opt_in",
+            "TRUNCATE account_link, account_verification, role_rule, role_rule_condition, discord_role, event_publication, " +
+                "nickname_opt_in, feature_setting",
         )
         redisTemplate.delete(EventStream.KEY)
         memberService.forget()
+        // WarEra data loaded by an earlier test would answer for the users of this one.
+        syncService.forget()
         warera.reset()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
         reportRoles(
@@ -117,11 +120,11 @@ class RoleSyncTest {
         )
     }
 
-    /** Other tests share the database and expect no syncs without rules. */
+    /** Other tests share the database and expect no syncs without rules, and every feature on. */
     @AfterTest
     fun deleteNicknameOptIns() {
         awaitBackgroundWork()
-        jdbc.execute("TRUNCATE nickname_opt_in")
+        jdbc.execute("TRUNCATE nickname_opt_in, feature_setting")
     }
 
     @Test
@@ -529,6 +532,54 @@ class RoleSyncTest {
         val relinked = awaitEvents(2).last() as RoleSyncEvent
         assertEquals(emptyMap(), relinked.nicknames)
         assertEquals(mapOf("1" to "Luftiger"), relinked.nicknameResets)
+    }
+
+    @Test
+    fun `while the role sync is off, syncs set nicknames only, and switching it on syncs everybody`() {
+        link("1", "w1")
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        awaitEvents(1)
+
+        setFeature("ROLE_SYNC", false)
+        optIn("1", true)
+        val nicknamesOnly = awaitEvents(2).last() as RoleSyncEvent
+        // Without managed roles, the bot changes none.
+        assertEquals(emptyList(), nicknamesOnly.managedRoleIds)
+        assertEquals(mapOf("1" to "Luftiger"), nicknamesOnly.nicknames)
+
+        setFeature("ROLE_SYNC", true)
+        val caughtUp = awaitEvents(3).last() as RoleSyncEvent
+        assertEquals(null, caughtUp.discordUserIds)
+        assertEquals(setOf("r-citizen"), grantedRoles(caughtUp, "1"))
+    }
+
+    @Test
+    fun `while nicknames are off, syncs set and clear none`() {
+        link("1", "w1")
+        optIn("1", true)
+        awaitEvents(1)
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        awaitEvents(2)
+
+        setFeature("NICKNAMES", false)
+        unlink("1")
+
+        val unlinked = awaitEvents(3).last() as RoleSyncEvent
+        assertEquals(emptyMap(), unlinked.nicknames)
+        assertEquals(emptyMap(), unlinked.nicknameResets)
+    }
+
+    @Test
+    fun `while the role sync and nicknames are off, nothing is synced`() {
+        link("1", "w1")
+        setFeature("ROLE_SYNC", false)
+        setFeature("NICKNAMES", false)
+
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        unlink("1")
+        syncTrigger.hourly()
+
+        awaitEvents(0)
     }
 
     @Test
@@ -981,6 +1032,16 @@ class RoleSyncTest {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }
+
+    private fun setFeature(
+        feature: String,
+        enabled: Boolean,
+    ) = mockMvc
+        .put("/web/admin/features/$feature") {
+            cookie(admin)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"enabled":$enabled}"""
+        }.andExpect { status { isNoContent() } }
 
     private fun optIn(
         discordUserId: String,

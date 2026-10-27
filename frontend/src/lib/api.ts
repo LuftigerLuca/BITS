@@ -208,6 +208,7 @@ export type AuditAction =
   | 'EMBASSY_MEMBER_ADDED'
   | 'EMBASSY_MEMBER_REMOVED'
   | 'EMBASSY_SETTINGS_CHANGED'
+  | 'FEATURE_TOGGLED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'
@@ -461,6 +462,26 @@ export async function removeEmbassyMember(threadId: string, discordUserId: strin
 /** Members of the Discord by name or ID, at most 20. */
 export async function searchEmbassyMembers(query: string): Promise<MemberOption[]> {
   return (await request(`${EMBASSIES}/member-search?${new URLSearchParams({ query })}`)).json()
+}
+
+/** Parts of BITS an admin can switch off under "Verwaltung"; a feature is on until then. */
+export type Feature = 'VERIFICATION' | 'ROLE_SYNC' | 'NICKNAMES' | 'PROFILE' | 'VOTES' | 'EMBASSIES'
+
+export interface FeatureState {
+  feature: Feature
+  enabled: boolean
+}
+
+export async function getFeatures(): Promise<FeatureState[]> {
+  return (await request('/web/features')).json()
+}
+
+export async function setFeature(feature: Feature, enabled: boolean): Promise<void> {
+  await request(`/web/admin/features/${feature}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
 }
 
 const OVERVIEW = '/web/admin/overview'

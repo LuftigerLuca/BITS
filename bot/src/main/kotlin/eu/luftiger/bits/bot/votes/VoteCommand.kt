@@ -150,7 +150,7 @@ class VoteCommand(
 
     companion object {
         const val NAME = "abstimmung"
-        private const val START = "starten"
+        const val START = "starten"
         private const val END = "beenden"
         private const val CANCEL = "abbrechen"
         private const val OPTION_QUESTION = "frage"

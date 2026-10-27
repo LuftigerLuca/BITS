@@ -1,9 +1,9 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Account, AccountRoles, Me } from '@/lib/api'
-import { json, status, stubFetch } from '@/test/fetch'
+import { features, json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
 
@@ -65,11 +65,28 @@ describe('account page', () => {
       ['Letzter Abgleich', '01.01.2026, 11:00'],
     ])
     await screen.findByText('Bürger Deutschland')
+    expect(screen.getByText('Rollen', { selector: '[data-slot=card-title]' })).toBeInTheDocument()
     expect(rows()).toEqual([
       ['Bürger Deutschland', 'Erfüllt', 'Staatsbürgerschaft Germany'],
       ['Veteran', 'Nicht erfüllt', 'Level ab 50 (Level 30 von 50)'],
     ])
     expect(screen.getByRole('link', { name: 'Daten herunterladen' })).toHaveAttribute('href', '/web/account/export')
+  })
+
+  it('shows no roles while the role sync is off, and the link can still be removed', async () => {
+    stubFetch({
+      'GET /web/me': () => json(member),
+      'GET /web/features': () => features('ROLE_SYNC', 'VERIFICATION'),
+      'GET /web/account': () => json(account),
+      'GET /web/account/roles': () => json(roles),
+    })
+    renderApp('/account')
+
+    expect(await screen.findByRole('button', { name: 'Verknüpfung lösen' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByText('Rollen', { selector: '[data-slot=card-title]' })).not.toBeInTheDocument(),
+    )
+    expect(screen.queryByText('Bürger Deutschland')).not.toBeInTheDocument()
   })
 
   it('points members without link to /verify', async () => {

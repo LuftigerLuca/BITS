@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.FeatureStates
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
 import eu.luftiger.bits.shared.PingResponse
@@ -45,6 +46,20 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
             assertEquals(PingResponse(pingCount = 3, wareraCountryCount = null), client.ping("42"))
+        }
+
+    @Test
+    fun `features are read from the backend and missing ones count as on`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals(HttpMethod.Get, request.method)
+                    assertEquals("http://backend:8080/api/features", request.url.toString())
+                    respond("""{"votes":false}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(FeatureStates(votes = false), client.features())
         }
 
     @Test

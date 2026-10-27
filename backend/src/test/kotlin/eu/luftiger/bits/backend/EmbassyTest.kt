@@ -112,7 +112,7 @@ class EmbassyTest {
         jdbc.execute(
             "TRUNCATE account_link, account_verification, embassy_thread, embassy_manual_member, embassy_thread_member, " +
                 "discord_thread, embassy_host_role, embassy_setting, embassy_office, overview_setting, audit_entry, " +
-                "system_log_entry, event_publication, discord_role, role_rule, nickname_opt_in CASCADE",
+                "system_log_entry, event_publication, discord_role, role_rule, nickname_opt_in, feature_setting CASCADE",
         )
         jdbc.execute("INSERT INTO embassy_office (office) VALUES ('PRESIDENT'), ('VICE_PRESIDENT'), ('MINISTER_OF_FOREIGN_AFFAIRS')")
     }
@@ -179,6 +179,24 @@ class EmbassyTest {
         assertEquals(mapOf("3" to "BITS: Außenminister von France"), event.ambassadors)
         assertEquals("r-amb", event.ambassadorRoleId)
         assertEquals(listOf("r-gov"), event.hostRoleIds)
+    }
+
+    @Test
+    fun `while the embassies are off nothing syncs, and switching them on syncs right away`() {
+        assign("t-fr", "fr").andExpect { status { isCreated() } }
+        awaitBackgroundWork()
+        val before = streamEvents().filterIsInstance<EmbassySyncEvent>().size
+
+        setFeature("EMBASSIES", false)
+        verify("3", "Minister")
+        embassyTrigger.hourly()
+        awaitBackgroundWork()
+        assertEquals(before, streamEvents().filterIsInstance<EmbassySyncEvent>().size)
+
+        setFeature("EMBASSIES", true)
+        awaitBackgroundWork()
+        assertEquals(before + 1, streamEvents().filterIsInstance<EmbassySyncEvent>().size)
+        assertEquals(mapOf("3" to "Außenminister von France"), lastSync().threads.single().members)
     }
 
     @Test
@@ -439,6 +457,16 @@ class EmbassyTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"discordUserId":"$discordUserId"}"""
         }
+
+    private fun setFeature(
+        feature: String,
+        enabled: Boolean,
+    ) = mockMvc
+        .put("/web/admin/features/$feature") {
+            cookie(session(SessionUser.admin("admin")))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"enabled":$enabled}"""
+        }.andExpect { status { isNoContent() } }
 
     private fun setSettings(body: String) = setSettingsRequest(body).andExpect { status { isNoContent() } }
 

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
+import { useFeatures } from '@/features/feature-toggles/queries'
 import { useVoteAccess } from '@/features/votes/queries'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -43,7 +44,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
-import type { Me } from '@/lib/api'
+import type { Feature, Me } from '@/lib/api'
 import { setTheme, storedTheme, type Theme } from '@/lib/theme'
 
 /** Frame of all pages behind the login: navigation in the sidebar, current user and logout in its menu. */
@@ -51,9 +52,14 @@ export function Layout() {
   const { user } = useAuth()
   // Whether the user may manage votes depends on their Discord roles, which only the backend knows.
   const voteAccess = useVoteAccess()
+  const features = useFeatures()
   if (!user) return null
   const isAdmin = user.role === 'ADMIN'
-  const canManageVotes = voteAccess.data?.canManage === true
+  // A page shows up unless its feature is known to be off; its guard decides once the features are loaded.
+  const enabled = (feature: Feature) => features.data?.find((state) => state.feature === feature)?.enabled !== false
+  const canManageVotes = voteAccess.data?.canManage === true && enabled('VOTES')
+  const showRoles = isAdmin && enabled('ROLE_SYNC')
+  const showEmbassies = isAdmin && enabled('EMBASSIES')
 
   return (
     // On the desktop the sidebar is always open; the open state only applies there, so changes are ignored.
@@ -81,20 +87,20 @@ export function Layout() {
                 </SidebarGroupContent>
               </SidebarGroup>
               {/* Members of the roles that may manage votes see the group too, with the votes only. */}
-              {(isAdmin || canManageVotes) && (
+              {(showRoles || showEmbassies || canManageVotes) && (
                 <SidebarGroup>
                   <SidebarGroupLabel>Admin</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {isAdmin && (
-                        <>
-                          <NavItem to="/admin/roles" icon={<ShieldIcon />}>
-                            Rollen
-                          </NavItem>
-                          <NavItem to="/admin/embassies" icon={<LandmarkIcon />}>
-                            Botschaften
-                          </NavItem>
-                        </>
+                      {showRoles && (
+                        <NavItem to="/admin/roles" icon={<ShieldIcon />}>
+                          Rollen
+                        </NavItem>
+                      )}
+                      {showEmbassies && (
+                        <NavItem to="/admin/embassies" icon={<LandmarkIcon />}>
+                          Botschaften
+                        </NavItem>
                       )}
                       {canManageVotes && (
                         <NavItem to="/votes" icon={<VoteIcon />}>
