@@ -19,6 +19,7 @@ import eu.luftiger.bits.shared.DiscordThreadsReport
 import eu.luftiger.bits.shared.Elector
 import eu.luftiger.bits.shared.ElectorateReport
 import eu.luftiger.bits.shared.EmbassySyncReport
+import eu.luftiger.bits.shared.FeatureStates
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
@@ -65,7 +66,9 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import java.time.Duration
 
-/** [BackendClient], [VoteBackend], [EmbassyBackend] and [PresenceBackend] that authenticate with the service token of the bot. */
+/** [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend] and [PresenceBackend] that authenticate with the
+ * service token of the bot.
+ */
 class KtorBackendClient(
     baseUrl: String,
     serviceToken: String,
@@ -74,6 +77,7 @@ class KtorBackendClient(
 ) : BackendClient,
     VoteBackend,
     EmbassyBackend,
+    FeatureBackend,
     PresenceBackend,
     AutoCloseable {
     private val http =
@@ -192,6 +196,8 @@ class KtorBackendClient(
             setBody(report)
         }
     }
+
+    override suspend fun features(): FeatureStates = http.get("api/features").body()
 
     override suspend fun botPresence(): BotPresence = http.get("api/bot-presence").body()
 

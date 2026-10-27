@@ -16,6 +16,8 @@ import eu.luftiger.bits.bot.embassies.ThreadReporter
 import eu.luftiger.bits.bot.events.EventHandler
 import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
+import eu.luftiger.bits.bot.features.FeatureGate
+import eu.luftiger.bits.bot.features.Features
 import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.presence.PresenceUpdater
 import eu.luftiger.bits.bot.roles.RoleReporter
@@ -70,6 +72,8 @@ fun main() {
     val channelReporter = ChannelReporter(config.guildId, backend, scope)
     val threadReporter = ThreadReporter(config.guildId, backend, scope)
     val verifyCommand = VerifyCommand(backend, scope)
+    val features = Features(backend, scope)
+    features.refreshPeriodically()
 
     // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent.
     val jda =
@@ -80,12 +84,27 @@ fun main() {
             .setChunkingFilter(ChunkingFilter.ALL)
             .addEventListeners(
                 PingCommand(backend, scope),
-                verifyCommand,
+                // Commands of a feature an admin switched off answer with a hint. Votes that are open run to their end,
+                // so only starting one is gated; ending, cancelling and the buttons stay. Unlinking always works, since
+                // members must be able to take back their data.
+                FeatureGate(
+                    features,
+                    { it.verification },
+                    VerifyCommand.NAME,
+                    buttonPrefix = VerifyCommand.CHECK_BUTTON_PREFIX,
+                    delegate = verifyCommand,
+                ),
                 UnverifyCommand(backend, scope),
-                NicknameCommand(backend, scope),
-                ProfileCommand(backend, scope),
-                RolesCommand(backend, scope),
-                VoteCommand(backend, scope),
+                FeatureGate(
+                    features,
+                    { it.nicknames },
+                    NicknameCommand.NAME,
+                    buttonPrefix = NicknameCommand.OPT_IN_BUTTON,
+                    delegate = NicknameCommand(backend, scope),
+                ),
+                FeatureGate(features, { it.profile }, ProfileCommand.NAME, delegate = ProfileCommand(backend, scope)),
+                FeatureGate(features, { it.roleSync }, RolesCommand.NAME, delegate = RolesCommand(backend, scope)),
+                FeatureGate(features, { it.votes }, VoteCommand.NAME, VoteCommand.START, delegate = VoteCommand(backend, scope)),
                 VoteButtons(backend, scope),
                 roleReporter,
                 memberReporter,

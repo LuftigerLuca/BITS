@@ -3,6 +3,9 @@ package eu.luftiger.bits.backend.rolesync.internal
 import eu.luftiger.bits.backend.account.api.AccountLinked
 import eu.luftiger.bits.backend.account.api.AccountUnlinked
 import eu.luftiger.bits.backend.account.api.NicknameOptedIn
+import eu.luftiger.bits.backend.feature.api.BitsFeature
+import eu.luftiger.bits.backend.feature.api.FeatureToggled
+import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService.FormerAccount
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
@@ -33,11 +36,15 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * A sync that fails is recorded in the [SystemLog]; a merged sync of all members counts as a rule change if one of the
  * requests was.
+ *
+ * While both the role sync and nicknames are switched off, requests are dropped and the hourly refresh does not run.
+ * Switching one of them on starts a refresh, which catches up on the account changes missed meanwhile.
  */
 @Component
 class RoleSyncTrigger(
     private val syncService: RoleSyncService,
     private val systemLog: SystemLog,
+    private val features: FeatureToggles,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val syncs = Executors.newSingleThreadExecutor { Thread(it, "role-sync") }
@@ -83,8 +90,14 @@ class RoleSyncTrigger(
     @ApplicationModuleListener
     fun onNicknameOptedIn(event: NicknameOptedIn) = request { pendingMembers += event.discordUserId }
 
+    @ApplicationModuleListener
+    fun onFeatureToggled(event: FeatureToggled) {
+        if (event.enabled && event.feature in SYNCED_FEATURES) hourly()
+    }
+
     @Scheduled(cron = "\${bits.role-sync.cron}")
     fun hourly() {
+        if (!active()) return
         if (!refreshing.compareAndSet(false, true)) {
             log.warn("Role sync refresh still running, skipping this one")
             return
@@ -108,7 +121,10 @@ class RoleSyncTrigger(
         syncs.submit {}.get(timeout.toMillis(), TimeUnit.MILLISECONDS)
     }
 
+    private fun active() = SYNCED_FEATURES.any(features::isEnabled)
+
     private fun request(add: () -> Unit) {
+        if (!active()) return
         synchronized(lock) {
             add()
             if (draining) return
@@ -178,5 +194,10 @@ class RoleSyncTrigger(
     fun shutdown() {
         refreshes.shutdownNow()
         syncs.shutdownNow()
+    }
+
+    private companion object {
+        /** What a sync sets, see [RoleSyncService]. */
+        val SYNCED_FEATURES = listOf(BitsFeature.ROLE_SYNC, BitsFeature.NICKNAMES)
     }
 }

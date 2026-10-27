@@ -86,7 +86,7 @@ class VoteTest {
         jdbc.awaitOutbox()
         jdbc.execute(
             "TRUNCATE vote, vote_manager_role, discord_channel, discord_role, account_link, audit_entry, system_log_entry, " +
-                "event_publication CASCADE",
+                "event_publication, feature_setting CASCADE",
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
@@ -362,6 +362,28 @@ class VoteTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `while votes are off the dashboard starts none, and open votes can still be ended`() {
+        val id = startByAdmin()
+        val admin = session(SessionUser.admin("admin"))
+        mockMvc
+            .put("/web/admin/features/VOTES") {
+                cookie(admin)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"enabled":false}"""
+            }.andExpect { status { isNoContent() } }
+
+        mockMvc
+            .post("/web/votes") {
+                cookie(admin)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"question":"Neue Steuern?","roleId":"r-congress","channelId":"c-votes","endsAt":null}"""
+            }.andExpect { status { isLocked() } }
+        mockMvc.post("/web/votes/$id/end") { cookie(admin) }.andExpect { status { isNoContent() } }
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM vote", Int::class.java))
+        jdbc.execute("TRUNCATE feature_setting")
     }
 
     @Test

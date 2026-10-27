@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { RequireAdmin, RequireAuth, RequireDiscordUser } from './auth/guards.tsx'
+import { RequireFeature } from './features/feature-toggles/RequireFeature.tsx'
 import { RequireVoteAccess } from './features/votes/RequireVoteAccess.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { Layout } from './pages/Layout.tsx'
@@ -18,11 +19,16 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           {
-            element: <RequireVoteAccess />,
+            element: <RequireFeature feature="VOTES" />,
             children: [
               {
-                path: 'votes',
-                lazy: async () => ({ Component: (await import('./pages/VotesPage.tsx')).VotesPage }),
+                element: <RequireVoteAccess />,
+                children: [
+                  {
+                    path: 'votes',
+                    lazy: async () => ({ Component: (await import('./pages/VotesPage.tsx')).VotesPage }),
+                  },
+                ],
               },
             ],
           },
@@ -44,12 +50,22 @@ export const routes: RouteObject[] = [
                 lazy: async () => ({ Component: (await import('./pages/AdminPage.tsx')).AdminPage }),
               },
               {
-                path: 'admin/roles',
-                lazy: async () => ({ Component: (await import('./pages/RolesPage.tsx')).RolesPage }),
+                element: <RequireFeature feature="ROLE_SYNC" />,
+                children: [
+                  {
+                    path: 'admin/roles',
+                    lazy: async () => ({ Component: (await import('./pages/RolesPage.tsx')).RolesPage }),
+                  },
+                ],
               },
               {
-                path: 'admin/embassies',
-                lazy: async () => ({ Component: (await import('./pages/EmbassiesPage.tsx')).EmbassiesPage }),
+                element: <RequireFeature feature="EMBASSIES" />,
+                children: [
+                  {
+                    path: 'admin/embassies',
+                    lazy: async () => ({ Component: (await import('./pages/EmbassiesPage.tsx')).EmbassiesPage }),
+                  },
+                ],
               },
               {
                 path: 'admin/audit-log',

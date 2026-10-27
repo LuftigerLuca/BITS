@@ -35,6 +35,11 @@ channel with that reason; the other threads are synced, and
 the next sync tries again, at the latest after an hour. Without the backend, the bot keeps reporting its private threads
 with backoff, so new threads show up for picking once it is back.
 
+Which features an admin switched off under "Verwaltung" the bot asks the backend every 30 seconds. Until its first
+answer after a start everything is on; while the backend is down, the bot keeps the last answer, and the commands fail
+at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;
+switching them on again syncs everybody.
+
 The bot's status and activity reach it as an event; while the bot is down, the event waits in the stream, and the bot
 also asks the backend for them on start, with backoff until it answers. Until then it shows as online without activity.
 

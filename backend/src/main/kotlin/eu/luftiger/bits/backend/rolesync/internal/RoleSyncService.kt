@@ -4,6 +4,8 @@ import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.account.api.NicknameOptIns
 import eu.luftiger.bits.backend.account.api.dto.LinkedAccount
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.feature.api.BitsFeature
+import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
@@ -36,11 +38,15 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * The event also carries the WarEra names the bot sets as nicknames of members who opted in, and for those who lost
  * their link the name to clear again. With opt-ins, a sync runs even without rules.
+ *
+ * A sync leaves out what an admin switched off: without the role sync it has no rules, so the bot changes no roles;
+ * without nicknames nobody counts as opted in, so the bot sets and clears none.
  */
 @Service
 class RoleSyncService(
     private val ruleInputs: RuleInputs,
     private val nicknameOptIns: NicknameOptIns,
+    private val features: FeatureToggles,
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
@@ -65,6 +71,12 @@ class RoleSyncService(
      * many of them, since it is kept in memory only.
      */
     fun loadedAll(): Boolean = loadedAll
+
+    /** Back to the state after a start of the backend, for tests. */
+    internal fun forget() {
+        users.clear()
+        loadedAll = false
+    }
 
     /**
      * The WarEra data a rule change would be judged with now, by WarEra user ID. A user who is missing would be loaded
@@ -120,8 +132,8 @@ class RoleSyncService(
         confirmedRoleIds: List<String> = emptyList(),
         formerAccounts: Map<String, FormerAccount> = emptyMap(),
     ) {
-        val rules = ruleInputs.activeRules()
-        val optedIn = nicknameOptIns.discordUserIds()
+        val rules = if (features.isEnabled(BitsFeature.ROLE_SYNC)) ruleInputs.activeRules() else emptyList()
+        val optedIn = if (features.isEnabled(BitsFeature.NICKNAMES)) nicknameOptIns.discordUserIds() else emptySet()
         if (rules.isEmpty() && optedIn.isEmpty()) {
             systemLog.recordSyncWithoutRules(trigger)
             return

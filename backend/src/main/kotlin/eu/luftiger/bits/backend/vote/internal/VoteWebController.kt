@@ -1,6 +1,8 @@
 package eu.luftiger.bits.backend.vote.internal
 
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.feature.api.BitsFeature
+import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
 import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Vote
@@ -35,6 +37,7 @@ class VoteWebController(
     private val channelService: DiscordChannelService,
     private val guildRoles: GuildRoles,
     private val settingsService: VoteResultSettingsService,
+    private val features: FeatureToggles,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -75,13 +78,17 @@ class VoteWebController(
         )
     }
 
-    /** 409 if the bot cannot post in the channel. */
+    /**
+     * 409 if the bot cannot post in the channel, 423 while an admin has switched votes off. The bot checks the switch
+     * itself before it starts a vote from Discord.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun start(
         @RequestBody request: CreateVoteRequest,
         @AuthenticationPrincipal session: Jwt,
     ): VoteResponse {
+        if (!features.isEnabled(BitsFeature.VOTES)) throw ResponseStatusException(HttpStatus.LOCKED, "Votes are switched off")
         val manager = manager(session)
         val endsAt = request.endsAt?.let(Instant::ofEpochMilli)
         return when (

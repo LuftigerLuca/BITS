@@ -2,6 +2,9 @@ package eu.luftiger.bits.backend.embassy.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinked
 import eu.luftiger.bits.backend.account.api.AccountUnlinked
+import eu.luftiger.bits.backend.feature.api.BitsFeature
+import eu.luftiger.bits.backend.feature.api.FeatureToggled
+import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -21,11 +24,14 @@ import java.util.concurrent.TimeUnit
  * Every sync covers all threads, since a government has a handful of offices and the [eu.luftiger.bits.warera.WareraClient]
  * keeps it for a few minutes. Requests that arrive while a sync runs are merged into one that follows it, with the
  * trigger of the first of them.
+ *
+ * While an admin has switched the embassies off, requests are dropped; switching them on starts a sync.
  */
 @Component
 class EmbassySyncTrigger(
     private val syncService: EmbassySyncService,
     private val systemLog: SystemLog,
+    private val features: FeatureToggles,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val syncs = Executors.newSingleThreadExecutor { Thread(it, "embassy-sync") }
@@ -34,6 +40,7 @@ class EmbassySyncTrigger(
     private var pending: SyncTrigger? = null
 
     fun request(trigger: SyncTrigger) {
+        if (!features.isEnabled(BitsFeature.EMBASSIES)) return
         synchronized(lock) {
             if (pending != null) return
             pending = trigger
@@ -46,6 +53,11 @@ class EmbassySyncTrigger(
 
     @ApplicationModuleListener
     fun onAccountUnlinked(event: AccountUnlinked) = request(SyncTrigger.ACCOUNT_CHANGE)
+
+    @ApplicationModuleListener
+    fun onFeatureToggled(event: FeatureToggled) {
+        if (event.feature == BitsFeature.EMBASSIES && event.enabled) request(SyncTrigger.SETTING_CHANGE)
+    }
 
     @Scheduled(cron = "\${bits.embassy.cron}")
     fun hourly() = request(SyncTrigger.HOURLY)
