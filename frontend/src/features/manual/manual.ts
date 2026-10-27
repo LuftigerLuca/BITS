@@ -243,6 +243,25 @@ export const MANUAL_PAGES: ManualPage[] = [
         tips: ['Das Land unter „Verwaltung“ bekommt auch keinen Botschafts-Thread.'],
       },
       {
+        id: 'features',
+        title: 'Funktionen ein- und ausschalten',
+        intro:
+          'Unter „Verwaltung“ schaltest du einzelne Funktionen aus: Verifizierung, Rollen-Sync, Nicknames, Profil, ' +
+          'Abstimmungen und Botschaften. Eine ausgeschaltete Funktion pausiert nur, gelöscht wird nichts.',
+        points: [
+          'Ihre Befehle antworten in Discord mit „Diese Funktion ist gerade ausgeschaltet.“ Der Bot übernimmt eine ' +
+            'Änderung innerhalb von 30 Sekunden.',
+          'Ihre Seiten verschwinden aus der Seitenleiste des Dashboards; ohne Rollen-Sync zeigt „Mein Account“ keine ' +
+            'Rollen.',
+          '/unverify, „Verknüpfung lösen“ und der Datenexport gehen immer.',
+          'Ohne Rollen-Sync und ohne Botschaften bleiben Rollen und Threads, wie sie sind. Schaltest du sie wieder ' +
+            'ein, gleicht BITS sofort alle Mitglieder ab.',
+          'Ohne Abstimmungen startet niemand eine neue. Laufende enden wie geplant und lassen sich in Discord mit ' +
+            '/abstimmung beenden oder abbrechen.',
+        ],
+        tips: ['Jedes Umschalten steht im Audit-Log.'],
+      },
+      {
         id: 'rules',
         title: 'Rollen nach WarEra-Daten',
         intro:

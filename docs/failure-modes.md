@@ -35,6 +35,11 @@ channel with that reason; the other threads are synced, and
 the next sync tries again, at the latest after an hour. Without the backend, the bot keeps reporting its private threads
 with backoff, so new threads show up for picking once it is back.
 
+Which features an admin switched off under "Verwaltung" the bot asks the backend every 30 seconds. Until its first
+answer after a start everything is on; while the backend is down, the bot keeps the last answer, and the commands fail
+at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;
+switching them on again syncs everybody.
+
 Admins see most of this in the system log of the dashboard: members and governments whose WarEra data is missing,
 role and nickname changes Discord refused or the bot could not make, events moved to `bits:events:dead`, and events that wait more than 10 minutes for Redis.
 A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or

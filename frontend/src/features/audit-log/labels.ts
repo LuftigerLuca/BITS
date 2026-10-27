@@ -16,6 +16,7 @@ export const ACTIONS: Record<AuditAction, string> = {
   EMBASSY_MEMBER_ADDED: 'Mitglied zur Botschaft hinzugefügt',
   EMBASSY_MEMBER_REMOVED: 'Mitglied aus Botschaft entfernt',
   EMBASSY_SETTINGS_CHANGED: 'Botschafts-Einstellungen geändert',
+  FEATURE_TOGGLED: 'Funktion umgeschaltet',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

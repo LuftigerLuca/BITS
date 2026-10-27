@@ -126,7 +126,7 @@ class VerifyCommand(
         const val NAME = "verify"
         private const val OPTION_NAME = "name"
         private const val MAX_NAME_LENGTH = 32
-        private const val CHECK_BUTTON_PREFIX = "verify:check:"
+        const val CHECK_BUTTON_PREFIX = "verify:check:"
 
         /**
          * Longest wait for the result of a check. The backend needs a few WarEra calls; even with throttling and
