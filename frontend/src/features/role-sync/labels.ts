@@ -1,4 +1,4 @@
-import { ApiError, type ConditionType, type GovernmentOffice, type RuleStatus } from '@/lib/api'
+import { ApiError, type ConditionType, type GovernmentOffice, type MuRole, type RuleStatus } from '@/lib/api'
 
 export const CONDITION_TYPES: Record<ConditionType, string> = {
   CITIZENSHIP: 'Staatsbürgerschaft',
@@ -8,6 +8,15 @@ export const CONDITION_TYPES: Record<ConditionType, string> = {
   MILITARY_RANK: 'Militärrang',
   COMPANIES: 'Firmenbesitz',
   PARTY: 'Partei',
+  MU_LEADERSHIP: 'MU-Führung',
+  PARTY_LEADER: 'Parteivorsitz',
+}
+
+/** Each includes the ranks above it. */
+export const MU_ROLES: Record<MuRole, string> = {
+  COMMANDER: 'Kommandeur',
+  MANAGER: 'Manager',
+  OWNER: 'Besitzer',
 }
 
 export const OFFICES: Record<GovernmentOffice, string> = {

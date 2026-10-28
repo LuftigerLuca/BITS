@@ -9,6 +9,7 @@ import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
+import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraNotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
@@ -129,17 +130,14 @@ class RoleRuleService(
             }
             ConditionType.MILITARY_UNIT -> {
                 val muId = request.muId?.takeIf { it.isNotBlank() } ?: throw badRequest("Military unit missing")
-                val mu =
-                    try {
-                        wareraClient.getMilitaryUnit(muId)
-                    } catch (_: WareraNotFoundException) {
-                        // Without the cause, which would let the 503 handler for WarEra errors take over.
-                        throw badRequest("Unknown military unit $muId")
-                    } catch (_: WareraBadRequestException) {
-                        // An ID in a format WarEra does not accept.
-                        throw badRequest("Unknown military unit $muId")
-                    }
+                val mu = knownMilitaryUnit(muId)
                 RuleCondition(type, muId = mu.id, targetName = mu.name)
+            }
+            ConditionType.MU_LEADERSHIP -> {
+                val role = request.muRole?.role ?: throw badRequest("Rank missing")
+                // Without a unit, any unit counts.
+                val mu = request.muId?.takeIf { it.isNotBlank() }?.let(::knownMilitaryUnit)
+                RuleCondition(type, muId = mu?.id, targetName = mu?.name, muRole = role)
             }
             ConditionType.PARTY -> {
                 val countryId = countryId(request)
@@ -148,6 +146,16 @@ class RoleRuleService(
                 val party =
                     wareraClient.getParties(countryId).firstOrNull { it.id == partyId } ?: throw badRequest("Unknown party $partyId")
                 RuleCondition(type, countryId = countryId, partyId = party.id, targetName = party.name)
+            }
+            ConditionType.PARTY_LEADER -> {
+                val countryId = countryId(request)
+                val country = knownCountry(countryId, countryName)
+                // Without a party, any party of the country counts.
+                val party =
+                    request.partyId?.takeIf { it.isNotBlank() }?.let { partyId ->
+                        wareraClient.getParties(countryId).firstOrNull { it.id == partyId } ?: throw badRequest("Unknown party $partyId")
+                    }
+                RuleCondition(type, countryId = countryId, partyId = party?.id, targetName = party?.name ?: country)
             }
             ConditionType.LEVEL, ConditionType.MILITARY_RANK, ConditionType.COMPANIES -> {
                 val threshold = request.threshold?.takeIf { it >= 1 } ?: throw badRequest("Threshold must be at least 1")
@@ -193,6 +201,17 @@ class RoleRuleService(
             .map(wareraClient::getMilitaryUnit)
             .map { OptionResponse(it.id, it.name) }
     }
+
+    private fun knownMilitaryUnit(muId: String): WareraMilitaryUnit =
+        try {
+            wareraClient.getMilitaryUnit(muId)
+        } catch (_: WareraNotFoundException) {
+            // Without the cause, which would let the 503 handler for WarEra errors take over.
+            throw badRequest("Unknown military unit $muId")
+        } catch (_: WareraBadRequestException) {
+            // An ID in a format WarEra does not accept.
+            throw badRequest("Unknown military unit $muId")
+        }
 
     private fun countryId(request: ConditionRequest): String =
         request.countryId?.takeIf { it.isNotBlank() } ?: throw badRequest("Country missing")

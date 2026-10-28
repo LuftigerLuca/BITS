@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { searchMilitaryUnits, type ConditionType, type GovernmentOffice, type Option } from '@/lib/api'
+import { searchMilitaryUnits, type ConditionType, type GovernmentOffice, type MuRole, type Option } from '@/lib/api'
 import { needsCountry, type ConditionDraft } from './conditionDraft'
-import { CONDITION_TYPES, OFFICES, errorMessage } from './labels'
+import { CONDITION_TYPES, MU_ROLES, OFFICES, errorMessage } from './labels'
 import { useParties } from './queries'
 
 const THRESHOLD_LABELS = { LEVEL: 'Level ab', MILITARY_RANK: 'Militärrang ab', COMPANIES: 'Firmen ab' } as const
+
+/** Stands for no military unit or party in the selects where that means any. */
+const ANY = 'any'
 
 /** The fields of one condition of a new rule, in a group named `name`. */
 export function ConditionFields({
@@ -35,7 +38,9 @@ export function ConditionFields({
   const { type } = draft
   const id = (field: string) => `condition-${draft.key}-${field}`
   const update = (changes: Partial<ConditionDraft>) => onChange({ ...draft, ...changes })
-  const parties = useParties(type === 'PARTY' ? draft.countryId : null)
+  const parties = useParties(type === 'PARTY' || type === 'PARTY_LEADER' ? draft.countryId : null)
+  const leadership = type === 'MU_LEADERSHIP'
+  const partyLeader = type === 'PARTY_LEADER'
 
   async function searchMu() {
     onSearchError(null)
@@ -56,8 +61,15 @@ export function ConditionFields({
     value,
     label,
   }))
-  const muItems = muResults.map((mu) => ({ value: mu.id, label: mu.name }))
-  const partyItems = (parties.data ?? []).map((party) => ({ value: party.id, label: party.name }))
+  const muRoleItems = Object.entries(MU_ROLES).map(([value, label]) => ({ value, label }))
+  const muItems = [
+    ...(leadership ? [{ value: ANY, label: 'Jede MU' }] : []),
+    ...muResults.map((mu) => ({ value: mu.id, label: mu.name })),
+  ]
+  const partyItems = [
+    ...(partyLeader && draft.countryId ? [{ value: ANY, label: 'Jede Partei' }] : []),
+    ...(parties.data ?? []).map((party) => ({ value: party.id, label: party.name })),
+  ]
   const partyPlaceholder = !draft.countryId
     ? 'Erst Land wählen'
     : parties.isError
@@ -147,7 +159,31 @@ export function ConditionFields({
             </Select>
           </div>
         )}
-        {type === 'MILITARY_UNIT' && (
+        {leadership && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={id('mu-role')}>Stufe</Label>
+            <Select
+              items={muRoleItems}
+              value={draft.muRole}
+              onValueChange={(value) => value && update({ muRole: value as MuRole })}
+            >
+              <SelectTrigger id={id('mu-role')} className="w-full" aria-describedby={id('mu-role-hint')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {muRoleItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p id={id('mu-role-hint')} className="text-sm text-muted-foreground">
+              Höhere Stufen zählen mit.
+            </p>
+          </div>
+        )}
+        {(type === 'MILITARY_UNIT' || leadership) && (
           <>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={id('mu-query')}>Military Unit suchen</Label>
@@ -172,8 +208,8 @@ export function ConditionFields({
               <Label htmlFor={id('mu')}>Military Unit</Label>
               <Select
                 items={muItems}
-                value={draft.muId}
-                onValueChange={(muId) => update({ muId })}
+                value={leadership ? (draft.muId ?? ANY) : draft.muId}
+                onValueChange={(muId) => update({ muId: muId === ANY ? null : muId })}
                 disabled={muItems.length === 0}
               >
                 <SelectTrigger id={id('mu')} className="w-full">
@@ -190,13 +226,13 @@ export function ConditionFields({
             </div>
           </>
         )}
-        {type === 'PARTY' && (
+        {(type === 'PARTY' || partyLeader) && (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={id('party')}>Partei</Label>
             <Select
               items={partyItems}
-              value={draft.partyId}
-              onValueChange={(partyId) => update({ partyId })}
+              value={partyLeader && draft.countryId ? (draft.partyId ?? ANY) : draft.partyId}
+              onValueChange={(partyId) => update({ partyId: partyId === ANY ? null : partyId })}
               disabled={partyItems.length === 0}
             >
               <SelectTrigger id={id('party')} className="w-full">

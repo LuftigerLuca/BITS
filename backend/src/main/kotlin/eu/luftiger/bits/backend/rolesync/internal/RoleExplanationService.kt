@@ -15,8 +15,8 @@ import org.springframework.stereotype.Service
 
 /**
  * Explains to a member which managed roles they meet and why, for `/rollen`. It judges with the [RuleEvaluator] of the
- * role sync, but always with a fresh WarEra user and companies (the governments and parties may be cached for a few
- * minutes), and changes nothing: the next sync brings the roles in line.
+ * role sync, but always with a fresh WarEra user and companies (the governments, parties and military units may be
+ * cached for a few minutes), and changes nothing: the next sync brings the roles in line.
  */
 @Service
 class RoleExplanationService(
@@ -44,7 +44,7 @@ class RoleExplanationService(
             }
         val positions = roleRepository.findAll().associate { it.id to it.position }
         val roles =
-            RuleEvaluator(rules, ruleInputs.ruleData(rules))
+            RuleEvaluator(rules, ruleInputs.ruleData(rules, listOfNotNull(user.mu)))
                 .check(user, companyCount)
                 .sortedByDescending { positions[it.roleId] }
                 .map { role ->
@@ -93,6 +93,8 @@ class RoleExplanationService(
             ConditionType.GOVERNMENT_OFFICE -> "Regierung von ${condition.targetName} gerade nicht abrufbar"
             ConditionType.COMPANIES -> "Firmen gerade nicht abrufbar"
             ConditionType.PARTY -> "Partei ${condition.targetName} gerade nicht abrufbar"
+            ConditionType.MU_LEADERSHIP -> "${condition.targetName?.let { "MU $it" } ?: "deine MU"} gerade nicht abrufbar"
+            ConditionType.PARTY_LEADER -> "Parteien gerade nicht abrufbar"
             // Decided by the user alone, who was loaded.
             ConditionType.CITIZENSHIP, ConditionType.MILITARY_UNIT, ConditionType.LEVEL, ConditionType.MILITARY_RANK ->
                 "gerade nicht prüfbar"
@@ -111,6 +113,13 @@ class RoleExplanationService(
             ConditionType.MILITARY_RANK -> "Militärrang ${user.militaryRank} von ${threshold(condition)}"
             ConditionType.COMPANIES -> "$companyCount von ${threshold(condition)} Firmen"
             ConditionType.PARTY -> "nicht Mitglied der Partei ${condition.targetName}"
+            ConditionType.MU_LEADERSHIP -> "nicht ${condition.label}"
+            ConditionType.PARTY_LEADER ->
+                if (condition.partyId == null) {
+                    "kein Parteivorsitz in ${condition.targetName}"
+                } else {
+                    "nicht Vorsitz der Partei ${condition.targetName}"
+                }
         }
 
     private fun threshold(condition: RuleCondition) = requireNotNull(condition.threshold)

@@ -25,6 +25,16 @@ sealed interface SystemProblem {
     ) : SystemProblem
 
     /**
+     * A military unit could not be loaded in a sync; its leadership rules were not run. [muName] is `null` for the unit
+     * of a member that no rule names.
+     */
+    @NamedInterface("api")
+    data class MilitaryUnitUnavailable(
+        val muId: String,
+        val muName: String?,
+    ) : SystemProblem
+
+    /**
      * The government of a country with an embassy thread could not be loaded; nobody was removed from the thread
      * because of their office. Recorded once per sync.
      */

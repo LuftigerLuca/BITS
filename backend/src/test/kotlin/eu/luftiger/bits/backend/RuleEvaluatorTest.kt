@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend
 
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
+import eu.luftiger.bits.backend.rolesync.domain.MilitaryUnitRole
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.backend.rolesync.internal.RoleOutcome
@@ -10,6 +11,8 @@ import eu.luftiger.bits.backend.rolesync.internal.RuleEvaluator
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.warera.WareraGovernment
+import eu.luftiger.bits.warera.WareraMilitaryUnit
+import eu.luftiger.bits.warera.WareraMilitaryUnitRoles
 import eu.luftiger.bits.warera.WareraParty
 import eu.luftiger.bits.warera.WareraUser
 import java.time.Instant
@@ -73,6 +76,82 @@ class RuleEvaluatorTest {
             RuleEvaluator(listOf(companies, party), RuleData())
                 .evaluate(WareraUser(id = "u1", username = "A"), companyCount = null)!!
                 .keepRoleIds,
+        )
+    }
+
+    @Test
+    fun `each rank of a military unit includes the ranks above it`() {
+        val bundeswehr =
+            WareraMilitaryUnit(
+                "m1",
+                "Bundeswehr",
+                owner = "owner",
+                roles = WareraMilitaryUnitRoles(managers = listOf("owner", "manager"), commanders = listOf("commander")),
+            )
+        val rules =
+            MilitaryUnitRole.entries.map { role ->
+                rule(role.name, ConditionType.MU_LEADERSHIP, muId = "m1", targetName = "Bundeswehr", muRole = role)
+            }
+        val evaluator = RuleEvaluator(rules, RuleData(militaryUnits = mapOf("m1" to bundeswehr)))
+
+        fun grants(userId: String) = evaluator.evaluate(WareraUser(id = userId, username = userId, mu = "m1"))?.grants.orEmpty()
+        assertEquals(listOf("COMMANDER", "MANAGER", "OWNER"), grants("owner").map { it.roleId })
+        assertEquals(listOf("COMMANDER", "MANAGER"), grants("manager").map { it.roleId })
+        assertEquals(listOf(RoleGrant("COMMANDER", "BITS: Kommandeur der MU Bundeswehr")), grants("commander"))
+        assertEquals(emptyList(), grants("member"))
+    }
+
+    @Test
+    fun `leadership of any military unit means leading the own one`() {
+        val manager = rule("manager", ConditionType.MU_LEADERSHIP, muRole = MilitaryUnitRole.MANAGER)
+        val data =
+            RuleData(
+                militaryUnits =
+                    mapOf(
+                        "m1" to WareraMilitaryUnit("m1", "Bundeswehr", owner = "u1"),
+                        "m2" to WareraMilitaryUnit("m2", "Marine", roles = WareraMilitaryUnitRoles(managers = listOf("u2"))),
+                    ),
+            )
+        val evaluator = RuleEvaluator(listOf(manager), data)
+
+        assertEquals(
+            MemberRoles(grants = listOf(RoleGrant("manager", "BITS: Manager einer MU"))),
+            evaluator.evaluate(WareraUser(id = "u1", username = "A", mu = "m1")),
+        )
+        assertEquals(listOf("manager"), evaluator.evaluate(WareraUser(id = "u2", username = "B", mu = "m2"))!!.grants.map { it.roleId })
+        // A manager of m2 who is in m1 does not count, nor does somebody without a unit.
+        assertNull(evaluator.evaluate(WareraUser(id = "u2", username = "B", mu = "m1")))
+        assertNull(evaluator.evaluate(WareraUser(id = "u2", username = "B")))
+        // A unit that could not be loaded leaves the role as it is.
+        assertEquals(listOf("manager"), evaluator.evaluate(WareraUser(id = "u3", username = "C", mu = "m9"))!!.keepRoleIds)
+    }
+
+    @Test
+    fun `party leadership counts for the party or for any party of the country`() {
+        val anyParty = rule("chair", ConditionType.PARTY_LEADER, countryId = "de", targetName = "Deutschland")
+        val party = rule("p1-chair", ConditionType.PARTY_LEADER, countryId = "de", targetName = "Partei", partyId = "p1")
+        val data =
+            RuleData(
+                parties =
+                    mapOf(
+                        "de" to
+                            listOf(
+                                WareraParty("p1", "Partei", members = listOf("u1", "u3"), leader = "u1"),
+                                WareraParty("p2", "Andere", members = listOf("u2"), leader = "u2"),
+                            ),
+                    ),
+            )
+        val evaluator = RuleEvaluator(listOf(anyParty, party), data)
+
+        assertEquals(
+            listOf(RoleGrant("chair", "BITS: Parteivorsitz in Deutschland"), RoleGrant("p1-chair", "BITS: Vorsitz der Partei Partei")),
+            evaluator.evaluate(WareraUser(id = "u1", username = "A"))!!.grants,
+        )
+        assertEquals(listOf("chair"), evaluator.evaluate(WareraUser(id = "u2", username = "B"))!!.grants.map { it.roleId })
+        assertNull(evaluator.evaluate(WareraUser(id = "u3", username = "C")))
+        assertEquals(
+            listOf("chair", "p1-chair"),
+            RuleEvaluator(listOf(anyParty, party), RuleData()).evaluate(WareraUser(id = "u1", username = "A"))!!.keepRoleIds,
         )
     }
 
@@ -202,7 +281,8 @@ class RuleEvaluatorTest {
         threshold: Int? = null,
         targetName: String? = null,
         partyId: String? = null,
-    ) = RoleRule(roleId, listOf(condition(type, countryId, office, muId, threshold, targetName, partyId)), Instant.EPOCH)
+        muRole: MilitaryUnitRole? = null,
+    ) = RoleRule(roleId, listOf(condition(type, countryId, office, muId, threshold, targetName, partyId, muRole)), Instant.EPOCH)
 
     private fun condition(
         type: ConditionType,
@@ -212,5 +292,6 @@ class RuleEvaluatorTest {
         threshold: Int? = null,
         targetName: String? = null,
         partyId: String? = null,
-    ) = RuleCondition(type, countryId, office, muId, threshold, targetName, partyId)
+        muRole: MilitaryUnitRole? = null,
+    ) = RuleCondition(type, countryId, office, muId, threshold, targetName, partyId, muRole)
 }

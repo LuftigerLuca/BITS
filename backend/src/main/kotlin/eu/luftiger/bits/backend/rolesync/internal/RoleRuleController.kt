@@ -4,6 +4,7 @@ import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
+import eu.luftiger.bits.backend.rolesync.domain.MilitaryUnitRole
 import eu.luftiger.bits.warera.WareraApiException
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
@@ -168,6 +169,7 @@ data class ConditionRequest(
     val muId: String? = null,
     val threshold: Int? = null,
     val partyId: String? = null,
+    val muRole: MuRole? = null,
 )
 
 /**
@@ -183,6 +185,8 @@ enum class RuleType {
     MILITARY_RANK,
     COMPANIES,
     PARTY,
+    MU_LEADERSHIP,
+    PARTY_LEADER,
 }
 
 val RuleType.condition: ConditionType
@@ -195,6 +199,8 @@ val RuleType.condition: ConditionType
             RuleType.MILITARY_RANK -> ConditionType.MILITARY_RANK
             RuleType.COMPANIES -> ConditionType.COMPANIES
             RuleType.PARTY -> ConditionType.PARTY
+            RuleType.MU_LEADERSHIP -> ConditionType.MU_LEADERSHIP
+            RuleType.PARTY_LEADER -> ConditionType.PARTY_LEADER
         }
 
 /** Like [RuleType], the API's names for [GovernmentOffice]. */
@@ -217,6 +223,22 @@ val Office.office: GovernmentOffice
             Office.MINISTER_OF_DEFENSE -> GovernmentOffice.MINISTER_OF_DEFENSE
             Office.MINISTER_OF_FOREIGN_AFFAIRS -> GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS
             Office.CONGRESS -> GovernmentOffice.CONGRESS
+        }
+
+/** Like [RuleType], the API's names for [MilitaryUnitRole]. */
+@Serializable
+enum class MuRole {
+    COMMANDER,
+    MANAGER,
+    OWNER,
+}
+
+val MuRole.role: MilitaryUnitRole
+    get() =
+        when (this) {
+            MuRole.COMMANDER -> MilitaryUnitRole.COMMANDER
+            MuRole.MANAGER -> MilitaryUnitRole.MANAGER
+            MuRole.OWNER -> MilitaryUnitRole.OWNER
         }
 
 @Serializable

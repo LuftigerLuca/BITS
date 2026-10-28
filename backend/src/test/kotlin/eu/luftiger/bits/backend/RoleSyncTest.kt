@@ -31,6 +31,7 @@ import eu.luftiger.bits.warera.WareraCompany
 import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
+import eu.luftiger.bits.warera.WareraMilitaryUnitRoles
 import eu.luftiger.bits.warera.WareraNotFoundException
 import eu.luftiger.bits.warera.WareraParty
 import eu.luftiger.bits.warera.WareraSchemaException
@@ -366,9 +367,12 @@ class RoleSyncTest {
             threshold: Int? = null,
             targetName: String? = null,
             partyId: String? = null,
+            muId: String? = null,
+            muRole: String? = null,
         ) = jdbc.update(
-            "INSERT INTO role_rule_condition (rule_id, position, type, country_id, office, threshold, target_name, party_id) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO role_rule_condition " +
+                "(rule_id, position, type, country_id, office, threshold, target_name, party_id, mu_id, mu_role) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             ruleId,
             position++,
             type,
@@ -377,6 +381,8 @@ class RoleSyncTest {
             threshold,
             targetName,
             partyId,
+            muId,
+            muRole,
         )
 
         listOf(
@@ -390,10 +396,22 @@ class RoleSyncTest {
             { insert("COMPANIES", threshold = 0) },
             { insert("PARTY", countryId = "de", targetName = "Partei") },
             { insert("CITIZENSHIP", countryId = "de", targetName = "Germany", partyId = "p1") },
+            { insert("MU_LEADERSHIP") },
+            { insert("MU_LEADERSHIP", muRole = "GENERAL") },
+            { insert("MU_LEADERSHIP", muId = "m1", muRole = "OWNER") },
+            { insert("MU_LEADERSHIP", targetName = "Marine", muRole = "OWNER") },
+            { insert("LEVEL", threshold = 5, muRole = "OWNER") },
+            { insert("PARTY_LEADER", targetName = "Germany") },
+            { insert("PARTY_LEADER", countryId = "de") },
         ).forEach { assertFailsWith<DataIntegrityViolationException> { it() } }
         assertEquals(1, insert("PARTY", countryId = "de", targetName = "Partei", partyId = "p1"))
         assertEquals(1, insert("PARTY", countryId = "de", targetName = "Andere", partyId = "p2"))
         assertEquals(1, insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany"))
+        assertEquals(1, insert("MU_LEADERSHIP", muRole = "MANAGER"))
+        assertEquals(1, insert("MU_LEADERSHIP", muId = "m1", targetName = "Marine", muRole = "MANAGER"))
+        assertEquals(1, insert("PARTY_LEADER", countryId = "de", targetName = "Germany"))
+        assertEquals(1, insert("PARTY_LEADER", countryId = "de", targetName = "Partei", partyId = "p1"))
+        assertFailsWith<DataIntegrityViolationException> { insert("MU_LEADERSHIP", muRole = "MANAGER") }
         assertFailsWith<DataIntegrityViolationException> {
             insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany")
         }
@@ -753,6 +771,98 @@ class RoleSyncTest {
                 .single()
                 .detail,
         )
+    }
+
+    @Test
+    fun `admin creates MU leadership and party leader rules`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei"))
+
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"COMMANDER"}]}""")
+            .andExpect { jsonPath("$.label") { value("Kommandeur der MU Deutsche Marine") } }
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muRole":"MANAGER"}]}""")
+            .andExpect { jsonPath("$.label") { value("Manager einer MU") } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de"}]}""")
+            .andExpect { jsonPath("$.label") { value("Parteivorsitz in Germany") } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de","partyId":"p1"}]}""")
+            .andExpect { jsonPath("$.label") { value("Vorsitz der Partei Partei") } }
+
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1"}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m9","muRole":"OWNER"}]}""")
+            .andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER"}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de","partyId":"p9"}]}""")
+            .andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muRole":"MANAGER"}]}""")
+            .andExpect { status { isConflict() } }
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de"}]}""")
+            .andExpect { status { isConflict() } }
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"MANAGER"}]}""")
+            .andExpect { status { isCreated() } }
+    }
+
+    @Test
+    fun `leadership rules follow WarEra, and a unit that cannot be loaded keeps the roles`() {
+        warera.users["w2"] = warera.users.getValue("w2").copy(mu = "m2")
+        warera.militaryUnits["m1"] =
+            WareraMilitaryUnit("m1", "Deutsche Marine", owner = "w9", roles = WareraMilitaryUnitRoles(commanders = listOf("w1")))
+        warera.militaryUnits["m2"] = WareraMilitaryUnit("m2", "Bundeswehr", owner = "w2")
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w1"), leader = "w1"))
+        link("1", "w1")
+        link("2", "w2")
+        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"COMMANDER"}]}""")
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"MU_LEADERSHIP","muRole":"OWNER"}]}""")
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"PARTY_LEADER","countryId":"de"}]}""")
+        awaitBackgroundWork()
+
+        warera.militaryUnitLookups.clear()
+        var count = roleSyncEvents().size
+        syncTrigger.hourly()
+        val synced = awaitEvents(++count).last()
+        assertEquals(setOf("r-veteran", "r-citizen"), grantedRoles(synced, "1"))
+        assertEquals(setOf("r-minister"), grantedRoles(synced, "2"))
+        // Each unit once: m1 for its rule and as the unit of w1, m2 as the unit of w2.
+        assertEquals(listOf("m1", "m2"), warera.militaryUnitLookups.sorted())
+
+        // A new commander and a new party leader take the roles over.
+        warera.militaryUnits["m1"] = WareraMilitaryUnit("m1", "Deutsche Marine", roles = WareraMilitaryUnitRoles(commanders = listOf("w2")))
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w1", "w2"), leader = "w2"))
+        syncTrigger.hourly()
+        val changed = awaitEvents(++count).last()
+        assertEquals(emptySet(), grantedRoles(changed, "1"))
+        assertEquals(setOf("r-veteran", "r-minister", "r-citizen"), grantedRoles(changed, "2"))
+
+        warera.militaryUnitsDown = true
+        syncTrigger.hourly()
+        val down = awaitEvents(++count).last() as RoleSyncEvent
+        assertEquals(MemberRoles(grants = emptyList(), keepRoleIds = listOf("r-veteran", "r-minister")), down.members["1"])
+        assertEquals(
+            listOf("MILITARY_UNIT_UNAVAILABLE"),
+            jdbc.queryForList("SELECT DISTINCT kind FROM system_log_entry WHERE kind = 'MILITARY_UNIT_UNAVAILABLE'", String::class.java),
+        )
+    }
+
+    @Test
+    fun `role explanation names the leadership that is missing`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w1")))
+        link("1", "w1")
+        createRule(
+            """{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muRole":"COMMANDER"},""" +
+                """{"type":"PARTY_LEADER","countryId":"de"}]}""",
+        )
+        awaitBackgroundWork()
+
+        fun detail() =
+            (explain("1") as RoleExplanationResponse.Explained)
+                .roles
+                .single()
+                .rules
+                .single()
+                .detail
+        assertEquals("nicht Kommandeur einer MU und kein Parteivorsitz in Germany", detail())
+
+        warera.militaryUnitsDown = true
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w1"), leader = "w1"))
+        assertEquals("deine MU gerade nicht abrufbar", detail())
     }
 
     @Test
@@ -1155,6 +1265,11 @@ class RoleSyncTest {
 
         /** Parties by country ID. */
         val parties = mutableMapOf<String, List<WareraParty>>()
+
+        /** Military units by ID; without changes, only the Marine (m1), led by nobody. */
+        val militaryUnits = mutableMapOf<String, WareraMilitaryUnit>()
+        val militaryUnitLookups = CopyOnWriteArrayList<String>()
+        var militaryUnitsDown = false
         val partyLookups = CopyOnWriteArrayList<String>()
         var governmentDown = false
 
@@ -1189,6 +1304,10 @@ class RoleSyncTest {
             users["w2"] = WareraUser("w2", "Other", country = "fr", leveling = WareraUser.Leveling(3))
             failingUsers.clear()
             parties.clear()
+            militaryUnits.clear()
+            militaryUnits["m1"] = WareraMilitaryUnit("m1", "Deutsche Marine")
+            militaryUnitLookups.clear()
+            militaryUnitsDown = false
             governments.clear()
             partyLookups.clear()
             companyCounts.clear()
@@ -1247,9 +1366,10 @@ class RoleSyncTest {
 
         override fun getMilitaryUnit(muId: String) =
             available {
+                militaryUnitLookups += muId
+                if (militaryUnitsDown) throw WareraApiException("down")
                 if (" " in muId) throw WareraBadRequestException("invalid id")
-                if (muId != "m1") throw WareraNotFoundException("no such MU")
-                WareraMilitaryUnit("m1", "Deutsche Marine")
+                militaryUnits[muId] ?: throw WareraNotFoundException("no such MU")
             }
 
         override fun getParties(countryId: String) =

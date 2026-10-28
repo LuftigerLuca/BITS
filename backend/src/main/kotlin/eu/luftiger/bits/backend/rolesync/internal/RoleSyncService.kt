@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
  * see [RoleSyncTrigger].
  *
  * Every sync is a run in the [SystemLog], written together with its event; members whose WarEra data is missing and
- * governments or parties that cannot be loaded are recorded there as problems of the run.
+ * governments, parties or military units that cannot be loaded are recorded there as problems of the run.
  *
  * The companies of a user cost a call of their own, so they are loaded only while a rule has a company condition. All
  * calls per user are paced by [RoleSyncProperties.userLookupInterval].
@@ -138,21 +138,25 @@ class RoleSyncService(
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
-        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, systemLog::recordProblem))
         val withCompanies = needsCompanies(rules)
         val pace = Pace()
-        val unavailable = mutableListOf<String>()
-        val members = HashMap<String, MemberRoles>()
-        val nicknames = HashMap<String, String>()
-        links.forEach { link ->
-            val cached = users[link.wareraUserId]?.takeUnless { refresh }
-            val loaded =
+        val loadedUsers =
+            links.associateWith { link ->
+                val cached = users[link.wareraUserId]?.takeUnless { refresh }
                 when {
                     cached == null -> load(link.wareraUserId, withCompanies, pace)
                     // A company rule was added since the user was loaded.
                     withCompanies && cached.user != null && !cached.companiesLoaded -> loadCompanies(cached, pace)
                     else -> cached
                 }
+            }
+        // The users first, since a leadership rule for any military unit needs the units of the members.
+        val memberMuIds = if (ruleInputs.needsMemberMilitaryUnits(rules)) loadedUsers.values.mapNotNull { it.user?.mu } else emptyList()
+        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, memberMuIds, systemLog::recordProblem))
+        val unavailable = mutableListOf<String>()
+        val members = HashMap<String, MemberRoles>()
+        val nicknames = HashMap<String, String>()
+        loadedUsers.forEach { (link, loaded) ->
             val user = loaded.user
             if (user == null || (withCompanies && loaded.companyCount == null)) unavailable += link.discordUserId
             if (user != null && link.discordUserId in optedIn) nicknames[link.discordUserId] = user.username

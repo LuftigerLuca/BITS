@@ -283,13 +283,17 @@ export const MANUAL_PAGES: ManualPage[] = [
         steps: [
           'Wähle unter „Neue Regel“ die Rolle.',
           'Füge eine bis zehn Bedingungen hinzu: Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in ' +
-            'einer Military Unit oder einer Partei, Level, Militärrang oder Zahl der Firmen ab einem Wert.',
+            'einer Military Unit oder einer Partei, Führung einer Military Unit, Parteivorsitz, Level, Militärrang ' +
+            'oder Zahl der Firmen ab einem Wert.',
           'Prüfe die Vorschau, wem die Regel die Rolle gibt und wem sie sie nimmt.',
           'Klicke auf „Regel anlegen“.',
         ],
         points: [
           'Die Bedingungen einer Regel müssen alle erfüllt sein, etwa „Staatsbürgerschaft Germany und Level ab 10“.',
           'Von mehreren Regeln für dieselbe Rolle genügt eine.',
+          'MU-Führung hat die Stufen Kommandeur, Manager und Besitzer; höhere Stufen zählen mit, „Kommandeur“ gilt ' +
+            'also auch für Manager und Besitzer. Ohne gewählte MU zählt die Führung der eigenen MU, ohne gewählte ' +
+            'Partei der Vorsitz jeder Partei des Landes.',
           'Wer keine Regel einer verwalteten Rolle erfüllt, verliert sie, auch wenn sie von Hand vergeben wurde.',
           'Regeln für Rollen, die in Discord gelöscht wurden, gelten als verwaist und wirken nicht.',
         ],
@@ -308,10 +312,10 @@ export const MANUAL_PAGES: ManualPage[] = [
           'stündlich für alle mit frischen WarEra-Daten',
         ],
         tips: [
-          'Kann BITS ein Mitglied, seine Firmen, eine Regierung oder die Parteien eines Landes gerade nicht laden, ' +
-            'bleiben die betroffenen Rollen, wie sie sind, außer eine andere Bedingung derselben Regel ist sicher nicht ' +
-            'erfüllt.',
-          'Regierungen und Parteien können dabei bis zu 10 Minuten alt sein.',
+          'Kann BITS ein Mitglied, seine Firmen, eine Regierung, die Parteien eines Landes oder eine Military Unit ' +
+            'gerade nicht laden, bleiben die betroffenen Rollen, wie sie sind, außer eine andere Bedingung derselben ' +
+            'Regel ist sicher nicht erfüllt.',
+          'Regierungen, Parteien und Military Units können dabei bis zu 10 Minuten alt sein.',
         ],
       },
       {

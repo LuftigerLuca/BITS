@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.domain
 
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
+import eu.luftiger.bits.warera.WareraMilitaryUnit
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
 import jakarta.persistence.ElementCollection
@@ -60,12 +61,16 @@ class RuleCondition(
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
     val type: ConditionType,
-    /** For [ConditionType.CITIZENSHIP], [ConditionType.GOVERNMENT_OFFICE] and [ConditionType.PARTY]. */
+    /**
+     * For [ConditionType.CITIZENSHIP], [ConditionType.GOVERNMENT_OFFICE], [ConditionType.PARTY] and
+     * [ConditionType.PARTY_LEADER].
+     */
     @Column(name = "country_id")
     val countryId: String? = null,
     @Enumerated(EnumType.STRING)
     @Column(name = "office")
     val office: GovernmentOffice? = null,
+    /** For [ConditionType.MILITARY_UNIT], and for [ConditionType.MU_LEADERSHIP] unless any military unit counts. */
     @Column(name = "mu_id")
     val muId: String? = null,
     /**
@@ -74,12 +79,22 @@ class RuleCondition(
      */
     @Column(name = "threshold")
     val threshold: Int? = null,
-    /** Name of the country, military unit or party at the time the rule was created. */
+    /**
+     * Name of the country, military unit or party at the time the rule was created; for [ConditionType.MU_LEADERSHIP]
+     * without a military unit `null`, for [ConditionType.PARTY_LEADER] without a party the country's.
+     */
     @Column(name = "target_name")
     val targetName: String? = null,
-    /** For [ConditionType.PARTY], a party of the country [countryId]. */
+    /**
+     * For [ConditionType.PARTY], a party of the country [countryId]; for [ConditionType.PARTY_LEADER] too, unless any
+     * party of the country counts.
+     */
     @Column(name = "party_id")
     val partyId: String? = null,
+    /** For [ConditionType.MU_LEADERSHIP], the lowest rank that counts. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mu_role")
+    val muRole: MilitaryUnitRole? = null,
 ) {
     /** German description, e.g. "Level ab 10". */
     val label: String
@@ -92,11 +107,14 @@ class RuleCondition(
                 ConditionType.MILITARY_RANK -> "Militärrang ab $threshold"
                 ConditionType.COMPANIES -> "Besitz von mindestens $threshold ${if (threshold == 1) "Firma" else "Firmen"}"
                 ConditionType.PARTY -> "Mitglied der Partei $targetName"
+                ConditionType.MU_LEADERSHIP -> "${muRole?.label} ${if (muId == null) "einer MU" else "der MU $targetName"}"
+                ConditionType.PARTY_LEADER -> if (partyId == null) "Parteivorsitz in $targetName" else "Vorsitz der Partei $targetName"
             }
 
     /**
      * What makes two conditions the same; the name of the target is left out, since it may change in WarEra. The party
-     * comes last and only if set, so the keys of the conditions from before it stay as they are.
+     * and the rank of the military unit come last and only if set, so the keys of the conditions from before them stay
+     * as they are.
      */
     val key: String
         get() =
@@ -107,6 +125,7 @@ class RuleCondition(
                 muId.orEmpty(),
                 threshold?.toString().orEmpty(),
                 partyId,
+                muRole?.name,
             ).joinToString("|")
 }
 
@@ -121,4 +140,31 @@ enum class ConditionType {
     COMPANIES,
 
     PARTY,
+
+    /** Holds at least the rank [RuleCondition.muRole] in the military unit [RuleCondition.muId], or in their own. */
+    MU_LEADERSHIP,
+
+    /** Leads the party [RuleCondition.partyId], or any party of the country [RuleCondition.countryId]. */
+    PARTY_LEADER,
+}
+
+/** A rank in a military unit, lowest first, with its German name; each includes the ranks above it. */
+enum class MilitaryUnitRole(
+    val label: String,
+) {
+    COMMANDER("Kommandeur"),
+    MANAGER("Manager"),
+    OWNER("Besitzer"),
+    ;
+
+    /** Whether [userId] holds this rank or a higher one in [mu]. */
+    fun isHeldBy(
+        mu: WareraMilitaryUnit,
+        userId: String,
+    ): Boolean =
+        when (this) {
+            OWNER -> mu.owner == userId
+            MANAGER -> OWNER.isHeldBy(mu, userId) || userId in mu.roles.managers
+            COMMANDER -> MANAGER.isHeldBy(mu, userId) || userId in mu.roles.commanders
+        }
 }
