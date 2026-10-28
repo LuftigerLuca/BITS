@@ -3,7 +3,7 @@ import { ErrorState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useCountries } from '@/lib/countries'
 import { ERROR_MESSAGE, countryErrorMessage } from './labels'
 import { useOverview, useSetOverviewCountry } from './queries'
@@ -38,23 +38,15 @@ export function CountrySettingCard() {
           )}
           <div className="flex flex-col gap-1.5 sm:max-w-sm">
             <Label htmlFor="overview-country">Land der Startseite</Label>
-            <Select
+            <SearchableSelect
+              id="overview-country"
+              className="w-full"
               items={items}
               value={countryId}
               onValueChange={setPicked}
               disabled={countries.isPending || overview.isPending}
-            >
-              <SelectTrigger id="overview-country" className="w-full">
-                <SelectValue placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'} />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'}
+            />
           </div>
           <Button type="submit" className="self-start" disabled={setCountry.isPending || !countryId || unchanged}>
             Speichern

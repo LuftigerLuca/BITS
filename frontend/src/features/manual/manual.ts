@@ -240,7 +240,11 @@ export const MANUAL_PAGES: ManualPage[] = [
           'wie viele Mitglieder der Server ohne Bots hat und wie viele davon verifiziert sind',
           'wie viele Bürger, gesamt und aktiv, das Land hat, das du unter „Verwaltung“ einstellst',
         ],
-        tips: ['Das Land unter „Verwaltung“ bekommt auch keinen Botschafts-Thread.'],
+        tips: [
+          'Das Land unter „Verwaltung“ bekommt auch keinen Botschafts-Thread.',
+          'Lange Auswahllisten wie Rollen, Kanäle, Länder und Parteien haben oben ein Suchfeld: Tippe einen Teil des ' +
+            'Namens, Groß- und Kleinschreibung und Akzente spielen keine Rolle.',
+        ],
       },
       {
         id: 'features',

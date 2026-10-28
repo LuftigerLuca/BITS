@@ -3,6 +3,7 @@ import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { searchMilitaryUnits, type ConditionType, type GovernmentOffice, type MuRole, type Option } from '@/lib/api'
 import { needsCountry, type ConditionDraft } from './conditionDraft'
@@ -119,23 +120,15 @@ export function ConditionFields({
         {needsCountry(type) && (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={id('country')}>Land</Label>
-            <Select
+            <SearchableSelect
+              id={id('country')}
+              className="w-full"
               items={countryItems}
               value={draft.countryId}
               onValueChange={(countryId) => update({ countryId, partyId: null })}
               disabled={countriesPending}
-            >
-              <SelectTrigger id={id('country')} className="w-full">
-                <SelectValue placeholder={countriesPending ? 'Länder werden geladen …' : 'Land wählen'} />
-              </SelectTrigger>
-              <SelectContent>
-                {countryItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder={countriesPending ? 'Länder werden geladen …' : 'Land wählen'}
+            />
           </div>
         )}
         {type === 'GOVERNMENT_OFFICE' && (
@@ -229,23 +222,15 @@ export function ConditionFields({
         {(type === 'PARTY' || partyLeader) && (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={id('party')}>Partei</Label>
-            <Select
+            <SearchableSelect
+              id={id('party')}
+              className="w-full"
               items={partyItems}
               value={partyLeader && draft.countryId ? (draft.partyId ?? ANY) : draft.partyId}
               onValueChange={(partyId) => update({ partyId: partyId === ANY ? null : partyId })}
               disabled={partyItems.length === 0}
-            >
-              <SelectTrigger id={id('party')} className="w-full">
-                <SelectValue placeholder={partyPlaceholder} />
-              </SelectTrigger>
-              <SelectContent>
-                {partyItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder={partyPlaceholder}
+            />
           </div>
         )}
         {(type === 'LEVEL' || type === 'MILITARY_RANK' || type === 'COMPANIES') && (

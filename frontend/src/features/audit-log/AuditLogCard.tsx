@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { AuditAction, AuditActor } from '@/lib/api'
@@ -25,7 +26,7 @@ export function AuditLogCard() {
   const actors = useAuditActors()
 
   const actorItems = [
-    { value: ALL, label: 'Alle Admins' },
+    { value: ALL, label: 'Alle Admins', pinned: true },
     ...(actors.data ?? []).map((a) => ({ value: a.subject, label: actorLabel(a) })),
   ]
   const actionItems = [
@@ -47,18 +48,13 @@ export function AuditLogCard() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="audit-actor">Admin</Label>
-            <Select items={actorItems} value={actor} onValueChange={(value) => setActor(value ?? ALL)}>
-              <SelectTrigger id="audit-actor" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {actorItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              id="audit-actor"
+              className="w-full"
+              items={actorItems}
+              value={actor}
+              onValueChange={(value) => setActor(value ?? ALL)}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="audit-action">Aktion</Label>

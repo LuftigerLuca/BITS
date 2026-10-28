@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Embassies, EmbassyThread } from '@/lib/api'
 import { useCountries } from '@/lib/countries'
@@ -193,33 +193,26 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="flex flex-1 flex-col gap-1.5">
           <Label htmlFor="embassy-thread">Thread</Label>
-          <Select items={threadItems} value={threadId} onValueChange={setThreadId}>
-            <SelectTrigger id="embassy-thread" className="w-full">
-              <SelectValue placeholder={threadItems.length === 0 ? 'Keine freien privaten Threads' : 'Thread wählen'} />
-            </SelectTrigger>
-            <SelectContent>
-              {threadItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            id="embassy-thread"
+            className="w-full"
+            items={threadItems}
+            value={threadId}
+            onValueChange={setThreadId}
+            placeholder={threadItems.length === 0 ? 'Keine freien privaten Threads' : 'Thread wählen'}
+          />
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
           <Label htmlFor="embassy-country">Land</Label>
-          <Select items={countryItems} value={countryId} onValueChange={setCountryId} disabled={countries.isPending}>
-            <SelectTrigger id="embassy-country" className="w-full">
-              <SelectValue placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'} />
-            </SelectTrigger>
-            <SelectContent>
-              {countryItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            id="embassy-country"
+            className="w-full"
+            items={countryItems}
+            value={countryId}
+            onValueChange={setCountryId}
+            disabled={countries.isPending}
+            placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'}
+          />
         </div>
       </div>
       <Button type="submit" className="self-start" disabled={!threadId || !countryId || assign.isPending}>
