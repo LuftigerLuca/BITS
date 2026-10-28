@@ -107,8 +107,8 @@ class AccountPageTest {
     @Test
     fun `a member sees their managed roles with the reasons`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":50}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":50}]]}""")
 
         val roles = mockMvc.get("/web/account/roles") { cookie(session(member)) }.andExpect { status { isOk() } }
 
@@ -123,7 +123,7 @@ class AccountPageTest {
     @Test
     fun `roles are a 503 if WarEra cannot be reached`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         warera.down = true
 
         mockMvc.get("/web/account/roles") { cookie(session(member)) }.andExpect { status { isServiceUnavailable() } }
@@ -133,7 +133,7 @@ class AccountPageTest {
     fun `unlinking deletes the link and the open code, and the next sync takes the managed roles`() {
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         jdbc.update(
             "INSERT INTO account_verification (discord_user_id, warera_user_id, warera_username, code, expires_at) " +
                 "VALUES ('1', 'w2', 'Other', 'BITS-ABC234', now() + interval '10 minutes')",

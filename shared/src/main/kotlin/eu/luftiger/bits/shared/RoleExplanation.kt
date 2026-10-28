@@ -29,7 +29,10 @@ sealed interface RoleExplanationResponse {
 data class ManagedRoleExplanation(
     val roleId: String,
     val outcome: ManagedRoleOutcome,
-    /** The rules of the role, any one of which is enough. */
+    /**
+     * The blocks of the rule of the role, any one of which is enough. Named `rules` from when a role had several rules
+     * instead, which bot and backend still expect.
+     */
     val rules: List<RuleExplanation>,
 )
 
@@ -38,19 +41,20 @@ enum class ManagedRoleOutcome {
     MET,
     NOT_MET,
 
-    /** No rule is met and the WarEra data for at least one is missing; the member keeps the role as it is. */
+    /** No block is met and the WarEra data for at least one is missing; the member keeps the role as it is. */
     UNDECIDED,
 }
 
+/** One block of the rule of a role. */
 @Serializable
 data class RuleExplanation(
-    /** German description of the rule, as in the dashboard; its conditions joined with "und", all of which must be met. */
+    /** German description of the block, as in the dashboard; its conditions joined with "und", all of which must be met. */
     val label: String,
     /** `null` if the WarEra data to decide is missing. */
     val met: Boolean?,
     /**
      * German description of what is missing, e.g. "Level 8 von 10": the conditions that fail joined with "und", or if
-     * none fails, those that cannot be checked; `null` if the rule is met.
+     * none fails, those that cannot be checked; `null` if the block is met.
      */
     val detail: String?,
 )

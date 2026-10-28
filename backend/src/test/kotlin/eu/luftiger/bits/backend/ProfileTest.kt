@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend
 
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleBlock
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.backend.rolesync.internal.RoleRuleRepository
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
@@ -108,12 +109,13 @@ class ProfileTest {
         )
         ruleRepository.saveAll(
             listOf(
-                "r-low" to ConditionType.LEVEL,
-                "r-high" to ConditionType.LEVEL,
-                "r-high" to ConditionType.MILITARY_RANK,
-                "r-unassignable" to ConditionType.LEVEL,
-                "r-deleted" to ConditionType.LEVEL,
-            ).map { (roleId, type) -> RoleRule(roleId, listOf(RuleCondition(type, threshold = 1)), Instant.EPOCH) },
+                "r-low" to listOf(ConditionType.LEVEL),
+                "r-high" to listOf(ConditionType.LEVEL, ConditionType.MILITARY_RANK),
+                "r-unassignable" to listOf(ConditionType.LEVEL),
+                "r-deleted" to listOf(ConditionType.LEVEL),
+            ).map { (roleId, types) ->
+                RoleRule(roleId, types.map { RuleBlock(listOf(RuleCondition(it, threshold = 1))) }, Instant.EPOCH)
+            },
         )
 
         assertEquals(listOf("r-high", "r-low"), (profile("1") as ProfileResponse.Found).managedRoleIds)

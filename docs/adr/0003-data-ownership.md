@@ -20,8 +20,7 @@ changes can get lost.
 
 ## Consequences
 
-- A role with at least one rule belongs to BITS: anybody who meets none of its rules loses it, even if an admin gave
-  it by hand.
+- A role with a rule belongs to BITS: anybody who does not meet its rule loses it, even if an admin gave it by hand.
 - A failed change costs at most an hour, so the bot can log and skip it instead of retrying.
 - Missing WarEra data must not look like change: members whose data cannot be loaded keep their roles, and a full
   sync that would take a role from many of its holders at once is held back (`RemovalLimit`).

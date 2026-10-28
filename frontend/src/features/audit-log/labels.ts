@@ -3,6 +3,7 @@ import type { AuditAction } from '@/lib/api'
 export const ACTIONS: Record<AuditAction, string> = {
   ROLE_RULE_CREATED: 'Regel angelegt',
   ROLE_RULE_DELETED: 'Regel gelöscht',
+  ROLE_RULE_UPDATED: 'Regel bearbeitet',
   OVERVIEW_COUNTRY_SET: 'Land der Startseite geändert',
   NICKNAME_SETTING_CHANGED: 'Nicknames umgeschaltet',
   VOTE_STARTED: 'Abstimmung gestartet',

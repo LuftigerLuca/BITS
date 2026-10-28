@@ -37,8 +37,10 @@ export const STATUS: Record<RuleStatus, { label: string; variant: 'secondary' | 
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 503) return 'WarEra ist gerade nicht erreichbar. Bitte versuche es später erneut.'
-    if (error.status === 400) return 'Die Regel ist unvollständig, hat eine Bedingung doppelt oder die Rolle kann nicht vergeben werden.'
-    if (error.status === 409) return 'Diese Regel gibt es für die Rolle schon.'
+    if (error.status === 400) {
+      return 'Die Regel ist unvollständig, hat eine Bedingung oder einen Block doppelt oder die Rolle kann nicht vergeben werden.'
+    }
+    if (error.status === 409) return 'Für diese Rolle gibt es schon eine Regel.'
   }
   return 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'
 }

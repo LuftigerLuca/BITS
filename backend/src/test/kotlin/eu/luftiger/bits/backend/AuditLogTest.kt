@@ -72,7 +72,7 @@ class AuditLogTest {
 
     @Test
     fun `creating and deleting a rule records one entry each`() {
-        val id = ruleId(createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""", discordAdmin))
+        val id = ruleId(createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""", discordAdmin))
         clock.now = Instant.parse("2026-01-01T12:05:00Z")
         mockMvc.delete("/web/admin/role-sync/rules/$id") { cookie(session(envAdmin)) }.andExpect { status { isNoContent() } }
 
@@ -93,8 +93,27 @@ class AuditLogTest {
     }
 
     @Test
+    fun `editing a rule records the rule before and after`() {
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""", discordAdmin)
+
+        mockMvc
+            .put("/web/admin/role-sync/rules/r-veteran") {
+                cookie(session(discordAdmin))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"blocks":[[{"type":"LEVEL","threshold":20}],[{"type":"MILITARY_RANK","threshold":5}]]}"""
+            }.andExpect { status { isOk() } }
+
+        val log = mockMvc.get("/web/admin/audit-log") { cookie(session(discordAdmin)) }
+        assertEquals(listOf("ROLE_RULE_UPDATED", "ROLE_RULE_CREATED"), log.read("$.entries[*].action"))
+        assertEquals(
+            "Rolle @Veteran: Level ab 20 oder Militärrang ab 5 (vorher: Level ab 10)",
+            log.read<List<String>>("$.entries[*].description").first(),
+        )
+    }
+
+    @Test
     fun `the description stays readable after the role is deleted in Discord`() {
-        val id = ruleId(createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""", discordAdmin))
+        val id = ruleId(createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""", discordAdmin))
         jdbc.update("DELETE FROM discord_role WHERE id = 'r-veteran'")
 
         mockMvc.delete("/web/admin/role-sync/rules/$id") { cookie(session(discordAdmin)) }
@@ -108,16 +127,16 @@ class AuditLogTest {
     @Test
     fun `failed actions record nothing`() {
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""",
             discordAdmin,
         ).andExpect { status { isCreated() } }
 
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":0}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":0}]]}""",
             discordAdmin,
         ).andExpect { status { isBadRequest() } }
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""",
             discordAdmin,
         ).andExpect { status { isConflict() } }
         mockMvc.delete("/web/admin/role-sync/rules/999999") { cookie(session(discordAdmin)) }.andExpect { status { isNotFound() } }
@@ -132,7 +151,7 @@ class AuditLogTest {
 
         // MockMvc hands the unexpected error on instead of answering with 500 as the server does.
         assertFailsWith<ServletException> {
-            createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""", admin)
+            createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""", admin)
         }
 
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
@@ -240,7 +259,7 @@ class AuditLogTest {
 
     private fun entryCount() = jdbc.queryForObject("SELECT COUNT(*) FROM audit_entry", Int::class.java)
 
-    private fun ruleId(result: ResultActionsDsl): Long = result.read<Number>("$.id").toLong()
+    private fun ruleId(result: ResultActionsDsl): String = result.read("$.roleId")
 
     private fun <T> ResultActionsDsl.read(path: String): T = JsonPath.read(andReturn().response.contentAsString, path)
 

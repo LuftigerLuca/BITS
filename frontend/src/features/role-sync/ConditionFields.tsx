@@ -11,12 +11,16 @@ import { needsCountry, type ConditionDraft } from './conditionDraft'
 import { CONDITION_TYPES, MU_ROLES, OFFICES, errorMessage } from './labels'
 import { useParties } from './queries'
 
-const THRESHOLD_LABELS = { LEVEL: 'Level ab', MILITARY_RANK: 'Militärrang ab', COMPANIES: 'Firmen ab' } as const
+const THRESHOLD_LABELS = {
+  LEVEL: 'Level ab',
+  MILITARY_RANK: 'Militärrang ab',
+  COMPANIES: 'Firmen ab',
+} as const
 
 /** Stands for no military unit or party in the selects where that means any. */
 const ANY = 'any'
 
-/** The fields of one condition of a new rule, in a group named `name`. */
+/** The fields of one condition of a rule, in a group named `name`. */
 export function ConditionFields({
   name,
   draft,
@@ -36,7 +40,10 @@ export function ConditionFields({
   onSearchError: (message: string | null) => void
 }) {
   const [muQuery, setMuQuery] = useState('')
-  const [muResults, setMuResults] = useState<Option[]>([])
+  // A saved military unit is shown until the admin searches for another.
+  const [muResults, setMuResults] = useState<Option[]>(() =>
+    draft.muId && draft.muName ? [{ id: draft.muId, name: draft.muName }] : [],
+  )
   const { type } = draft
   const id = (field: string) => `condition-${draft.key}-${field}`
   const update = (changes: Partial<ConditionDraft>) => onChange({ ...draft, ...changes })
@@ -63,14 +70,20 @@ export function ConditionFields({
     value: value as GovernmentOffice,
     label,
   }))
-  const muRoleItems = Object.entries(MU_ROLES).map(([value, label]) => ({ value, label }))
+  const muRoleItems = Object.entries(MU_ROLES).map(([value, label]) => ({
+    value,
+    label,
+  }))
   const muItems = [
     ...(leadership ? [{ value: ANY, label: 'Jede MU' }] : []),
     ...muResults.map((mu) => ({ value: mu.id, label: mu.name })),
   ]
   const partyItems = [
     ...(partyLeader && draft.countryId ? [{ value: ANY, label: 'Jede Partei' }] : []),
-    ...(parties.data ?? []).map((party) => ({ value: party.id, label: party.name })),
+    ...(parties.data ?? []).map((party) => ({
+      value: party.id,
+      label: party.name,
+    })),
   ]
   const partyPlaceholder = !draft.countryId
     ? 'Erst Land wählen'

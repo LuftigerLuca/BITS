@@ -108,11 +108,11 @@ export const MANUAL_PAGES: ManualPage[] = [
         title: 'Warum du eine Rolle hast',
         intro:
           'Mit /rollen siehst du, nur für dich, zu jeder Rolle, die BITS verwaltet, ob du sie bekommst und warum: die ' +
-          'Regel, die greift, oder was dir fehlt, etwa „Level 8 von 10“.',
+          'Teil der Regel, der greift, oder was dir je Teil fehlt, etwa „Level 8 von 10“.',
         points: [
           'BITS prüft dafür deine aktuellen WarEra-Daten, ändert aber keine Rollen.',
           'Auf dem Server gleicht der nächste Abgleich deine Rollen an, spätestens nach einer Stunde.',
-          'Rollen von Hand zu vergeben hilft nicht: Wer keine Regel einer verwalteten Rolle erfüllt, verliert sie.',
+          'Rollen von Hand zu vergeben hilft nicht: Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie.',
         ],
       },
       {
@@ -282,25 +282,32 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'rules',
         title: 'Rollen nach WarEra-Daten',
         intro:
-          'Unter „Rollen“ legst du Regeln an, die eine Discord-Rolle an WarEra-Merkmale koppeln. Eine Rolle mit ' +
-          'mindestens einer Regel verwaltet BITS.',
+          'Unter „Rollen“ legst du Regeln an, die eine Discord-Rolle an WarEra-Merkmale koppeln. Jede Rolle hat ' +
+          'höchstens eine Regel; eine Rolle mit Regel verwaltet BITS.',
         steps: [
-          'Wähle unter „Neue Regel“ die Rolle.',
-          'Füge eine bis zehn Bedingungen hinzu: Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in ' +
-            'einer Military Unit oder einer Partei, Führung einer Military Unit, Parteivorsitz, Level, Militärrang ' +
-            'oder Zahl der Firmen ab einem Wert.',
+          'Wähle unter „Neue Regel“ die Rolle. Hat sie schon eine Regel, bearbeitest du stattdessen diese.',
+          'Füge Bedingungen hinzu: Staatsbürgerschaft, Regierungsamt in einem Land, Mitgliedschaft in einer ' +
+            'Military Unit oder einer Partei, Führung einer Military Unit, Parteivorsitz, Level, Militärrang oder ' +
+            'Zahl der Firmen ab einem Wert.',
+          'Wähle zwischen je zwei Bedingungen „und“ oder „oder“.',
           'Prüfe die Vorschau, wem die Regel die Rolle gibt und wem sie sie nimmt.',
           'Klicke auf „Regel anlegen“.',
         ],
         points: [
-          'Die Bedingungen einer Regel müssen alle erfüllt sein, etwa „Staatsbürgerschaft Germany und Level ab 10“.',
-          'Von mehreren Regeln für dieselbe Rolle genügt eine.',
+          '„und“ bindet stärker als „oder“: Jedes „oder“ trennt die Regel in Blöcke, von denen einer genügt; die ' +
+            'Bedingungen eines Blocks müssen alle erfüllt sein. „Staatsbürgerschaft Germany und Level ab 10 oder ' +
+            'Mitglied der MU Bundeswehr“ gibt die Rolle deutschen Spielern ab Level 10 und allen in der Bundeswehr.',
+          'Eine Regel hat bis zu zehn Blöcke mit je bis zu zehn Bedingungen.',
+          'Mit dem Stift in der Liste bearbeitest du eine Regel als Ganzes: Bedingungen hinzufügen, entfernen oder ' +
+            'zwischen „und“ und „oder“ umstellen. Vor dem Speichern zeigt die Vorschau wieder, wer die Rolle ' +
+            'bekommt und wer sie verliert.',
           'Beim Regierungsamt kannst du mehrere Ämter ankreuzen; eines davon genügt, etwa „Präsident oder ' +
             'Vizepräsident in Germany“.',
           'MU-Führung hat die Stufen Kommandeur, Manager und Besitzer; höhere Stufen zählen mit, „Kommandeur“ gilt ' +
             'also auch für Manager und Besitzer. Ohne gewählte MU zählt die Führung der eigenen MU, ohne gewählte ' +
             'Partei der Vorsitz jeder Partei des Landes.',
-          'Wer keine Regel einer verwalteten Rolle erfüllt, verliert sie, auch wenn sie von Hand vergeben wurde.',
+          'Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie, auch wenn sie von Hand vergeben wurde.',
+          'Löschst du die Regel, verwaltet BITS die Rolle nicht mehr; niemand verliert sie dadurch.',
           'Regeln für Rollen, die in Discord gelöscht wurden, gelten als verwaist und wirken nicht.',
         ],
         tips: [
@@ -311,7 +318,9 @@ export const MANUAL_PAGES: ManualPage[] = [
       {
         id: 'sync',
         title: 'Wann BITS Rollen abgleicht',
-        intro: 'BITS gibt und nimmt Rollen bei jedem Abgleich und nennt dabei im Audit-Log von Discord den Grund.',
+        intro:
+          'BITS gibt und nimmt Rollen bei jedem Abgleich und nennt dabei im Audit-Log von Discord den Grund: den ' +
+          'ersten erfüllten Block der Regel.',
         points: [
           'beim Verknüpfen für das Mitglied',
           'nach jeder Regeländerung für alle, mit den WarEra-Daten des letzten Abgleichs',
@@ -319,8 +328,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         ],
         tips: [
           'Kann BITS ein Mitglied, seine Firmen, eine Regierung, die Parteien eines Landes oder eine Military Unit ' +
-            'gerade nicht laden, bleiben die betroffenen Rollen, wie sie sind, außer eine andere Bedingung derselben ' +
-            'Regel ist sicher nicht erfüllt.',
+            'gerade nicht laden, bleiben die betroffenen Rollen, wie sie sind, außer ein anderer Block der Regel ist ' +
+            'erfüllt oder jeder betroffene Block hat eine andere Bedingung, die sicher nicht erfüllt ist.',
           'Regierungen, Parteien und Military Units können dabei bis zu 10 Minuten alt sein.',
         ],
       },
