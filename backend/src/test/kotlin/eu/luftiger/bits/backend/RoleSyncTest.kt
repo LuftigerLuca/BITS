@@ -262,7 +262,7 @@ class RoleSyncTest {
             jsonPath("$.status") { value("ACTIVE") }
         }
         createRule(
-            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"MINISTER_OF_DEFENSE"}]}""",
+            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["MINISTER_OF_DEFENSE"]}]}""",
         ).andExpect { jsonPath("$.label") { value("Verteidigungsminister in Germany") } }
         createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_UNIT","muId":"m1"}]}""")
             .andExpect { jsonPath("$.label") { value("Mitglied der MU Deutsche Marine") } }
@@ -363,7 +363,7 @@ class RoleSyncTest {
         fun insert(
             type: String,
             countryId: String? = null,
-            office: String? = null,
+            offices: String? = null,
             threshold: Int? = null,
             targetName: String? = null,
             partyId: String? = null,
@@ -371,13 +371,13 @@ class RoleSyncTest {
             muRole: String? = null,
         ) = jdbc.update(
             "INSERT INTO role_rule_condition " +
-                "(rule_id, position, type, country_id, office, threshold, target_name, party_id, mu_id, mu_role) " +
+                "(rule_id, position, type, country_id, offices, threshold, target_name, party_id, mu_id, mu_role) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             ruleId,
             position++,
             type,
             countryId,
-            office,
+            offices,
             threshold,
             targetName,
             partyId,
@@ -387,7 +387,10 @@ class RoleSyncTest {
 
         listOf(
             { insert("GOVERNMENT_OFFICE", countryId = "de", targetName = "Germany") },
-            { insert("GOVERNMENT_OFFICE", countryId = "de", office = "KING", targetName = "Germany") },
+            { insert("GOVERNMENT_OFFICE", countryId = "de", offices = "KING", targetName = "Germany") },
+            { insert("GOVERNMENT_OFFICE", countryId = "de", offices = "", targetName = "Germany") },
+            { insert("GOVERNMENT_OFFICE", countryId = "de", offices = "PRESIDENT,KING", targetName = "Germany") },
+            { insert("GOVERNMENT_OFFICE", countryId = "de", offices = "PRESIDENT,", targetName = "Germany") },
             { insert("CITIZENSHIP", countryId = "de") },
             { insert("LEVEL") },
             { insert("LEVEL", threshold = 0) },
@@ -406,14 +409,15 @@ class RoleSyncTest {
         ).forEach { assertFailsWith<DataIntegrityViolationException> { it() } }
         assertEquals(1, insert("PARTY", countryId = "de", targetName = "Partei", partyId = "p1"))
         assertEquals(1, insert("PARTY", countryId = "de", targetName = "Andere", partyId = "p2"))
-        assertEquals(1, insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany"))
+        assertEquals(1, insert("GOVERNMENT_OFFICE", countryId = "de", offices = "CONGRESS", targetName = "Germany"))
+        assertEquals(1, insert("GOVERNMENT_OFFICE", countryId = "de", offices = "PRESIDENT,VICE_PRESIDENT", targetName = "Germany"))
         assertEquals(1, insert("MU_LEADERSHIP", muRole = "MANAGER"))
         assertEquals(1, insert("MU_LEADERSHIP", muId = "m1", targetName = "Marine", muRole = "MANAGER"))
         assertEquals(1, insert("PARTY_LEADER", countryId = "de", targetName = "Germany"))
         assertEquals(1, insert("PARTY_LEADER", countryId = "de", targetName = "Partei", partyId = "p1"))
         assertFailsWith<DataIntegrityViolationException> { insert("MU_LEADERSHIP", muRole = "MANAGER") }
         assertFailsWith<DataIntegrityViolationException> {
-            insert("GOVERNMENT_OFFICE", countryId = "de", office = "CONGRESS", targetName = "Germany")
+            insert("GOVERNMENT_OFFICE", countryId = "de", offices = "CONGRESS", targetName = "Germany")
         }
     }
 
@@ -869,9 +873,44 @@ class RoleSyncTest {
     fun `office rules check the government of the country`() {
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""")
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
 
         assertEquals(setOf("2"), (awaitEvents(1).single() as RoleSyncEvent).members.keys)
+    }
+
+    @Test
+    fun `an office rule with several offices gives the role to the holder of any of them`() {
+        warera.governments["de"] = WareraGovernment(country = "de", president = "w2", vicePresident = "w1", minOfEconomy = "w3")
+        link("1", "w1")
+        link("2", "w2")
+        // The preview judges the WarEra data loaded last.
+        syncTrigger.hourly()
+        awaitBackgroundWork()
+        reportMembers(mapOf("1" to emptyList(), "2" to listOf("r-minister")))
+        val heads =
+            """{"roleId":"r-minister","conditions":[""" +
+                """{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["VICE_PRESIDENT","PRESIDENT"]}]}"""
+
+        assertEquals(listOf("1"), preview(heads).gains.map { it.discordUserId })
+        val id =
+            ruleId(
+                createRule(heads).andExpect { jsonPath("$.label") { value("Präsident oder Vizepräsident in Germany") } },
+            )
+        assertEquals(setOf("1", "2"), (awaitEvents(1).single() as RoleSyncEvent).members.keys)
+        assertEquals("PRESIDENT,VICE_PRESIDENT", jdbc.queryForObject("SELECT offices FROM role_rule_condition", String::class.java))
+
+        createRule(
+            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT","VICE_PRESIDENT"]}]}""",
+        ).andExpect { status { isConflict() } }
+        createRule(
+            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":[]}]}""",
+        ).andExpect { status { isBadRequest() } }
+        createRule(
+            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""",
+        ).andExpect { status { isCreated() } }
+        reportMembers(mapOf("1" to listOf("r-minister"), "2" to listOf("r-minister")))
+        // The president keeps the role through the rule with the president alone.
+        assertEquals(listOf("1"), deletionPreview(id).losses.map { it.discordUserId })
     }
 
     @Test
@@ -879,7 +918,7 @@ class RoleSyncTest {
         link("1", "w1")
         link("2", "w2")
         createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""")
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
         awaitEvents(2)
 
         warera.failingUsers += "w1"
@@ -912,7 +951,7 @@ class RoleSyncTest {
         link("1", "w1")
         link("2", "w2")
         createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""")
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
         createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
         createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_RANK","threshold":50}]}""")
         awaitBackgroundWork()
@@ -951,7 +990,7 @@ class RoleSyncTest {
         link("2", "w2")
         createRule(
             """{"roleId":"r-veteran","conditions":[{"type":"CITIZENSHIP","countryId":"de"},{"type":"LEVEL","threshold":10},""" +
-                """{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""",
+                """{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""",
         )
         awaitBackgroundWork()
 
@@ -976,7 +1015,7 @@ class RoleSyncTest {
         link("1", "w1")
         link("2", "w2")
         createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""")
+        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
         createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_RANK","threshold":40}]}""")
         // Rule changes right after one another may be merged into one sync, so only the syncs after them are counted.
         awaitBackgroundWork()

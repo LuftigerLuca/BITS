@@ -2,8 +2,10 @@ package eu.luftiger.bits.backend.rolesync.domain
 
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.warera.WareraMilitaryUnit
+import jakarta.persistence.AttributeConverter
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
+import jakarta.persistence.Convert
 import jakarta.persistence.ElementCollection
 import jakarta.persistence.Embeddable
 import jakarta.persistence.Entity
@@ -67,9 +69,10 @@ class RuleCondition(
      */
     @Column(name = "country_id")
     val countryId: String? = null,
-    @Enumerated(EnumType.STRING)
-    @Column(name = "office")
-    val office: GovernmentOffice? = null,
+    /** For [ConditionType.GOVERNMENT_OFFICE], at least one; holding any of them is enough. */
+    @Convert(converter = GovernmentOfficesConverter::class)
+    @Column(name = "offices")
+    val offices: Set<GovernmentOffice> = emptySet(),
     /** For [ConditionType.MILITARY_UNIT], and for [ConditionType.MU_LEADERSHIP] unless any military unit counts. */
     @Column(name = "mu_id")
     val muId: String? = null,
@@ -101,7 +104,7 @@ class RuleCondition(
         get() =
             when (type) {
                 ConditionType.CITIZENSHIP -> "Staatsbürgerschaft $targetName"
-                ConditionType.GOVERNMENT_OFFICE -> "${office?.label} in $targetName"
+                ConditionType.GOVERNMENT_OFFICE -> "${officesLabel()} in $targetName"
                 ConditionType.MILITARY_UNIT -> "Mitglied der MU $targetName"
                 ConditionType.LEVEL -> "Level ab $threshold"
                 ConditionType.MILITARY_RANK -> "Militärrang ab $threshold"
@@ -111,17 +114,24 @@ class RuleCondition(
                 ConditionType.PARTY_LEADER -> if (partyId == null) "Parteivorsitz in $targetName" else "Vorsitz der Partei $targetName"
             }
 
+    /** The [offices] by rank, e.g. "Präsident, Vizepräsident oder Außenminister". */
+    fun officesLabel(): String {
+        val labels = offices.sorted().map { it.label }
+        return if (labels.size <= 1) labels.joinToString() else "${labels.dropLast(1).joinToString(", ")} oder ${labels.last()}"
+    }
+
     /**
-     * What makes two conditions the same; the name of the target is left out, since it may change in WarEra. The party
-     * and the rank of the military unit come last and only if set, so the keys of the conditions from before them stay
-     * as they are.
+     * What makes two conditions the same; the name of the target is left out, since it may change in WarEra. The
+     * offices are sorted by rank, so a single office gives the key from before there could be several. The party and
+     * the rank of the military unit come last and only if set, so the keys of the conditions from before them stay as
+     * they are.
      */
     val key: String
         get() =
             listOfNotNull(
                 type.name,
                 countryId.orEmpty(),
-                office?.name.orEmpty(),
+                offices.sorted().joinToString(",") { it.name },
                 muId.orEmpty(),
                 threshold?.toString().orEmpty(),
                 partyId,
@@ -167,4 +177,13 @@ enum class MilitaryUnitRole(
             MANAGER -> OWNER.isHeldBy(mu, userId) || userId in mu.roles.managers
             COMMANDER -> MANAGER.isHeldBy(mu, userId) || userId in mu.roles.commanders
         }
+}
+
+/** Stores [RuleCondition.offices] in one column, sorted by rank and separated by commas; no office as `NULL`. */
+class GovernmentOfficesConverter : AttributeConverter<Set<GovernmentOffice>, String?> {
+    override fun convertToDatabaseColumn(attribute: Set<GovernmentOffice>?): String? =
+        attribute?.takeIf { it.isNotEmpty() }?.sorted()?.joinToString(",") { it.name }
+
+    override fun convertToEntityAttribute(dbData: String?): Set<GovernmentOffice> =
+        dbData?.split(",")?.mapTo(sortedSetOf()) { GovernmentOffice.valueOf(it) } ?: emptySet()
 }

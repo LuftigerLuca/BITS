@@ -225,7 +225,7 @@ class SystemLogTest {
     @Test
     fun `missing WarEra data and governments, roles the bot cannot give and lost events are errors`() {
         createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","office":"PRESIDENT"}]}""")
+        createRule("""{"roleId":"r-citizen","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
         verify("1", "Luftiger", "Luca")
         awaitBackgroundWork()
         warera.failingUsers += "w1"

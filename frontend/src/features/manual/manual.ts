@@ -295,6 +295,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         points: [
           'Die Bedingungen einer Regel müssen alle erfüllt sein, etwa „Staatsbürgerschaft Germany und Level ab 10“.',
           'Von mehreren Regeln für dieselbe Rolle genügt eine.',
+          'Beim Regierungsamt kannst du mehrere Ämter ankreuzen; eines davon genügt, etwa „Präsident oder ' +
+            'Vizepräsident in Germany“.',
           'MU-Führung hat die Stufen Kommandeur, Manager und Besitzer; höhere Stufen zählen mit, „Kommandeur“ gilt ' +
             'also auch für Manager und Besitzer. Ohne gewählte MU zählt die Führung der eigenen MU, ohne gewählte ' +
             'Partei der Vorsitz jeder Partei des Landes.',
