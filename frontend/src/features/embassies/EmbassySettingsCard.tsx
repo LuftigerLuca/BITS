@@ -3,7 +3,7 @@ import { RoleName } from '@/components/RoleName'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { OFFICES } from '@/features/role-sync/labels'
 import type { Embassies, EmbassySettings, GovernmentOffice } from '@/lib/api'
 import { useSetEmbassySettings } from './queries'
@@ -81,22 +81,13 @@ function SettingsForm({ roles, saved }: { roles: Embassies['roles']; saved: Emba
       </fieldset>
       <div className="flex flex-col gap-1.5 sm:max-w-sm">
         <Label htmlFor="embassy-ambassador-role">Botschafter-Rolle</Label>
-        <Select
+        <SearchableSelect
+          id="embassy-ambassador-role"
+          className="w-full"
           items={roleItems}
           value={ambassadorRoleId ?? NO_ROLE}
-          onValueChange={(value: string | null) => setAmbassadorRoleId(value === NO_ROLE ? null : value)}
-        >
-          <SelectTrigger id="embassy-ambassador-role" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {roleItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onValueChange={(value) => setAmbassadorRoleId(value === NO_ROLE ? null : value)}
+        />
       </div>
       <fieldset className="flex max-h-72 flex-col gap-2 overflow-y-auto">
         <legend className="mb-2 text-sm font-medium">Gastgeber-Rollen</legend>

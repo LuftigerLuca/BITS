@@ -54,7 +54,7 @@ describe('country of the start page', () => {
     )
     renderApp('/admin')
 
-    expect(await screen.findByText('Germany', { selector: '[data-slot=select-value]' })).toBeInTheDocument()
+    expect(await screen.findByText('Germany', { selector: '[data-slot=searchable-select-value]' })).toBeInTheDocument()
     expect(saveButton()).toBeDisabled()
     await chooseCountry('France')
     await userEvent.click(saveButton())

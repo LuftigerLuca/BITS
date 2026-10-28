@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { LogCategory, SystemLogEntry, SystemLogFilter } from '@/lib/api'
@@ -34,7 +35,10 @@ export function SystemLogCard() {
     { value: ALL, label: 'Alle Typen' },
     ...Object.entries(CATEGORIES).map(([value, label]) => ({ value, label })),
   ]
-  const roleItems = [{ value: ALL, label: 'Alle Rollen' }, ...(roles.data ?? []).map((r) => ({ value: r.id, label: name(r) }))]
+  const roleItems = [
+    { value: ALL, label: 'Alle Rollen', pinned: true },
+    ...(roles.data ?? []).map((r) => ({ value: r.id, label: name(r) })),
+  ]
   const entries = log.data?.pages.flatMap((page) => page.entries) ?? []
   const filtered = filter.category !== null || filter.member !== null || filter.roleId !== null
 
@@ -79,18 +83,13 @@ export function SystemLogCard() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="system-log-role">Rolle</Label>
-            <Select items={roleItems} value={roleId} onValueChange={(value) => setRoleId(value ?? ALL)}>
-              <SelectTrigger id="system-log-role" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {roleItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              id="system-log-role"
+              className="w-full"
+              items={roleItems}
+              value={roleId}
+              onValueChange={(value) => setRoleId(value ?? ALL)}
+            />
           </div>
           <form className="flex flex-col gap-1.5" onSubmit={searchMember}>
             <Label htmlFor="system-log-member">Mitglied</Label>

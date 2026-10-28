@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useCountries } from '@/lib/countries'
 import { MAX_CONDITIONS, type CreateCondition, type CreateRoleRule, type DiscordRole } from '@/lib/api'
 import { ConditionFields } from './ConditionFields'
@@ -76,6 +76,7 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
   }
 
   const roleItems = roles.map((r) => ({ value: r.id, label: r.name }))
+  const colors = new Map(roles.map((r) => [r.id, r.color]))
 
   return (
     <form className="flex flex-col gap-4" onSubmit={submit}>
@@ -89,18 +90,15 @@ export function NewRuleForm({ roles }: { roles: DiscordRole[] }) {
       )}
       <div className="flex flex-col gap-1.5 sm:max-w-[calc(50%-0.5rem)]">
         <Label htmlFor="rule-role">Rolle</Label>
-        <Select items={roleItems} value={roleId} onValueChange={setRoleId}>
-          <SelectTrigger id="rule-role" className="w-full">
-            <SelectValue placeholder="Rolle wählen" />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                <RoleName name={r.name} color={r.color} />
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          id="rule-role"
+          className="w-full"
+          items={roleItems}
+          value={roleId}
+          onValueChange={setRoleId}
+          placeholder="Rolle wählen"
+          renderItem={(item) => <RoleName name={item.label} color={colors.get(item.value) ?? null} />}
+        />
         <p className="text-xs text-muted-foreground">
           Nur Rollen unter der höchsten Rolle des Bots, ohne @everyone und Integrationsrollen.
         </p>

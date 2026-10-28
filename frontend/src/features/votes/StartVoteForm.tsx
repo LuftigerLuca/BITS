@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ThresholdChoice } from '@/lib/api'
 import { DEFAULT_DURATION_MILLIS, THRESHOLD_CHOICE, errorMessage, toLocalInput } from './labels'
@@ -47,6 +48,7 @@ export function StartVoteForm() {
   }
 
   const roleItems = (options.data?.roles ?? []).map((r) => ({ value: r.id, label: r.name }))
+  const colors = new Map((options.data?.roles ?? []).map((r) => [r.id, r.color]))
   const channelItems = (options.data?.channels ?? []).map((c) => ({
     value: c.id,
     label: c.category ? `#${c.name} (${c.category})` : `#${c.name}`,
@@ -81,33 +83,26 @@ export function StartVoteForm() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="vote-role">Stimmberechtigte Rolle</Label>
-                <Select items={roleItems} value={roleId} onValueChange={setRoleId}>
-                  <SelectTrigger id="vote-role" className="w-full">
-                    <SelectValue placeholder="Rolle wählen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {options.data.roles.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        <RoleName name={r.name} color={r.color} />
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  id="vote-role"
+                  className="w-full"
+                  items={roleItems}
+                  value={roleId}
+                  onValueChange={setRoleId}
+                  placeholder="Rolle wählen"
+                  renderItem={(item) => <RoleName name={item.label} color={colors.get(item.value) ?? null} />}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="vote-channel">Kanal</Label>
-                <Select items={channelItems} value={channelId} onValueChange={setChannelId}>
-                  <SelectTrigger id="vote-channel" className="w-full">
-                    <SelectValue placeholder="Kanal wählen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {channelItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  id="vote-channel"
+                  className="w-full"
+                  items={channelItems}
+                  value={channelId}
+                  onValueChange={setChannelId}
+                  placeholder="Kanal wählen"
+                />
                 <p className="text-xs text-muted-foreground">Nur Kanäle, in denen der Bot posten darf.</p>
               </div>
               <div className="flex flex-col gap-1.5">
