@@ -68,6 +68,15 @@ class RuleEvaluator(
             ConditionType.COMPANIES -> companyCount?.let { it >= requireNotNull(condition.threshold) }
             ConditionType.PARTY ->
                 data.parties[condition.countryId]?.let { parties -> parties.any { it.id == condition.partyId && user.id in it.members } }
+            ConditionType.MU_LEADERSHIP -> {
+                // Without a unit of the rule, the member can only lead their own.
+                val muId = condition.muId ?: user.mu ?: return false
+                data.militaryUnits[muId]?.let { requireNotNull(condition.muRole).isHeldBy(it, user.id) }
+            }
+            ConditionType.PARTY_LEADER ->
+                data.parties[condition.countryId]?.let { parties ->
+                    parties.any { (condition.partyId == null || it.id == condition.partyId) && it.leader == user.id }
+                }
         }
     }
 }

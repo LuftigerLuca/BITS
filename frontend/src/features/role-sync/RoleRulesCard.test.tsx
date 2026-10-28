@@ -43,6 +43,7 @@ function renderCard(
     'GET /web/admin/role-sync/rules': () => json(rules),
     'GET /web/admin/role-sync/countries': () => json([{ id: 'de', name: 'Germany' }]),
     'GET /web/admin/role-sync/countries/de/parties': () => json([{ id: 'p1', name: 'Zentrum' }]),
+    'GET /web/admin/role-sync/military-units': () => json([{ id: 'm1', name: 'Deutsche Marine' }]),
     'POST /web/admin/role-sync/rules': (init) => onCreate(JSON.parse(String(init?.body))),
     'POST /web/admin/role-sync/rules/preview': () => json(rulePreview),
     'GET /web/admin/role-sync/rules/1/deletion-preview': () => json(rulePreview),
@@ -178,6 +179,61 @@ describe('rule form', () => {
     await confirm('Regel anlegen')
     await expect.poll(() => created).toEqual([
       { roleId: 'r-veteran', conditions: [{ type: 'PARTY', countryId: 'de', partyId: 'p1' }] },
+    ])
+  })
+
+  it('takes a rank and optionally a military unit for MU leadership rules', async () => {
+    const created: unknown[] = []
+    renderCard([], (body) => {
+      created.push(body)
+      return json(rule(9, veteran, 'Manager einer MU'), 201)
+    })
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Veteran')
+    await choose('Art', 'MU-Führung')
+    expect(screen.getByLabelText('Military Unit')).toHaveTextContent('Jede MU')
+    expect(screen.getByLabelText('Stufe')).toHaveAccessibleDescription('Höhere Stufen zählen mit.')
+    await choose('Stufe', 'Manager')
+    await userEvent.click(submit())
+    await confirm('Regel anlegen')
+
+    await userEvent.type(screen.getByLabelText('Military Unit suchen'), 'Marine')
+    await userEvent.click(screen.getByRole('button', { name: 'Suchen' }))
+    await choose('Military Unit', 'Deutsche Marine')
+    await userEvent.click(submit())
+    await confirm('Regel anlegen')
+
+    await expect.poll(() => created).toEqual([
+      { roleId: 'r-veteran', conditions: [{ type: 'MU_LEADERSHIP', muRole: 'MANAGER' }] },
+      { roleId: 'r-veteran', conditions: [{ type: 'MU_LEADERSHIP', muId: 'm1', muRole: 'MANAGER' }] },
+    ])
+  })
+
+  it('takes a country and optionally a party for party leader rules', async () => {
+    const created: unknown[] = []
+    renderCard([], (body) => {
+      created.push(body)
+      return json(rule(9, veteran, 'Parteivorsitz in Germany'), 201)
+    })
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Veteran')
+    await choose('Art', 'Parteivorsitz')
+    expect(screen.getByLabelText('Partei')).toHaveTextContent('Erst Land wählen')
+    expect(submit()).toBeDisabled()
+    await choose('Land', 'Germany')
+    expect(screen.getByLabelText('Partei')).toHaveTextContent('Jede Partei')
+    await userEvent.click(submit())
+    await confirm('Regel anlegen')
+
+    await choose('Partei', 'Zentrum')
+    await userEvent.click(submit())
+    await confirm('Regel anlegen')
+
+    await expect.poll(() => created).toEqual([
+      { roleId: 'r-veteran', conditions: [{ type: 'PARTY_LEADER', countryId: 'de' }] },
+      { roleId: 'r-veteran', conditions: [{ type: 'PARTY_LEADER', countryId: 'de', partyId: 'p1' }] },
     ])
   })
 

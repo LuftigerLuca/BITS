@@ -113,11 +113,23 @@ class RestWareraClientTest {
         server
             .expect(requestTo("https://warera.test/trpc/mu.getById?input=%7B%22muId%22%3A%22m1%22%7D"))
             .andRespond(
-                withSuccess("""{"result":{"data":{"_id":"m1","name":"Deutsche Marine","members":["u1"]}}}""", MediaType.APPLICATION_JSON),
+                withSuccess(
+                    """{"result":{"data":{"_id":"m1","name":"Deutsche Marine","members":["u1","u2","u3"],"user":"u1",""" +
+                        """"roles":{"managers":["u1","u2"],"commanders":["u3"]}}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
             )
 
         assertEquals(listOf("m1"), client.searchMilitaryUnitIds("Marine"))
-        assertEquals(WareraMilitaryUnit(id = "m1", name = "Deutsche Marine"), client.getMilitaryUnit("m1"))
+        assertEquals(
+            WareraMilitaryUnit(
+                id = "m1",
+                name = "Deutsche Marine",
+                owner = "u1",
+                roles = WareraMilitaryUnitRoles(managers = listOf("u1", "u2"), commanders = listOf("u3")),
+            ),
+            client.getMilitaryUnit("m1"),
+        )
         server.verify()
     }
 

@@ -75,6 +75,8 @@ export type ConditionType =
   | 'MILITARY_RANK'
   | 'COMPANIES'
   | 'PARTY'
+  | 'MU_LEADERSHIP'
+  | 'PARTY_LEADER'
 
 export type GovernmentOffice =
   | 'PRESIDENT'
@@ -83,6 +85,9 @@ export type GovernmentOffice =
   | 'MINISTER_OF_DEFENSE'
   | 'MINISTER_OF_FOREIGN_AFFAIRS'
   | 'CONGRESS'
+
+/** A rank in a military unit, lowest first; each includes the ranks above it. */
+export type MuRole = 'COMMANDER' | 'MANAGER' | 'OWNER'
 
 export type RuleStatus = 'ACTIVE' | 'ORPHANED' | 'NOT_ASSIGNABLE'
 
@@ -113,6 +118,7 @@ export interface CreateCondition {
   muId?: string
   threshold?: number
   partyId?: string
+  muRole?: MuRole
 }
 
 export interface Option {
@@ -269,6 +275,7 @@ export type LogEntryType =
   | 'WARERA_USERS_UNAVAILABLE'
   | 'GOVERNMENT_UNAVAILABLE'
   | 'PARTIES_UNAVAILABLE'
+  | 'MILITARY_UNIT_UNAVAILABLE'
   | 'ROLE_NOT_ASSIGNABLE'
   | 'SYNC_ABORTED'
   | 'EVENT_UNDELIVERED'

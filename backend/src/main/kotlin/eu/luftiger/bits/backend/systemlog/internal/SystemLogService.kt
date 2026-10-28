@@ -175,6 +175,16 @@ class SystemLogService(
                                 "${problem.partyNames.joinToString(", ")} wurden übersprungen.",
                     ),
                 )
+            is SystemProblem.MilitaryUnitUnavailable ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.MILITARY_UNIT_UNAVAILABLE,
+                        message =
+                            "Die MU ${problem.muName ?: problem.muId} konnte nicht geladen werden. " +
+                                "Regeln für die Führung dieser MU wurden übersprungen.",
+                    ),
+                )
             is SystemProblem.EmbassyGovernmentUnavailable ->
                 entries.save(
                     SystemLogEntry(

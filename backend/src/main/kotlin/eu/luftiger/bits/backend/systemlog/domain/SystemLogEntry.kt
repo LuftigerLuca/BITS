@@ -99,6 +99,9 @@ enum class EntryKind(
 
     /** The parties of a country could not be loaded for a sync. */
     PARTIES_UNAVAILABLE(Category.ERROR),
+
+    /** A military unit could not be loaded for a sync. */
+    MILITARY_UNIT_UNAVAILABLE(Category.ERROR),
     ROLE_NOT_ASSIGNABLE(Category.ERROR),
     SYNC_ABORTED(Category.ERROR),
 
