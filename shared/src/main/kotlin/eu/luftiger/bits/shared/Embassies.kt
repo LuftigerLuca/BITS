@@ -116,3 +116,46 @@ data class ReportedEmbassyChange(
     /** Why the member was added or removed, or why it was skipped or failed, in German for the dashboard. */
     val reason: String? = null,
 )
+
+/**
+ * An admin asked for a new embassy thread: the bot creates a private thread [name] in [channelId] that only moderators
+ * can invite to and that archives after the longest time, and reports it under [creationId], see
+ * [EmbassyThreadCreationReport]. The backend gives up after a minute, so the bot drops an event older than that.
+ */
+@Serializable
+@SerialName("embassy_thread_creation")
+data class EmbassyThreadCreationEvent(
+    val creationId: Long,
+    val channelId: String,
+    val name: String,
+    val countryName: String,
+    override val occurredAt: Long,
+) : BitsEvent
+
+/** What became of an [EmbassyThreadCreationEvent]: the thread, or why there is none. */
+@Serializable
+data class EmbassyThreadCreationReport(
+    /** `null` if [failure] is set. */
+    val thread: CreatedThread? = null,
+    val failure: ThreadCreationFailure? = null,
+)
+
+@Serializable
+data class CreatedThread(
+    val id: String,
+    val name: String,
+    val parentChannelId: String,
+    val parentChannelName: String,
+)
+
+@Serializable
+enum class ThreadCreationFailure {
+    /** The channel was deleted, or the bot cannot see it. */
+    CHANNEL_MISSING,
+
+    /** The bot may not create private threads, manage threads or send messages in threads there. */
+    NO_PERMISSION,
+
+    /** Discord refused for another reason. */
+    FAILED,
+}

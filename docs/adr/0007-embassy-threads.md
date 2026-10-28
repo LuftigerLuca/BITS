@@ -27,6 +27,7 @@ hour.
 - **Missing data removes nobody.** If a government cannot be loaded, its thread loses nobody and its members keep the
   role. Members who may manage threads in the channel are never removed, so moderators can look in.
 - **Admins pick threads from a list** of private threads the bot reports, active and archived, instead of pasting IDs.
+  The bot can also create them, see ADR 0008.
 - **The dashboard refuses what Discord would refuse.** The bot reports with each thread which roles may see its
   channel, and the backend rejects an ambassador or host role that may not, and a member added by hand who may not
   even with the ambassador role, so the admin learns it right away instead of from the system log. Overwrites for

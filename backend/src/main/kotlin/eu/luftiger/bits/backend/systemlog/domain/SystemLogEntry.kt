@@ -119,6 +119,9 @@ enum class EntryKind(
 
     /** An embassy thread is gone, or the bot may not manage it. */
     EMBASSY_THREAD_UNAVAILABLE(Category.ERROR),
+
+    /** The bot could not create an embassy thread. */
+    EMBASSY_THREAD_CREATION_FAILED(Category.ERROR),
     ;
 
     enum class Category {

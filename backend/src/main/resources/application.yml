@@ -43,6 +43,8 @@ bits:
   embassy:
     # Hourly like the role sync, but not at the same minute, when the role sync loads every linked user.
     cron: "0 10 * * * *"
+    # Gives up on embassy threads the bot has not created within a minute.
+    creation-cron: "*/10 * * * * *"
   vote:
     # Ends votes within a minute of their end and tries stuck results again.
     cron: "0 * * * * *"

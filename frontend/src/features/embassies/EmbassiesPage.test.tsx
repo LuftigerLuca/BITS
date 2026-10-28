@@ -10,10 +10,19 @@ const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername
 
 const embassies: Embassies = {
   ownCountryId: 'de',
-  settings: { offices: ['PRESIDENT', 'MINISTER_OF_FOREIGN_AFFAIRS'], ambassadorRoleId: 'r-amb', hostRoleIds: [] },
+  settings: {
+    offices: ['PRESIDENT', 'MINISTER_OF_FOREIGN_AFFAIRS'],
+    ambassadorRoleId: 'r-amb',
+    hostRoleIds: [],
+    channelId: 'c-1',
+  },
   roles: [
     { id: 'r-amb', name: 'Botschafter', color: null },
     { id: 'r-gov', name: 'Regierung', color: 0x00ff00 },
+  ],
+  channels: [
+    { id: 'c-1', name: 'diplomatie', category: 'Außen', threadsCreatable: true },
+    { id: 'c-2', name: 'ankündigungen', category: null, threadsCreatable: false },
   ],
   threads: [
     {
@@ -31,6 +40,7 @@ const embassies: Embassies = {
     },
   ],
   availableThreads: [{ id: 't-pl', name: 'botschaft-polen', channelName: 'diplomatie', archived: true, manageable: true }],
+  creations: [],
 }
 
 const countries = [
@@ -124,6 +134,7 @@ describe('embassies', () => {
           offices: ['PRESIDENT', 'VICE_PRESIDENT', 'MINISTER_OF_FOREIGN_AFFAIRS'],
           ambassadorRoleId: 'r-amb',
           hostRoleIds: ['r-gov'],
+          channelId: 'c-1',
         },
       ])
   })
@@ -154,6 +165,81 @@ describe('embassies', () => {
     await expectToast(
       'error',
       'Das Mitglied darf den Kanal des Threads in Discord nicht sehen, auch nicht mit der Botschafter-Rolle. Erlaube der Botschafter-Rolle dort „Kanal ansehen“.',
+    )
+  })
+
+  it('has the bot create a thread with the name from the dialog', async () => {
+    const created: unknown[] = []
+    stub({ 'POST /web/admin/embassies/creations': bodies(created) })
+    renderApp('/admin/embassies')
+
+    await userEvent.click(await screen.findByLabelText('Land'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Poland' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Automatisch anlegen' }))
+    const name = await screen.findByLabelText('Name')
+    expect(name).toHaveValue('Botschaft Poland')
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Botschaft Polen')
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }))
+
+    await expect.poll(() => created).toEqual([{ countryId: 'pl', threadName: 'Botschaft Polen' }])
+    await expectToast('success', 'Thread wird angelegt')
+  })
+
+  it('offers creating a thread only once an embassy channel is set', async () => {
+    stub({
+      'GET /web/admin/embassies': () => json({ ...embassies, settings: { ...embassies.settings, channelId: null } }),
+    })
+    renderApp('/admin/embassies')
+
+    await userEvent.click(await screen.findByLabelText('Land'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Poland' }))
+    expect(screen.getByRole('button', { name: 'Automatisch anlegen' })).toBeDisabled()
+    expect(screen.getByText('Zum automatischen Anlegen wähle unter „Einstellungen“ einen Botschafts-Kanal.')).toBeInTheDocument()
+  })
+
+  it('shows threads being created and why one failed, which can be dismissed', async () => {
+    const dismissed: unknown[] = []
+    stub({
+      'GET /web/admin/embassies': () =>
+        json({
+          ...embassies,
+          creations: [
+            { id: 1, countryId: 'it', countryName: 'Italy', threadName: 'Botschaft Italy', failure: null },
+            {
+              id: 2,
+              countryId: 'pl',
+              countryName: 'Poland',
+              threadName: 'Botschaft Poland',
+              failure: 'Discord hat das Anlegen abgelehnt.',
+            },
+          ],
+        }),
+      'DELETE /web/admin/embassies/creations/2': bodies(dismissed),
+    })
+    renderApp('/admin/embassies')
+
+    const italy = await screen.findByRole('region', { name: 'Botschaft Italy' })
+    expect(within(italy).getByText('Wird angelegt …')).toBeInTheDocument()
+    const poland = screen.getByRole('region', { name: 'Botschaft Poland' })
+    expect(within(poland).getByText('Discord hat das Anlegen abgelehnt.')).toBeInTheDocument()
+    expect(within(poland).getByRole('button', { name: 'Automatisch anlegen' })).toBeEnabled()
+
+    await userEvent.click(within(poland).getByRole('button', { name: 'Verwerfen' }))
+    await expect.poll(() => dismissed).toHaveLength(1)
+  })
+
+  it('says when the bot may not create threads in the embassy channel', async () => {
+    stub({ 'PUT /web/admin/embassies/settings': () => status(422) })
+    renderApp('/admin/embassies')
+
+    await userEvent.click(await screen.findByLabelText('Botschafts-Kanal'))
+    await userEvent.click(await screen.findByRole('option', { name: '#ankündigungen – Bot fehlen Rechte' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    await expectToast(
+      'error',
+      'Dem Bot fehlen im Botschafts-Kanal die Rechte „Private Threads erstellen“, „Threads verwalten“ oder „Nachrichten in Threads senden“.',
     )
   })
 })

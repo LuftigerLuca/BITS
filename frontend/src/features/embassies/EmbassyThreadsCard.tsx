@@ -1,6 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { SparklesIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,10 +17,21 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { Embassies, EmbassyThread } from '@/lib/api'
+import type { Embassies, EmbassyCreation, EmbassyThread } from '@/lib/api'
 import { useCountries } from '@/lib/countries'
 import { errorMessage } from './labels'
-import { useAddMember, useAssignThread, useMemberSearch, useRemoveMember, useUnassignThread } from './queries'
+import {
+  useAddMember,
+  useAssignThread,
+  useCreateThread,
+  useDismissCreation,
+  useMemberSearch,
+  useRemoveMember,
+  useUnassignThread,
+} from './queries'
+
+/** Discord's limit for thread names. */
+const MAX_THREAD_NAME_LENGTH = 100
 
 /** The embassy threads by country, who is in each and why, and the form to assign another one. */
 export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
@@ -20,13 +40,17 @@ export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
       <CardHeader>
         <CardTitle>Botschafts-Threads</CardTitle>
         <CardDescription>
-          Lege den privaten Thread zuerst in Discord an. Der Bot braucht im Kanal die Rechte „Threads verwalten“ und
-          „Nachrichten in Threads senden“. BITS gleicht die Threads nach jeder Verknüpfung und stündlich ab und entfernt
-          alle, die weder ein Amt haben noch manuell hinzugefügt sind, außer wer Threads verwalten darf.
+          Wähle einen privaten Thread aus Discord oder lass ihn vom Bot im Botschafts-Kanal anlegen. Der Bot braucht im
+          Kanal die Rechte „Threads verwalten“ und „Nachrichten in Threads senden“. BITS gleicht die Threads nach jeder
+          Verknüpfung und stündlich ab und entfernt alle, die weder ein Amt haben noch manuell hinzugefügt sind, außer
+          wer Threads verwalten darf.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        {embassies.threads.length === 0 ? (
+        {embassies.creations.map((creation) => (
+          <CreationSection key={creation.id} creation={creation} />
+        ))}
+        {embassies.threads.length === 0 && embassies.creations.length === 0 ? (
           <p className="text-sm text-muted-foreground">Noch keinem Land ist ein Thread zugeordnet.</p>
         ) : (
           embassies.threads.map((thread) => <ThreadSection key={thread.threadId} thread={thread} />)
@@ -34,6 +58,106 @@ export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
         <AssignForm embassies={embassies} />
       </CardContent>
     </Card>
+  )
+}
+
+/** A thread the bot is creating, or why it could not, with the way to try again. */
+function CreationSection({ creation }: { creation: EmbassyCreation }) {
+  const dismiss = useDismissCreation()
+  const [retrying, setRetrying] = useState(false)
+  return (
+    <section aria-label={`Botschaft ${creation.countryName}`} className="flex flex-col gap-3 rounded-lg border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="font-heading font-semibold">{creation.countryName}</h3>
+          <p className="text-sm text-muted-foreground">{creation.threadName}</p>
+        </div>
+        {creation.failure === null ? (
+          <Badge variant="secondary">Wird angelegt …</Badge>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Badge variant="destructive">Anlegen fehlgeschlagen</Badge>
+            <Button variant="outline" size="sm" onClick={() => setRetrying(true)}>
+              Automatisch anlegen
+            </Button>
+            <Button variant="ghost" size="sm" disabled={dismiss.isPending} onClick={() => dismiss.mutate(creation.id)}>
+              Verwerfen
+            </Button>
+          </div>
+        )}
+      </div>
+      {creation.failure !== null && <p className="text-sm text-destructive">{creation.failure}</p>}
+      {retrying && (
+        <CreateDialog
+          countryId={creation.countryId}
+          countryName={creation.countryName}
+          initialName={creation.threadName}
+          onClose={() => setRetrying(false)}
+        />
+      )}
+    </section>
+  )
+}
+
+/** Asks for the name of the thread the bot creates, "Botschaft <Land>" unless changed; mounted while open. */
+function CreateDialog({
+  countryId,
+  countryName,
+  initialName,
+  onClose,
+  onCreated,
+}: {
+  countryId: string
+  countryName: string
+  initialName: string
+  onClose: () => void
+  onCreated?: () => void
+}) {
+  const create = useCreateThread()
+  const [name, setName] = useState(initialName)
+  const trimmed = name.trim()
+  return (
+    <AlertDialog open onOpenChange={(next) => !next && onClose()}>
+      <AlertDialogContent>
+        <form
+          className="contents"
+          onSubmit={(event) => {
+            event.preventDefault()
+            create.mutate(
+              { countryId, threadName: trimmed },
+              {
+                onSuccess: () => {
+                  onClose()
+                  onCreated?.()
+                },
+              },
+            )
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Thread für {countryName} anlegen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Der Bot legt im Botschafts-Kanal einen privaten Thread an und ordnet ihn {countryName} zu.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`embassy-create-name-${countryId}`}>Name</Label>
+            <Input
+              id={`embassy-create-name-${countryId}`}
+              value={name}
+              maxLength={MAX_THREAD_NAME_LENGTH}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <Button type="submit" disabled={trimmed.length === 0 || create.isPending}>
+              Anlegen
+            </Button>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
@@ -163,9 +287,19 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
   const assign = useAssignThread()
   const [threadId, setThreadId] = useState<string | null>(null)
   const [countryId, setCountryId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
-  const taken = new Set([embassies.ownCountryId, ...embassies.threads.map((t) => t.countryId)])
-  const countryItems = (countries.data ?? []).filter((c) => !taken.has(c.id)).map((c) => ({ value: c.id, label: c.name }))
+  // A country whose creation failed is free again.
+  const taken = new Set([
+    embassies.ownCountryId,
+    ...embassies.threads.map((t) => t.countryId),
+    ...embassies.creations.filter((c) => c.failure === null).map((c) => c.countryId),
+  ])
+  const countryItems = (countries.data ?? [])
+    .filter((c) => !taken.has(c.id))
+    .map((c) => ({ value: c.id, label: c.name }))
+  const countryName = countryItems.find((c) => c.value === countryId)?.label
+  const channelSet = embassies.settings.channelId !== null
   const threadItems = embassies.availableThreads.map((t) => ({
     value: t.id,
     label: `#${t.channelName} › ${t.name}${t.archived ? ' (archiviert)' : ''}${t.manageable ? '' : ' – Bot fehlen Rechte'}`,
@@ -187,37 +321,70 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
   }
 
   return (
-    <form className="flex flex-col gap-4 border-t pt-4" onSubmit={submit}>
-      <h3 className="font-heading font-semibold">Thread zuordnen</h3>
-      {countries.isError && <ErrorState message={errorMessage(countries.error)} onRetry={() => countries.refetch()} />}
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Label htmlFor="embassy-thread">Thread</Label>
-          <SearchableSelect
-            id="embassy-thread"
-            className="w-full"
-            items={threadItems}
-            value={threadId}
-            onValueChange={setThreadId}
-            placeholder={threadItems.length === 0 ? 'Keine freien privaten Threads' : 'Thread wählen'}
-          />
+    <>
+      <form className="flex flex-col gap-4 border-t pt-4" onSubmit={submit}>
+        <h3 className="font-heading font-semibold">Thread zuordnen</h3>
+        {countries.isError && (
+          <ErrorState message={errorMessage(countries.error)} onRetry={() => countries.refetch()} />
+        )}
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Label htmlFor="embassy-thread">Thread</Label>
+            <SearchableSelect
+              id="embassy-thread"
+              className="w-full"
+              items={threadItems}
+              value={threadId}
+              onValueChange={setThreadId}
+              placeholder={threadItems.length === 0 ? 'Keine freien privaten Threads' : 'Thread wählen'}
+            />
+          </div>
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Label htmlFor="embassy-country">Land</Label>
+            <SearchableSelect
+              id="embassy-country"
+              className="w-full"
+              items={countryItems}
+              value={countryId}
+              onValueChange={setCountryId}
+              disabled={countries.isPending}
+              placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'}
+            />
+          </div>
         </div>
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Label htmlFor="embassy-country">Land</Label>
-          <SearchableSelect
-            id="embassy-country"
-            className="w-full"
-            items={countryItems}
-            value={countryId}
-            onValueChange={setCountryId}
-            disabled={countries.isPending}
-            placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'}
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" disabled={!threadId || !countryId || assign.isPending}>
+            Zuordnen
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!countryId || !channelSet}
+            onClick={() => setCreating(true)}
+          >
+            <SparklesIcon />
+            Automatisch anlegen
+          </Button>
         </div>
-      </div>
-      <Button type="submit" className="self-start" disabled={!threadId || !countryId || assign.isPending}>
-        Zuordnen
-      </Button>
-    </form>
+        {!channelSet && (
+          <p className="text-sm text-muted-foreground">
+            Zum automatischen Anlegen wähle unter „Einstellungen“ einen Botschafts-Kanal.
+          </p>
+        )}
+      </form>
+      {/* Outside the form, since a submit in the dialog would bubble up to it through the portal. */}
+      {creating && countryId && countryName && (
+        <CreateDialog
+          countryId={countryId}
+          countryName={countryName}
+          initialName={`Botschaft ${countryName}`}
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setThreadId(null)
+            setCountryId(null)
+          }}
+        />
+      )}
+    </>
   )
 }

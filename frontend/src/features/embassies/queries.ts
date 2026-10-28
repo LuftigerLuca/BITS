@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addEmbassyMember,
   assignEmbassyThread,
+  createEmbassyThread,
+  dismissEmbassyCreation,
   getEmbassies,
   removeEmbassyMember,
   searchEmbassyMembers,
@@ -14,9 +16,16 @@ import { CANNOT_VIEW, errorMessage } from './labels'
 
 const EMBASSIES = ['embassies'] as const
 
-/** Who is in a thread changes with every sync, which a change on this page starts. */
+/**
+ * Who is in a thread changes with every sync, which a change on this page starts. While the bot creates a thread, the
+ * page asks more often, so the thread shows up within seconds.
+ */
 export function useEmbassies() {
-  return useQuery({ queryKey: [...EMBASSIES, 'overview'], queryFn: getEmbassies, refetchInterval: 30_000 })
+  return useQuery({
+    queryKey: [...EMBASSIES, 'overview'],
+    queryFn: getEmbassies,
+    refetchInterval: (query) => (query.state.data?.creations.some((c) => c.failure === null) ? 3_000 : 30_000),
+  })
 }
 
 /** Only from two characters on, so a single letter does not list half the Discord. */
@@ -30,20 +39,49 @@ export function useMemberSearch(query: string) {
 }
 
 /** A mutation of the embassy page that reloads it and tells the result in a toast. */
-function useEmbassyMutation<T>(mutationFn: (variables: T) => Promise<void>, success: string, cannotView?: string) {
+function useEmbassyMutation<T>(
+  mutationFn: (variables: T) => Promise<void>,
+  success: string,
+  cannotView?: string,
+  detail: string | undefined = 'Discord wird gleich abgeglichen.',
+) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn,
     onSuccess: () => {
-      notify.success(success, 'Discord wird gleich abgeglichen.')
+      notify.success(success, detail)
       return queryClient.invalidateQueries({ queryKey: EMBASSIES })
     },
     onError: (error) => notify.error(errorMessage(error, cannotView)),
   })
 }
 
-export function useSetEmbassySettings() {
-  return useEmbassyMutation((settings: EmbassySettings) => setEmbassySettings(settings), 'Einstellungen gespeichert')
+/** [cannotView] says what a 422 means for the settings at hand. */
+export function useSetEmbassySettings(cannotView?: string) {
+  return useEmbassyMutation(
+    (settings: EmbassySettings) => setEmbassySettings(settings),
+    'Einstellungen gespeichert',
+    cannotView,
+  )
+}
+
+export function useCreateThread() {
+  return useEmbassyMutation(
+    ({ countryId, threadName }: { countryId: string; threadName: string }) =>
+      createEmbassyThread(countryId, threadName),
+    'Thread wird angelegt',
+    undefined,
+    'Der Bot legt ihn gleich an.',
+  )
+}
+
+export function useDismissCreation() {
+  return useEmbassyMutation(
+    (creationId: number) => dismissEmbassyCreation(creationId),
+    'Verworfen',
+    undefined,
+    undefined,
+  )
 }
 
 export function useAssignThread() {

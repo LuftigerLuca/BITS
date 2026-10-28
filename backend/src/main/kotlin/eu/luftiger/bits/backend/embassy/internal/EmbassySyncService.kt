@@ -4,6 +4,7 @@ import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.embassy.domain.EmbassySetting
 import eu.luftiger.bits.backend.embassy.domain.EmbassyThread
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.rolesync.api.MemberCountries
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -26,6 +27,10 @@ import java.time.Clock
  * Only the governments of countries with a thread are loaded, outside of any transaction. The [WareraClient] keeps them
  * for a few minutes, so a sync right after another one costs no calls. A country whose government cannot be loaded is
  * recorded in the [SystemLog]; its thread then loses nobody, see [EmbassyThreadTarget.complete].
+ *
+ * First, every sync asks the bot for the threads of foreign countries in which a linked member holds a chosen office,
+ * see [EmbassyThreadCreationService.createMissing]. The countries of the members come from the role sync; those of
+ * newly linked members are loaded right away.
  */
 @Service
 class EmbassySyncService(
@@ -35,6 +40,8 @@ class EmbassySyncService(
     private val hostRoleRepository: EmbassyHostRoleRepository,
     private val settingRepository: EmbassySettingRepository,
     private val accountLinks: AccountLinks,
+    private val memberCountries: MemberCountries,
+    private val creationService: EmbassyThreadCreationService,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
     private val systemLog: SystemLog,
@@ -43,8 +50,15 @@ class EmbassySyncService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /** Does nothing while no thread is assigned, not even a log entry, so an unused feature costs nothing. */
-    fun sync(trigger: SyncTrigger) {
+    /**
+     * [newWareraUserIds] are users linked just now, whose country is loaded unless the role sync knows it. Publishes
+     * nothing while no thread is assigned, not even a log entry, so an unused feature costs nothing.
+     */
+    fun sync(
+        trigger: SyncTrigger,
+        newWareraUserIds: Set<String> = emptySet(),
+    ) {
+        createMissingThreads(newWareraUserIds)
         val threads = threadRepository.findAll().sortedBy { it.countryName }
         if (threads.isEmpty()) return
         val offices = officeRepository.findAll().map { it.office }.sortedBy { it.ordinal }
@@ -93,6 +107,21 @@ class EmbassySyncService(
             )
         }
         log.info("Embassy sync published for {} threads, {} ambassadors", threads.size, ambassadors.size)
+    }
+
+    /** Costs no WarEra call for newly linked users while no embassy channel is set. */
+    private fun createMissingThreads(newWareraUserIds: Set<String>) {
+        if (settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)?.channelId == null) return
+        val linked = accountLinks.findAll().mapTo(HashSet()) { it.wareraUserId }
+        val countries = memberCountries.byWareraUserId().filterKeys { it in linked }.toMutableMap()
+        newWareraUserIds.filter { it in linked && it !in countries }.forEach { id ->
+            try {
+                wareraClient.getUser(id).country?.let { countries[id] = it }
+            } catch (e: WareraApiException) {
+                log.warn("WarEra user {} could not be loaded, their country gets no embassy thread for now", id, e)
+            }
+        }
+        creationService.createMissing(countries)
     }
 
     private fun government(thread: EmbassyThread): WareraGovernment? =

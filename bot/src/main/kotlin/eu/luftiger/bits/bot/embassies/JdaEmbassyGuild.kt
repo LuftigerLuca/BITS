@@ -1,5 +1,7 @@
 package eu.luftiger.bits.bot.embassies
 
+import eu.luftiger.bits.bot.channels.ChannelReporter
+import eu.luftiger.bits.shared.CreatedThread
 import kotlinx.coroutines.future.await
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.Permission
@@ -9,13 +11,15 @@ import net.dv8tion.jda.api.entities.UserSnowflake
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel
 import net.dv8tion.jda.api.exceptions.ErrorResponseException
+import net.dv8tion.jda.api.exceptions.InsufficientPermissionException
 import net.dv8tion.jda.api.requests.ErrorResponse
 
-/** [EmbassyGuild] on the guild [guildId], whose members JDA keeps in its cache. */
+/** [EmbassyGuild] and [EmbassyThreadFactory] on the guild [guildId], whose members JDA keeps in its cache. */
 class JdaEmbassyGuild(
     private val jda: JDA,
     private val guildId: String,
-) : EmbassyGuild {
+) : EmbassyGuild,
+    EmbassyThreadFactory {
     private val guild: Guild
         get() = jda.getGuildById(guildId) ?: error("Bot is not a member of guild $guildId")
 
@@ -69,6 +73,46 @@ class JdaEmbassyGuild(
         val role = guild.getRoleById(roleId) ?: error("Role $roleId is gone")
         guild
             .removeRoleFromMember(UserSnowflake.fromId(discordUserId), role)
+            .reason(reason)
+            .submit()
+            .await()
+    }
+
+    override suspend fun createPrivateThread(
+        channelId: String,
+        name: String,
+        reason: String,
+    ): ThreadCreation {
+        val channel = guild.getTextChannelById(channelId) ?: return ThreadCreation.ChannelMissing
+        if (!guild.selfMember.hasPermission(channel, ChannelReporter.THREAD_PERMISSIONS)) return ThreadCreation.NoPermission
+        val thread =
+            try {
+                channel
+                    .createThreadChannel(name, true)
+                    .setInvitable(false)
+                    .setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_1_WEEK)
+                    .reason(reason)
+                    .submit()
+                    .await()
+            } catch (e: InsufficientPermissionException) {
+                return ThreadCreation.NoPermission
+            } catch (e: ErrorResponseException) {
+                when (e.errorResponse) {
+                    ErrorResponse.MISSING_PERMISSIONS -> return ThreadCreation.NoPermission
+                    ErrorResponse.UNKNOWN_CHANNEL, ErrorResponse.MISSING_ACCESS -> return ThreadCreation.ChannelMissing
+                    else -> throw e
+                }
+            }
+        return ThreadCreation.Created(CreatedThread(thread.id, thread.name, channel.id, channel.name))
+    }
+
+    override suspend fun deleteThread(
+        threadId: String,
+        reason: String,
+    ) {
+        val thread = guild.getThreadChannelById(threadId) ?: return
+        thread
+            .delete()
             .reason(reason)
             .submit()
             .await()

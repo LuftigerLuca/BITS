@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.DiscordThreadDto
 import eu.luftiger.bits.shared.EmbassySyncReport
+import eu.luftiger.bits.shared.EmbassyThreadCreationReport
 
 /** The part of the backend's REST API for the embassies; [KtorBackendClient] implements it next to [BackendClient]. */
 interface EmbassyBackend {
@@ -12,5 +13,11 @@ interface EmbassyBackend {
     suspend fun reportEmbassySync(
         syncId: Long,
         report: EmbassySyncReport,
+    )
+
+    /** Tells the backend what became of the embassy thread creation [creationId]; 410 if it no longer wants the thread. */
+    suspend fun reportThreadCreation(
+        creationId: Long,
+        report: EmbassyThreadCreationReport,
     )
 }

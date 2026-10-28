@@ -5,13 +5,17 @@ import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.embassy.internal.EmbassySyncTrigger
+import eu.luftiger.bits.backend.embassy.internal.EmbassyThreadCreationService
 import eu.luftiger.bits.backend.members.internal.GuildMemberService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.CreatedThread
 import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.EmbassySyncReport
+import eu.luftiger.bits.shared.EmbassyThreadCreationEvent
+import eu.luftiger.bits.shared.EmbassyThreadCreationReport
 import eu.luftiger.bits.shared.EmbassyThreadStatus
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.ReportedEmbassyChange
@@ -19,6 +23,7 @@ import eu.luftiger.bits.shared.ReportedEmbassyThread
 import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.ReportedThreadMember
 import eu.luftiger.bits.shared.RoleChangeOutcome
+import eu.luftiger.bits.shared.ThreadCreationFailure
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraGovernment
@@ -76,6 +81,9 @@ class EmbassyTest {
     @Autowired
     lateinit var memberService: GuildMemberService
 
+    @Autowired
+    lateinit var creationService: EmbassyThreadCreationService
+
     private val admin by lazy { session(SessionUser.admin("admin")) }
 
     @BeforeTest
@@ -112,7 +120,8 @@ class EmbassyTest {
         jdbc.execute(
             "TRUNCATE account_link, account_verification, embassy_thread, embassy_manual_member, embassy_thread_member, " +
                 "discord_thread, embassy_host_role, embassy_setting, embassy_office, overview_setting, audit_entry, " +
-                "system_log_entry, event_publication, discord_role, role_rule, nickname_opt_in, feature_setting CASCADE",
+                "system_log_entry, event_publication, discord_role, role_rule, nickname_opt_in, feature_setting, " +
+                "embassy_thread_creation, discord_channel CASCADE",
         )
         jdbc.execute("INSERT INTO embassy_office (office) VALUES ('PRESIDENT'), ('VICE_PRESIDENT'), ('MINISTER_OF_FOREIGN_AFFAIRS')")
     }
@@ -386,7 +395,9 @@ class EmbassyTest {
         assertEquals("r-amb", JsonPath.read<String>(embassies, "$.settings.ambassadorRoleId"))
         assertEquals(listOf("r-gov"), JsonPath.read<List<String>>(embassies, "$.settings.hostRoleIds"))
         assertEquals(
-            listOf("Botschaften: Ämter: Präsident, Außenminister; Botschafter-Rolle: @Botschafter; Gastgeber-Rollen: @Regierung"),
+            listOf(
+                "Botschaften: Ämter: Präsident, Außenminister; Botschafter-Rolle: @Botschafter; Gastgeber-Rollen: @Regierung; Botschafts-Kanal: keiner",
+            ),
             jdbc.queryForList("SELECT description FROM audit_entry", String::class.java),
         )
     }
@@ -418,6 +429,170 @@ class EmbassyTest {
     }
 
     @Test
+    fun `the embassy channel must exist, be visible to the roles and let the bot create threads`() {
+        reportChannels(
+            channel("c-open", creatable = true),
+            channel("c-closed", creatable = false),
+            channel("c-hidden", creatable = true, viewers = listOf("r-gov")),
+        )
+        createThread("fr").andExpect { status { isBadRequest() } }
+
+        setSettingsRequest(settings(channelId = "c-unknown")).andExpect { status { isBadRequest() } }
+        setSettingsRequest(settings(channelId = "c-closed")).andExpect { status { isUnprocessableContent() } }
+        setSettingsRequest(settings(channelId = "c-hidden")).andExpect { status { isUnprocessableContent() } }
+        setSettings(settings(channelId = "c-open"))
+
+        val embassies = embassies()
+        assertEquals("c-open", JsonPath.read<String>(embassies, "$.settings.channelId"))
+        assertEquals(listOf(true, false, true), JsonPath.read<List<Boolean>>(embassies, "$.channels[*].threadsCreatable"))
+        assertEquals(
+            "Botschaften: Ämter: Präsident, Vizepräsident, Außenminister; Botschafter-Rolle: @Botschafter; " +
+                "Gastgeber-Rollen: keine; Botschafts-Kanal: #c-open",
+            jdbc.queryForList("SELECT description FROM audit_entry", String::class.java).last(),
+        )
+    }
+
+    @Test
+    fun `an admin has the bot create a thread, which is assigned and synced right away, once`() {
+        jdbc.update("INSERT INTO overview_setting (country_id, country_name, updated_at) VALUES ('de', 'Germany', now())")
+        reportChannels(channel("c-1", creatable = true))
+        setSettings(settings(channelId = "c-1"))
+        createThread("de").andExpect { status { isBadRequest() } }
+        createThread("fr", " ").andExpect { status { isBadRequest() } }
+        createThread("fr", "x".repeat(101)).andExpect { status { isBadRequest() } }
+
+        createThread("fr", " Botschaft France ").andExpect { status { isAccepted() } }
+        // A second click, or assigning a thread meanwhile, gets no second thread.
+        createThread("fr").andExpect { status { isConflict() } }
+        assign("t-fr", "fr").andExpect { status { isConflict() } }
+
+        val event = creationEvents().single()
+        assertEquals("c-1", event.channelId)
+        assertEquals("Botschaft France", event.name)
+        assertEquals("France", event.countryName)
+        val pending = embassies()
+        assertEquals(listOf("France"), JsonPath.read<List<String>>(pending, "$.creations[*].countryName"))
+        assertEquals(listOf(null), JsonPath.read<List<String?>>(pending, "$.creations[*].failure"))
+        awaitBackgroundWork()
+        val syncs = streamEvents().filterIsInstance<EmbassySyncEvent>().size
+
+        val created = EmbassyThreadCreationReport(thread = CreatedThread("t-new", "Botschaft France", "c-1", "diplomatie"))
+        postCreation(event.creationId, created).andExpect { status { isNoContent() } }
+        // The same report again changes nothing.
+        postCreation(event.creationId, created).andExpect { status { isNoContent() } }
+        awaitBackgroundWork()
+
+        val embassies = embassies()
+        assertEquals(emptyList(), JsonPath.read<List<Any>>(embassies, "$.creations"))
+        assertEquals(listOf("t-new"), JsonPath.read<List<String>>(embassies, "$.threads[*].threadId"))
+        assertEquals(listOf("diplomatie"), JsonPath.read<List<String>>(embassies, "$.threads[*].channelName"))
+        assertEquals(listOf(false), JsonPath.read<List<Boolean>>(embassies, "$.threads[*].missing"))
+        assertEquals(syncs + 1, streamEvents().filterIsInstance<EmbassySyncEvent>().size)
+        assertEquals(listOf("t-new"), lastSync().threads.map { it.threadId })
+        createThread("fr").andExpect { status { isConflict() } }
+        assertEquals(
+            "Botschafts-Thread Botschaft France für France vom Bot anlegen lassen",
+            jdbc.queryForList("SELECT description FROM audit_entry", String::class.java).last(),
+        )
+    }
+
+    @Test
+    fun `a foreign office holder who links gets their country a thread, a congress member does not`() {
+        reportChannels(channel("c-1", creatable = true))
+        setSettings(settings(channelId = "c-1"))
+
+        verify("4", "Deputy")
+        assertEquals(emptyList(), creationEvents())
+
+        verify("3", "Minister")
+        val event = creationEvents().single()
+        assertEquals("Botschaft France", event.name)
+        assertEquals(
+            "Botschafts-Thread Botschaft France automatisch angefordert: Außenminister von France ist verknüpft",
+            jdbc.queryForObject(
+                "SELECT description FROM audit_entry WHERE action = 'EMBASSY_THREAD_CREATION_REQUESTED'",
+                String::class.java,
+            ),
+        )
+
+        // The bot creates it, and the minister is in it with the sync that follows.
+        postCreation(event.creationId, EmbassyThreadCreationReport(thread = CreatedThread("t-new", "Botschaft France", "c-1", "d")))
+            .andExpect { status { isNoContent() } }
+        awaitBackgroundWork()
+        assertEquals(mapOf("3" to "Außenminister von France"), lastSync().threads.single().members)
+    }
+
+    @Test
+    fun `a failed request is not repeated on its own`() {
+        reportChannels(channel("c-1", creatable = true))
+        setSettings(settings(channelId = "c-1"))
+        verify("3", "Minister")
+        val event = creationEvents().single()
+        postCreation(event.creationId, EmbassyThreadCreationReport(failure = ThreadCreationFailure.FAILED))
+            .andExpect { status { isNoContent() } }
+
+        embassyTrigger.hourly()
+        awaitBackgroundWork()
+        assertEquals(1, creationEvents().size)
+    }
+
+    @Test
+    fun `a failure or no answer within a minute frees the country and is logged`() {
+        reportChannels(channel("c-1", creatable = true))
+        setSettings(settings(channelId = "c-1"))
+        createThread("fr").andExpect { status { isAccepted() } }
+        val first = creationEvents().single()
+
+        postCreation(first.creationId, EmbassyThreadCreationReport(failure = ThreadCreationFailure.NO_PERMISSION))
+            .andExpect { status { isNoContent() } }
+        assertEquals(
+            listOf(
+                "Dem Bot fehlen im Botschafts-Kanal die Rechte „Private Threads erstellen“, „Threads verwalten“ oder " +
+                    "„Nachrichten in Threads senden“.",
+            ),
+            JsonPath.read<List<String>>(embassies(), "$.creations[*].failure"),
+        )
+
+        // Trying again replaces the failed request; without an answer it fails after a minute.
+        createThread("fr").andExpect { status { isAccepted() } }
+        val second = creationEvents().last()
+        clock.now = clock.now.plusSeconds(59)
+        creationService.expire()
+        assertEquals(listOf(null), JsonPath.read<List<String?>>(embassies(), "$.creations[*].failure"))
+        clock.now = clock.now.plusSeconds(2)
+        creationService.expire()
+        assertEquals(
+            listOf("Der Bot hat nicht innerhalb einer Minute geantwortet."),
+            JsonPath.read<List<String>>(embassies(), "$.creations[*].failure"),
+        )
+
+        // A thread that comes too late is not taken; the bot deletes it.
+        postCreation(second.creationId, EmbassyThreadCreationReport(thread = CreatedThread("t-late", "Botschaft France", "c-1", "d")))
+            .andExpect { status { isGone() } }
+        assertEquals(
+            2,
+            jdbc.queryForObject("SELECT COUNT(*) FROM system_log_entry WHERE kind = 'EMBASSY_THREAD_CREATION_FAILED'", Int::class.java),
+        )
+
+        // The country is free: assigning a thread clears the failure.
+        assign("t-fr", "fr").andExpect { status { isCreated() } }
+        assertEquals(emptyList(), JsonPath.read<List<Any>>(embassies(), "$.creations"))
+    }
+
+    @Test
+    fun `a failed creation can be dismissed, a pending one cannot`() {
+        reportChannels(channel("c-1", creatable = true))
+        setSettings(settings(channelId = "c-1"))
+        createThread("fr").andExpect { status { isAccepted() } }
+        val id = creationEvents().single().creationId
+
+        mockMvc.delete("/web/admin/embassies/creations/$id") { cookie(admin) }.andExpect { status { isConflict() } }
+        postCreation(id, EmbassyThreadCreationReport(failure = ThreadCreationFailure.FAILED)).andExpect { status { isNoContent() } }
+        mockMvc.delete("/web/admin/embassies/creations/$id") { cookie(admin) }.andExpect { status { isNoContent() } }
+        assertEquals(emptyList(), JsonPath.read<List<Any>>(embassies(), "$.creations"))
+    }
+
+    @Test
     fun `members are found by name or ID`() {
         reportMembers("3", "5")
 
@@ -429,6 +604,46 @@ class EmbassyTest {
     }
 
     private fun embassies() = get("/web/admin/embassies")
+
+    private fun settings(channelId: String?) =
+        """{"offices":["PRESIDENT","VICE_PRESIDENT","MINISTER_OF_FOREIGN_AFFAIRS"],"ambassadorRoleId":"r-amb","hostRoleIds":[],""" +
+            """"channelId":${channelId?.let { "\"$it\"" } ?: "null"}}"""
+
+    private fun channel(
+        id: String,
+        creatable: Boolean,
+        viewers: List<String>? = null,
+    ) = """{"id":"$id","name":"$id","category":null,"position":0,"postable":true,"threadsCreatable":$creatable,""" +
+        """"everyoneCanView":${viewers == null},"viewerRoleIds":[${viewers.orEmpty().joinToString(",") { "\"$it\"" }}]}"""
+
+    private fun reportChannels(vararg channels: String) {
+        mockMvc
+            .put("/api/discord-channels") {
+                header("Authorization", BOT_TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"channels":[${channels.joinToString(",")}]}"""
+            }.andExpect { status { isNoContent() } }
+    }
+
+    private fun createThread(
+        countryId: String,
+        threadName: String = "Botschaft",
+    ): ResultActionsDsl =
+        mockMvc.post("/web/admin/embassies/creations") {
+            cookie(admin)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"countryId":"$countryId","threadName":"$threadName"}"""
+        }
+
+    private fun postCreation(
+        creationId: Long,
+        report: EmbassyThreadCreationReport,
+    ): ResultActionsDsl =
+        mockMvc.post("/api/embassies/thread-creations/$creationId") {
+            header("Authorization", BOT_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = BitsJson.encodeToString(EmbassyThreadCreationReport.serializer(), report)
+        }
 
     private fun get(path: String): String =
         mockMvc
@@ -568,6 +783,12 @@ class EmbassyTest {
         roleSyncTrigger.awaitIdle()
         embassyTrigger.awaitIdle()
         jdbc.awaitOutbox()
+    }
+
+    /** Written to Redis by the outbox after the commit. */
+    private fun creationEvents(): List<EmbassyThreadCreationEvent> {
+        jdbc.awaitOutbox()
+        return streamEvents().filterIsInstance<EmbassyThreadCreationEvent>()
     }
 
     private fun lastSync(): EmbassySyncEvent = streamEvents().filterIsInstance<EmbassySyncEvent>().lastOrNull() ?: fail("no embassy sync")

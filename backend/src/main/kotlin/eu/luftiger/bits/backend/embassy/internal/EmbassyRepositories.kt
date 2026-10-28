@@ -6,16 +6,24 @@ import eu.luftiger.bits.backend.embassy.domain.EmbassyManualMember
 import eu.luftiger.bits.backend.embassy.domain.EmbassyOffice
 import eu.luftiger.bits.backend.embassy.domain.EmbassySetting
 import eu.luftiger.bits.backend.embassy.domain.EmbassyThread
+import eu.luftiger.bits.backend.embassy.domain.EmbassyThreadCreation
 import eu.luftiger.bits.backend.embassy.domain.EmbassyThreadMember
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import java.time.Instant
 
 interface DiscordThreadRepository : JpaRepository<DiscordThread, String>
 
 interface EmbassyThreadRepository : JpaRepository<EmbassyThread, String> {
     fun existsByCountryId(countryId: String): Boolean
+}
+
+interface EmbassyThreadCreationRepository : JpaRepository<EmbassyThreadCreation, Long> {
+    fun findByCountryId(countryId: String): EmbassyThreadCreation?
+
+    fun findByFailureIsNullAndRequestedAtBefore(requestedAt: Instant): List<EmbassyThreadCreation>
 }
 
 interface EmbassyManualMemberRepository : JpaRepository<EmbassyManualMember, Long> {

@@ -73,6 +73,15 @@ class BitsEventTest {
     }
 
     @Test
+    fun `embassy thread creation survives a round trip with its type`() {
+        val event =
+            EmbassyThreadCreationEvent(creationId = 4, channelId = "c1", name = "Botschaft Polen", countryName = "Polen", occurredAt = 5)
+
+        assertEquals(event, decodeEvent(event.encode()))
+        assertTrue(event.encode().contains("\"type\":\"embassy_thread_creation\""))
+    }
+
+    @Test
     fun `fields added by a newer sender are ignored`() {
         val payload = """{"type":"ping","discordUserId":"123","occurredAt":5,"addedLater":{"any":"thing"}}"""
 

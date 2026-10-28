@@ -348,6 +348,7 @@ export type AuditAction =
   | 'EMBASSY_MEMBER_ADDED'
   | 'EMBASSY_MEMBER_REMOVED'
   | 'EMBASSY_SETTINGS_CHANGED'
+  | 'EMBASSY_THREAD_CREATION_REQUESTED'
   | 'FEATURE_TOGGLED'
   | 'DSK_CREATED'
   | 'DSK_UPDATED'
@@ -422,6 +423,7 @@ export type LogEntryType =
   | 'MEMBER_REPORT_REFUSED'
   | 'VOTE_EVALUATION_DELAYED'
   | 'EMBASSY_THREAD_UNAVAILABLE'
+  | 'EMBASSY_THREAD_CREATION_FAILED'
 
 export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE' | 'SETTING_CHANGE'
 
@@ -534,6 +536,26 @@ export interface EmbassySettings {
   ambassadorRoleId: string | null
   /** Their members belong in every thread, without getting the ambassador role. */
   hostRoleIds: string[]
+  /** Where the bot creates embassy threads; `null` for none. */
+  channelId: string | null
+}
+
+export interface EmbassyChannel {
+  id: string
+  name: string
+  category: string | null
+  /** Whether the bot may create and manage private threads there. */
+  threadsCreatable: boolean
+}
+
+/** A thread the bot is creating, or failed to create. */
+export interface EmbassyCreation {
+  id: number
+  countryId: string
+  countryName: string
+  threadName: string
+  /** Why it failed, in German; `null` while the bot is creating it. */
+  failure: string | null
 }
 
 export interface MemberOption {
@@ -563,6 +585,8 @@ export interface Embassies {
   settings: EmbassySettings
   /** Highest first. */
   roles: { id: string; name: string; color: number | null }[]
+  /** Text channels in the order of Discord. */
+  channels: EmbassyChannel[]
   /** By country name. */
   threads: EmbassyThread[]
   /** Private threads without a country yet. */
@@ -573,6 +597,8 @@ export interface Embassies {
     archived: boolean
     manageable: boolean
   }[]
+  /** Being created by the bot, or failed; by country name. */
+  creations: EmbassyCreation[]
 }
 
 export async function getEmbassies(): Promise<Embassies> {
@@ -594,6 +620,20 @@ export async function assignEmbassyThread(threadId: string, countryId: string): 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ threadId, countryId }),
   })
+}
+
+/** 400 without an embassy channel, 409 if the country has a thread or one is being created. */
+export async function createEmbassyThread(countryId: string, threadName: string): Promise<void> {
+  await request(`${EMBASSIES}/creations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ countryId, threadName }),
+  })
+}
+
+/** Only a creation that failed. */
+export async function dismissEmbassyCreation(creationId: number): Promise<void> {
+  await request(`${EMBASSIES}/creations/${creationId}`, { method: 'DELETE' })
 }
 
 export async function unassignEmbassyThread(threadId: string): Promise<void> {

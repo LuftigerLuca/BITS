@@ -52,6 +52,14 @@ sealed interface SystemProblem {
         val cause: EmbassyThreadCause,
     ) : SystemProblem
 
+    /** The bot could not create an embassy thread an admin asked for; [reason] is in German. */
+    @NamedInterface("api")
+    data class EmbassyThreadCreationFailed(
+        val threadName: String,
+        val countryName: String,
+        val reason: String,
+    ) : SystemProblem
+
     /** A role with rules was deleted in Discord or moved above the bot, so its rules no longer run. */
     @NamedInterface("api")
     data class RoleNotAssignable(
