@@ -61,7 +61,7 @@ class RuleEvaluator(
         return when (condition.type) {
             ConditionType.CITIZENSHIP -> user.country == condition.countryId
             ConditionType.GOVERNMENT_OFFICE ->
-                data.governments[condition.countryId]?.let { requireNotNull(condition.office).isHeldBy(it, user.id) }
+                data.governments[condition.countryId]?.let { government -> condition.offices.any { it.isHeldBy(government, user.id) } }
             ConditionType.MILITARY_UNIT -> user.mu == condition.muId
             ConditionType.LEVEL -> user.leveling.level >= requireNotNull(condition.threshold)
             ConditionType.MILITARY_RANK -> user.militaryRank >= requireNotNull(condition.threshold)

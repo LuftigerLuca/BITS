@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -59,7 +60,7 @@ export function ConditionFields({
   }))
   const countryItems = countries.map((c) => ({ value: c.id, label: c.name }))
   const officeItems = Object.entries(OFFICES).map(([value, label]) => ({
-    value,
+    value: value as GovernmentOffice,
     label,
   }))
   const muRoleItems = Object.entries(MU_ROLES).map(([value, label]) => ({ value, label }))
@@ -132,25 +133,27 @@ export function ConditionFields({
           </div>
         )}
         {type === 'GOVERNMENT_OFFICE' && (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={id('office')}>Amt</Label>
-            <Select
-              items={officeItems}
-              value={draft.office}
-              onValueChange={(value) => value && update({ office: value as GovernmentOffice })}
-            >
-              <SelectTrigger id={id('office')} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {officeItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <fieldset className="flex flex-col gap-2 sm:col-span-2">
+            <legend className="mb-1.5 text-sm leading-none font-medium">Ämter</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {officeItems.map((item) => (
+                <label key={item.value} className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={draft.offices.includes(item.value)}
+                    onCheckedChange={(checked) =>
+                      update({
+                        offices: checked
+                          ? [...draft.offices, item.value]
+                          : draft.offices.filter((office) => office !== item.value),
+                      })
+                    }
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">Eines der gewählten Ämter genügt.</p>
+          </fieldset>
         )}
         {leadership && (
           <div className="flex flex-col gap-1.5">

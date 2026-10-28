@@ -114,7 +114,8 @@ export const MAX_CONDITIONS = 10
 export interface CreateCondition {
   type: ConditionType
   countryId?: string
-  office?: GovernmentOffice
+  /** For `GOVERNMENT_OFFICE`, at least one; holding any of them is enough. */
+  offices?: GovernmentOffice[]
   muId?: string
   threshold?: number
   partyId?: string

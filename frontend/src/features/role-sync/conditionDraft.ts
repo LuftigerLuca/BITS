@@ -1,4 +1,5 @@
 import type { ConditionType, CreateCondition, GovernmentOffice, MuRole } from '@/lib/api'
+import { OFFICES } from './labels'
 
 /** A condition as entered so far; `toCondition` tells whether it is complete. */
 export interface ConditionDraft {
@@ -6,7 +7,8 @@ export interface ConditionDraft {
   key: number
   type: ConditionType
   countryId: string | null
-  office: GovernmentOffice
+  /** Holding any of them is enough; none ticked at first, so no office is picked by accident. */
+  offices: GovernmentOffice[]
   /** Optional for `MU_LEADERSHIP`: without, any military unit counts. */
   muId: string | null
   muRole: MuRole
@@ -23,7 +25,7 @@ export function newDraft(key: number): ConditionDraft {
     key,
     type: 'CITIZENSHIP',
     countryId: null,
-    office: 'PRESIDENT',
+    offices: [],
     muId: null,
     muRole: 'COMMANDER',
     threshold: '1',
@@ -37,14 +39,15 @@ export function needsCountry(type: ConditionType) {
 
 /** `null` while a field the type needs is missing. */
 export function toCondition(draft: ConditionDraft): CreateCondition | null {
-  const { type, countryId, office, muId, muRole, partyId } = draft
+  const { type, countryId, offices, muId, muRole, partyId } = draft
   switch (type) {
     case 'CITIZENSHIP':
       return countryId ? { type, countryId } : null
     case 'PARTY':
       return countryId && partyId ? { type, countryId, partyId } : null
     case 'GOVERNMENT_OFFICE':
-      return countryId ? { type, countryId, office } : null
+      // By rank, like the backend, so the same offices in another order count as the same condition.
+      return countryId && offices.length > 0 ? { type, countryId, offices: byRank(offices) } : null
     case 'PARTY_LEADER':
       if (!countryId) return null
       return partyId ? { type, countryId, partyId } : { type, countryId }
@@ -59,4 +62,10 @@ export function toCondition(draft: ConditionDraft): CreateCondition | null {
       return Number.isInteger(value) && value >= 1 ? { type, threshold: value } : null
     }
   }
+}
+
+const RANKS = Object.keys(OFFICES) as GovernmentOffice[]
+
+function byRank(offices: GovernmentOffice[]) {
+  return RANKS.filter((office) => offices.includes(office))
 }

@@ -107,7 +107,7 @@ class RoleExplanationService(
     ): String =
         when (condition.type) {
             ConditionType.CITIZENSHIP -> "keine Staatsbürgerschaft ${condition.targetName}"
-            ConditionType.GOVERNMENT_OFFICE -> "nicht ${condition.office?.label} in ${condition.targetName}"
+            ConditionType.GOVERNMENT_OFFICE -> "nicht ${condition.officesLabel()} in ${condition.targetName}"
             ConditionType.MILITARY_UNIT -> "nicht Mitglied der MU ${condition.targetName}"
             ConditionType.LEVEL -> "Level ${user.leveling.level} von ${threshold(condition)}"
             ConditionType.MILITARY_RANK -> "Militärrang ${user.militaryRank} von ${threshold(condition)}"

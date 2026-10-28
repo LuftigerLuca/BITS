@@ -237,6 +237,34 @@ describe('rule form', () => {
     ])
   })
 
+  it('takes one or more offices, by rank, for office rules', async () => {
+    const created: unknown[] = []
+    renderCard([], (body) => {
+      created.push(body)
+      return json(rule(9, veteran, 'Präsident oder Vizepräsident in Germany'), 201)
+    })
+    await screen.findByLabelText('Rolle')
+
+    await choose('Rolle', 'Veteran')
+    await choose('Art', 'Regierungsamt')
+    await choose('Land', 'Germany')
+    expect(submit()).toBeDisabled()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Vizepräsident' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Außenminister' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Präsident' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Außenminister' }))
+    expect(screen.getByRole('checkbox', { name: 'Außenminister' })).not.toBeChecked()
+    await userEvent.click(submit())
+
+    await confirm('Regel anlegen')
+    await expect.poll(() => created).toEqual([
+      {
+        roleId: 'r-veteran',
+        conditions: [{ type: 'GOVERNMENT_OFFICE', countryId: 'de', offices: ['PRESIDENT', 'VICE_PRESIDENT'] }],
+      },
+    ])
+  })
+
   it('takes a number of companies', async () => {
     const created: unknown[] = []
     renderCard([], (body) => {
@@ -333,7 +361,7 @@ describe('rule form', () => {
     const results = await axe.run(container, { runOnly: ['label', 'button-name', 'select-name', 'aria-input-field-name'] })
 
     expect(results.violations).toEqual([])
-    expect(screen.getByLabelText('Amt')).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Ämter' })).getByRole('checkbox', { name: 'Präsident' })).toBeInTheDocument()
   })
 })
 

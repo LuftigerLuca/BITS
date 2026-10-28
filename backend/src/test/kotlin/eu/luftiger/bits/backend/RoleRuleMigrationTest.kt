@@ -17,7 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * V16 turns every rule into a rule with exactly its one condition. It runs in a schema of its own, so the rules from
+ * V16 turns every rule into a rule with exactly its one condition, V21 every office into a set of one office. It runs in a schema of its own, so the rules from
  * before V16 can be inserted. The configuration is the one of [RoleSyncTest], so the context is shared.
  */
 @SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
@@ -55,7 +55,7 @@ class RoleRuleMigrationTest {
                     RuleCondition(
                         ConditionType.GOVERNMENT_OFFICE,
                         countryId = "de",
-                        office = GovernmentOffice.PRESIDENT,
+                        offices = setOf(GovernmentOffice.PRESIDENT),
                         targetName = "Germany",
                     ),
                 "r-veteran" to RuleCondition(ConditionType.MILITARY_UNIT, muId = "m1", targetName = "Deutsche Marine"),
@@ -64,13 +64,46 @@ class RoleRuleMigrationTest {
         assertEquals(
             expected.map { (roleId, condition) ->
                 val rule = RoleRule(roleId, listOf(condition), Instant.EPOCH)
-                listOf(roleId, rule.conditionsKey, 0, condition.type.name, condition.countryId, condition.office?.name) +
-                    listOf(condition.muId, condition.threshold, condition.targetName)
+                listOf(roleId, rule.conditionsKey, 0, condition.type.name, condition.countryId) +
+                    listOf(condition.offices.singleOrNull()?.name, condition.muId, condition.threshold, condition.targetName)
             },
             jdbc.query(
-                "SELECT r.role_id, r.conditions_key, c.position, c.type, c.country_id, c.office, c.mu_id, c.threshold, c.target_name " +
+                "SELECT r.role_id, r.conditions_key, c.position, c.type, c.country_id, c.offices, c.mu_id, c.threshold, c.target_name " +
                     "FROM $SCHEMA.role_rule r JOIN $SCHEMA.role_rule_condition c ON c.rule_id = r.id ORDER BY r.id",
             ) { row, _ -> (1..9).map { row.getObject(it) } },
+        )
+    }
+
+    @Test
+    fun `existing office conditions keep their office as the only one, with the same key and label`() {
+        migrate(target = "20")
+        val ruleId =
+            jdbc.queryForObject(
+                "INSERT INTO $SCHEMA.role_rule (role_id, conditions_key, created_at) " +
+                    "VALUES ('r-minister', 'GOVERNMENT_OFFICE|de|MINISTER_OF_DEFENSE||', now()) RETURNING id",
+                Long::class.java,
+            )
+        jdbc.update(
+            "INSERT INTO $SCHEMA.role_rule_condition (rule_id, position, type, country_id, office, target_name) " +
+                "VALUES (?, 0, 'GOVERNMENT_OFFICE', 'de', 'MINISTER_OF_DEFENSE', 'Germany')",
+            ruleId,
+        )
+
+        migrate(target = null)
+
+        val condition =
+            RuleCondition(
+                ConditionType.GOVERNMENT_OFFICE,
+                countryId = "de",
+                offices = setOf(GovernmentOffice.MINISTER_OF_DEFENSE),
+                targetName = "Germany",
+            )
+        assertEquals("Verteidigungsminister in Germany", condition.label)
+        assertEquals(
+            listOf("MINISTER_OF_DEFENSE", RoleRule("r-minister", listOf(condition), Instant.EPOCH).conditionsKey),
+            jdbc.queryForObject(
+                "SELECT c.offices, r.conditions_key FROM $SCHEMA.role_rule r JOIN $SCHEMA.role_rule_condition c ON c.rule_id = r.id",
+            ) { row, _ -> listOf(row.getString(1), row.getString(2)) },
         )
     }
 

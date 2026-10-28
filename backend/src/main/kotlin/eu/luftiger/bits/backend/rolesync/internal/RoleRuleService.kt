@@ -124,7 +124,7 @@ class RoleRuleService(
                 RuleCondition(
                     type,
                     countryId = countryId,
-                    office = request.office?.office ?: throw badRequest("Office missing"),
+                    offices = request.offices.ifEmpty { throw badRequest("Offices missing") }.mapTo(sortedSetOf()) { it.office },
                     targetName = knownCountry(countryId, countryName),
                 )
             }

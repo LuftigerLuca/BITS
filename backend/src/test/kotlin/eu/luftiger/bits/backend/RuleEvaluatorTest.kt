@@ -22,8 +22,9 @@ import kotlin.test.assertNull
 
 class RuleEvaluatorTest {
     private val german = rule("citizen", ConditionType.CITIZENSHIP, countryId = "de", targetName = "Germany")
-    private val president = rule("president", ConditionType.GOVERNMENT_OFFICE, countryId = "de", office = GovernmentOffice.PRESIDENT)
-    private val congress = rule("congress", ConditionType.GOVERNMENT_OFFICE, countryId = "fr", office = GovernmentOffice.CONGRESS)
+    private val president =
+        rule("president", ConditionType.GOVERNMENT_OFFICE, countryId = "de", offices = setOf(GovernmentOffice.PRESIDENT))
+    private val congress = rule("congress", ConditionType.GOVERNMENT_OFFICE, countryId = "fr", offices = setOf(GovernmentOffice.CONGRESS))
     private val marine = rule("mu", ConditionType.MILITARY_UNIT, muId = "m1", targetName = "Marine")
     private val level = rule("veteran", ConditionType.LEVEL, threshold = 20)
     private val rank = rule("veteran", ConditionType.MILITARY_RANK, threshold = 50)
@@ -181,6 +182,49 @@ class RuleEvaluatorTest {
     }
 
     @Test
+    fun `an office condition with several offices is met by holding any of them`() {
+        val heads =
+            rule(
+                "heads",
+                ConditionType.GOVERNMENT_OFFICE,
+                countryId = "de",
+                offices = setOf(GovernmentOffice.VICE_PRESIDENT, GovernmentOffice.PRESIDENT),
+                targetName = "Germany",
+            )
+        val data =
+            RuleData(
+                mapOf(
+                    "de" to WareraGovernment(country = "de", president = "u1", vicePresident = "u2", congressMembers = listOf("u3")),
+                ),
+            )
+        val evaluator = RuleEvaluator(listOf(heads), data)
+
+        assertEquals(
+            MemberRoles(grants = listOf(RoleGrant("heads", "BITS: Präsident oder Vizepräsident in Germany"))),
+            evaluator.evaluate(WareraUser(id = "u1", username = "A")),
+        )
+        assertEquals(listOf("heads"), evaluator.evaluate(WareraUser(id = "u2", username = "B"))!!.grants.map { it.roleId })
+        assertNull(evaluator.evaluate(WareraUser(id = "u3", username = "C")))
+    }
+
+    @Test
+    fun `offices are named and keyed by rank, whatever order they were given in`() {
+        fun condition(vararg offices: GovernmentOffice) =
+            condition(ConditionType.GOVERNMENT_OFFICE, countryId = "de", offices = offices.toSet(), targetName = "Germany")
+
+        val three = condition(GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS, GovernmentOffice.PRESIDENT, GovernmentOffice.VICE_PRESIDENT)
+        assertEquals("Präsident, Vizepräsident oder Außenminister in Germany", three.label)
+        assertEquals("GOVERNMENT_OFFICE|de|PRESIDENT,VICE_PRESIDENT,MINISTER_OF_FOREIGN_AFFAIRS||", three.key)
+        assertEquals(
+            condition(GovernmentOffice.PRESIDENT, GovernmentOffice.VICE_PRESIDENT, GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS).key,
+            three.key,
+        )
+        // As before there could be several offices.
+        assertEquals("GOVERNMENT_OFFICE|de|CONGRESS||", condition(GovernmentOffice.CONGRESS).key)
+        assertEquals("Kongressmitglied in Germany", condition(GovernmentOffice.CONGRESS).label)
+    }
+
+    @Test
     fun `missing government keeps the office role unless another rule decides`() {
         val evaluator = RuleEvaluator(listOf(president, rule("president", ConditionType.LEVEL, threshold = 99)), RuleData())
 
@@ -218,7 +262,7 @@ class RuleEvaluatorTest {
             RoleRule(
                 "president",
                 listOf(
-                    condition(ConditionType.GOVERNMENT_OFFICE, countryId = "de", office = GovernmentOffice.PRESIDENT),
+                    condition(ConditionType.GOVERNMENT_OFFICE, countryId = "de", offices = setOf(GovernmentOffice.PRESIDENT)),
                     condition(ConditionType.LEVEL, threshold = 20),
                 ),
                 Instant.EPOCH,
@@ -276,22 +320,22 @@ class RuleEvaluatorTest {
         roleId: String,
         type: ConditionType,
         countryId: String? = null,
-        office: GovernmentOffice? = null,
+        offices: Set<GovernmentOffice> = emptySet(),
         muId: String? = null,
         threshold: Int? = null,
         targetName: String? = null,
         partyId: String? = null,
         muRole: MilitaryUnitRole? = null,
-    ) = RoleRule(roleId, listOf(condition(type, countryId, office, muId, threshold, targetName, partyId, muRole)), Instant.EPOCH)
+    ) = RoleRule(roleId, listOf(condition(type, countryId, offices, muId, threshold, targetName, partyId, muRole)), Instant.EPOCH)
 
     private fun condition(
         type: ConditionType,
         countryId: String? = null,
-        office: GovernmentOffice? = null,
+        offices: Set<GovernmentOffice> = emptySet(),
         muId: String? = null,
         threshold: Int? = null,
         targetName: String? = null,
         partyId: String? = null,
         muRole: MilitaryUnitRole? = null,
-    ) = RuleCondition(type, countryId, office, muId, threshold, targetName, partyId, muRole)
+    ) = RuleCondition(type, countryId, offices, muId, threshold, targetName, partyId, muRole)
 }

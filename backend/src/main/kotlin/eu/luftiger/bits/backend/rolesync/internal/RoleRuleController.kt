@@ -165,7 +165,8 @@ data class CreateRuleRequest(
 data class ConditionRequest(
     val type: RuleType,
     val countryId: String? = null,
-    val office: Office? = null,
+    /** For [RuleType.GOVERNMENT_OFFICE], at least one; holding any of them is enough. */
+    val offices: List<Office> = emptyList(),
     val muId: String? = null,
     val threshold: Int? = null,
     val partyId: String? = null,
