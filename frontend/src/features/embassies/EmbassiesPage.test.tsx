@@ -15,6 +15,7 @@ const embassies: Embassies = {
     ambassadorRoleId: 'r-amb',
     hostRoleIds: [],
     channelId: 'c-1',
+    threadNameTemplate: '🏛️ Botschaft {land}',
   },
   roles: [
     { id: 'r-amb', name: 'Botschafter', color: null },
@@ -32,6 +33,7 @@ const embassies: Embassies = {
       countryId: 'fr',
       countryName: 'France',
       missing: false,
+      renameSkipped: false,
       members: [
         { discordUserId: '3', name: 'Minister', reason: 'Außenminister von France' },
         { discordUserId: '5', name: 'Guest', reason: 'Manuell hinzugefügt' },
@@ -135,8 +137,49 @@ describe('embassies', () => {
           ambassadorRoleId: 'r-amb',
           hostRoleIds: ['r-gov'],
           channelId: 'c-1',
+          threadNameTemplate: '🏛️ Botschaft {land}',
         },
       ])
+  })
+
+  it('saves the thread name template only with {land} exactly once', async () => {
+    const saved: unknown[] = []
+    stub({ 'PUT /web/admin/embassies/settings': bodies(saved) })
+    renderApp('/admin/embassies')
+
+    const name = await screen.findByLabelText('Thread-Name')
+    const save = screen.getByRole('button', { name: 'Speichern' })
+    await userEvent.clear(name)
+    expect(screen.getByText('Der Thread-Name darf nicht leer sein.')).toBeInTheDocument()
+    await userEvent.type(name, 'Botschaft')
+    expect(screen.getByText('Der Thread-Name muss {land} genau einmal enthalten.')).toBeInTheDocument()
+    expect(save).toBeDisabled()
+    await userEvent.type(name, ' {{land}{{land}')
+    expect(save).toBeDisabled()
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Botschaft – {{land}')
+    await userEvent.click(save)
+
+    await expect.poll(() => saved).toMatchObject([{ threadNameTemplate: 'Botschaft – {land}' }])
+  })
+
+  it('has the bot rename the threads once confirmed and marks archived ones it skips', async () => {
+    const renamed: unknown[] = []
+    stub({
+      'GET /web/admin/embassies': () =>
+        json({ ...embassies, threads: embassies.threads.map((t) => ({ ...t, renameSkipped: true })) }),
+      'POST /web/admin/embassies/thread-renames': bodies(renamed),
+    })
+    renderApp('/admin/embassies')
+
+    const section = await screen.findByRole('region', { name: 'Botschaft France' })
+    expect(within(section).getByText('Archiviert, beim Umbenennen übersprungen')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Bestehende umbenennen' }))
+    expect(renamed).toEqual([])
+    await userEvent.click(await screen.findByRole('button', { name: 'Umbenennen' }))
+
+    await expect.poll(() => renamed).toEqual([null])
+    await expectToast('success', 'Threads werden umbenannt')
   })
 
   it('says why an assignment failed', async () => {
@@ -177,7 +220,7 @@ describe('embassies', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Poland' }))
     await userEvent.click(screen.getByRole('button', { name: 'Automatisch anlegen' }))
     const name = await screen.findByLabelText('Name')
-    expect(name).toHaveValue('Botschaft Poland')
+    expect(name).toHaveValue('🏛️ Botschaft Poland')
     await userEvent.clear(name)
     await userEvent.type(name, 'Botschaft Polen')
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }))

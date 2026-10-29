@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.embassies
 
 import eu.luftiger.bits.bot.channels.ChannelReporter
 import eu.luftiger.bits.shared.CreatedThread
+import eu.luftiger.bits.shared.ThreadRenameFailure
 import kotlinx.coroutines.future.await
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.Permission
@@ -146,6 +147,28 @@ class JdaEmbassyGuild(
                 .reason(reason)
                 .submit()
                 .await()
+        }
+
+        override suspend fun rename(
+            name: String,
+            reason: String,
+        ): ThreadRenameFailure? {
+            try {
+                thread.manager
+                    .setName(name)
+                    .reason(reason)
+                    .submit()
+                    .await()
+            } catch (e: InsufficientPermissionException) {
+                return ThreadRenameFailure.NO_PERMISSION
+            } catch (e: ErrorResponseException) {
+                return when (e.errorResponse) {
+                    ErrorResponse.MISSING_PERMISSIONS -> ThreadRenameFailure.NO_PERMISSION
+                    ErrorResponse.UNKNOWN_CHANNEL, ErrorResponse.MISSING_ACCESS -> ThreadRenameFailure.MISSING
+                    else -> throw e
+                }
+            }
+            return null
         }
 
         /** The bot may see the channel, see [manageable], so Missing Access is about the member. */

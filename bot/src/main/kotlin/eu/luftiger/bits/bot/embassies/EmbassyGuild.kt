@@ -1,5 +1,7 @@
 package eu.luftiger.bits.bot.embassies
 
+import eu.luftiger.bits.shared.ThreadRenameFailure
+
 /**
  * What the [EmbassySyncHandler] needs from the guild, so it can be tested without JDA; [JdaEmbassyGuild] is the real
  * one. Calls that go to Discord suspend and throw if Discord refuses them.
@@ -70,6 +72,12 @@ interface EmbassyThreadChannel {
     suspend fun memberIds(): Set<String>
 
     suspend fun unarchive(reason: String)
+
+    /** `null` once renamed, or why Discord refused; throws if it refused for another reason. */
+    suspend fun rename(
+        name: String,
+        reason: String,
+    ): ThreadRenameFailure?
 
     /** @throws MemberCannotViewException if Discord refuses since the member may not see the thread's channel */
     suspend fun add(discordUserId: String)

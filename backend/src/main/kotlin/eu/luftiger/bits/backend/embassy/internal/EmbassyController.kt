@@ -4,6 +4,8 @@ import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.warera.WareraApiException
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 class EmbassyController(
     private val embassyService: EmbassyService,
     private val creationService: EmbassyThreadCreationService,
+    private val renameService: EmbassyThreadRenameService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -111,6 +114,19 @@ class EmbassyController(
         log.info("Member {} removed from embassy thread {} by {}", discordUserId, threadId, session.subject)
     }
 
+    /**
+     * The bot renames every assigned thread that is not archived after the template; what fails lands in the system
+     * log. Changing the template alone renames nothing.
+     */
+    @PostMapping("/thread-renames")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun rename(
+        @AuthenticationPrincipal session: Jwt,
+    ) {
+        val count = renameService.request(actor(session))
+        log.info("Renaming of {} embassy threads requested by {}", count, session.subject)
+    }
+
     /** Only when assigning or creating a thread, which checks the country. */
     @ExceptionHandler(WareraApiException::class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
@@ -148,6 +164,13 @@ data class EmbassySettingsRequest(
     val hostRoleIds: List<String>,
     /** Where the bot creates embassy threads; `null` for none, which leaves only assigning threads by hand. */
     val channelId: String? = null,
+    /**
+     * The name of the threads the bot creates, with `{land}` exactly once for the English name of the country. Always
+     * sent, since the dashboard shows it.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault
+    val threadNameTemplate: String = EmbassyThreadName.DEFAULT_TEMPLATE,
 )
 
 @Serializable
@@ -186,6 +209,8 @@ data class EmbassyThreadResponse(
     val countryName: String,
     /** Whether the bot no longer reports the thread, e.g. because it was deleted. */
     val missing: Boolean,
+    /** Whether the thread is archived and named other than after the template, so renaming skips it. */
+    val renameSkipped: Boolean,
     /** Who is in the thread and why, as of the last sync; empty until the bot reported one. */
     val members: List<ThreadMemberResponse>,
     /** Members an admin added by hand. */

@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.systemlog
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.EmbassyBackend
 import eu.luftiger.bits.shared.EmbassySyncReport
+import eu.luftiger.bits.shared.EmbassyThreadRenameReport
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import io.ktor.client.plugins.ClientRequestException
@@ -33,6 +34,9 @@ class SystemLogReporter(
         syncId: Long,
         report: EmbassySyncReport,
     ) = send("the result of embassy sync $syncId") { embassyBackend.reportEmbassySync(syncId, report) }
+
+    fun reportThreadRenames(report: EmbassyThreadRenameReport) =
+        send("${report.failures.size} failed embassy thread renames") { embassyBackend.reportThreadRenames(report) }
 
     fun reportUndeliveredEvent(report: UndeliveredEventReport) =
         send("undelivered event ${report.streamId}") { backend.reportUndeliveredEvent(report) }

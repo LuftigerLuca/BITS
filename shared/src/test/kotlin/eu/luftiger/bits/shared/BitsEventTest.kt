@@ -82,6 +82,18 @@ class BitsEventTest {
     }
 
     @Test
+    fun `embassy thread rename survives a round trip with its type`() {
+        val event =
+            EmbassyThreadRenameEvent(
+                threads = listOf(EmbassyThreadRename("t1", "c1", "🏛️ Botschaft Poland", "Poland")),
+                occurredAt = 5,
+            )
+
+        assertEquals(event, decodeEvent(event.encode()))
+        assertTrue(event.encode().contains("\"type\":\"embassy_thread_rename\""))
+    }
+
+    @Test
     fun `fields added by a newer sender are ignored`() {
         val payload = """{"type":"ping","discordUserId":"123","occurredAt":5,"addedLater":{"any":"thing"}}"""
 

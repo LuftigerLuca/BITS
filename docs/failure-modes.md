@@ -48,6 +48,9 @@ minute, e.g. because the bot or Redis is down, fails with that reason on the das
 country is free again; the bot drops the request when it gets it later, and deletes a thread it created too late.
 Without WarEra, no thread is created on its own; the next sync tries again. Without the role sync, only members who
 link get their country a thread, since their country is otherwise known only from the role sync's hourly load.
+Renaming embassy threads waits in the stream while the bot is down. A thread that is gone, or in whose channel the bot
+may not manage threads, or whose rename Discord refuses, keeps its name and is recorded in the system log; the others
+are renamed. While the backend is down, the bot sends those failures again with backoff for about an hour.
 
 Which features an admin switched off under "Verwaltung" the bot asks the backend every 30 seconds. Until its first
 answer after a start everything is on; while the backend is down, the bot keeps the last answer, and the commands fail

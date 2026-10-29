@@ -78,13 +78,14 @@ class EmbassyThreadCreationService(
     }
 
     /**
-     * Asks the bot for a thread "Botschaft <Land>" for every foreign country in which one of the users in [countryByUser]
+     * Asks the bot for a thread named after the template for every foreign country in which one of the users in [countryByUser]
      * (WarEra user ID to country ID) holds one of the chosen offices, and that has neither a thread nor a request, not
      * even a failed one: that waits for an admin. Does nothing while no embassy channel is set. Governments come from
      * the WarEra cache; a country whose government cannot be loaded is tried again with the next sync.
      */
     fun createMissing(countryByUser: Map<String, String>) {
-        val channelId = settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)?.channelId ?: return
+        val setting = settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID) ?: return
+        val channelId = setting.channelId ?: return
         val offices = officeRepository.findAll().map { it.office }.sortedBy { it.ordinal }
         val taken =
             threadRepository.findAll().mapTo(HashSet()) { it.countryId } +
@@ -104,7 +105,7 @@ class EmbassyThreadCreationService(
                         return@forEach
                     }
                 val office = offices.firstOrNull { office -> userIds.any { office.isHeldBy(government, it) } } ?: return@forEach
-                val name = "Botschaft ${country.name}".take(MAX_THREAD_NAME_LENGTH)
+                val name = EmbassyThreadName.of(setting.threadNameTemplate, country.name)
                 try {
                     create(
                         country,
@@ -259,7 +260,6 @@ class EmbassyThreadCreationService(
 
         val TIMEOUT: Duration = Duration.ofMinutes(1)
 
-        /** Discord's limit. */
-        const val MAX_THREAD_NAME_LENGTH = 100
+        const val MAX_THREAD_NAME_LENGTH = EmbassyThreadName.MAX_LENGTH
     }
 }

@@ -159,3 +159,51 @@ enum class ThreadCreationFailure {
     /** Discord refused for another reason. */
     FAILED,
 }
+
+/**
+ * An admin asked to rename the embassy threads after the name template: the bot renames each thread in [threads], one
+ * after the other, unless it is archived or has the name already. It reports only what failed, see
+ * [EmbassyThreadRenameReport].
+ */
+@Serializable
+@SerialName("embassy_thread_rename")
+data class EmbassyThreadRenameEvent(
+    val threads: List<EmbassyThreadRename>,
+    override val occurredAt: Long,
+) : BitsEvent
+
+@Serializable
+data class EmbassyThreadRename(
+    val threadId: String,
+    /** Channel the thread is in, for finding it while it is archived. */
+    val parentChannelId: String,
+    val name: String,
+    val countryName: String,
+)
+
+/** The threads of an [EmbassyThreadRenameEvent] the bot could not rename; the others are renamed or skipped. */
+@Serializable
+data class EmbassyThreadRenameReport(
+    val failures: List<FailedThreadRename>,
+)
+
+@Serializable
+data class FailedThreadRename(
+    val threadId: String,
+    /** The name the thread keeps; `null` if it is gone. */
+    val threadName: String?,
+    val countryName: String,
+    val failure: ThreadRenameFailure,
+)
+
+@Serializable
+enum class ThreadRenameFailure {
+    /** Deleted, or the bot cannot see it. */
+    MISSING,
+
+    /** The bot may not manage threads in its channel. */
+    NO_PERMISSION,
+
+    /** Discord refused for another reason. */
+    FAILED,
+}

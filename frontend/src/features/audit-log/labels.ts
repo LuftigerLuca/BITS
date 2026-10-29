@@ -26,6 +26,7 @@ export const ACTIONS: Record<AuditAction, string> = {
   DSK_MILITARY_UNIT_ADDED: 'MU einer DSK zugeordnet',
   DSK_MILITARY_UNIT_REMOVED: 'MU aus DSK entfernt',
   STATUS_ROLES_CHANGED: 'Statusrollen geändert',
+  EMBASSY_THREADS_RENAME_REQUESTED: 'Botschafts-Threads umbenannt',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

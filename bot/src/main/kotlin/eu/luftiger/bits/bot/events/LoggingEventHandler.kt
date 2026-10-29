@@ -5,6 +5,7 @@ import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BotPresenceChangedEvent
 import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.EmbassyThreadCreationEvent
+import eu.luftiger.bits.shared.EmbassyThreadRenameEvent
 import eu.luftiger.bits.shared.PingEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
@@ -30,6 +31,7 @@ class LoggingEventHandler : EventHandler {
             is VoteEvaluatedEvent -> log.info("Vote {} evaluated", event.voteId)
             is EmbassySyncEvent -> log.info("Embassy sync {} for {} threads", event.syncId, event.threads.size)
             is EmbassyThreadCreationEvent -> log.info("Embassy thread creation {} for {}", event.creationId, event.countryName)
+            is EmbassyThreadRenameEvent -> log.info("Embassy thread rename of {} threads", event.threads.size)
             is BotPresenceChangedEvent -> log.info("Bot presence changed to {}", event.presence.status)
         }
     }

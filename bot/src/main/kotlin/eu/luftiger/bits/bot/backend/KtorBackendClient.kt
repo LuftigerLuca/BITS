@@ -20,6 +20,7 @@ import eu.luftiger.bits.shared.Elector
 import eu.luftiger.bits.shared.ElectorateReport
 import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.EmbassyThreadCreationReport
+import eu.luftiger.bits.shared.EmbassyThreadRenameReport
 import eu.luftiger.bits.shared.FeatureStates
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
@@ -203,6 +204,13 @@ class KtorBackendClient(
         report: EmbassyThreadCreationReport,
     ) {
         http.post("api/embassies/thread-creations/$creationId") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportThreadRenames(report: EmbassyThreadRenameReport) {
+        http.post("api/embassies/thread-renames") {
             contentType(ContentType.Application.Json)
             setBody(report)
         }
