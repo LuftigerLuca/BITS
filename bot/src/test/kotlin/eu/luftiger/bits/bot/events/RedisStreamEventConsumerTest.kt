@@ -277,12 +277,20 @@ class RedisStreamEventConsumerTest {
 
     private fun client(url: String) = RedisClient.create(url).also { clients += it }
 
-    /** Starts [consumer] and waits until its group exists, so that nothing published afterwards is missed. */
+    /**
+     * Starts [consumer] and waits until the groups of all lanes exist, so that nothing published afterwards is missed.
+     * The main group alone is not enough: a lane whose group comes after an event was published starts behind it.
+     */
     private suspend fun start(consumer: RedisStreamEventConsumer = consumer()): Job {
         val job = consumers.launch { consumer.run() }
-        eventually { assertTrue(redis.exists(EventStream.KEY) == 1L && redis.xinfoGroups(EventStream.KEY).isNotEmpty()) }
+        eventually { assertTrue(redis.exists(EventStream.KEY) == 1L && groupNames().containsAll(EventLane.entries.map { it.group })) }
         return job
     }
+
+    private fun groupNames() =
+        redis.xinfoGroups(EventStream.KEY).map { group ->
+            (group as List<*>).chunked(2).first { (key, _) -> key.toString() == "name" }[1].toString()
+        }
 
     private fun publish(event: BitsEvent) {
         redis.xadd(EventStream.KEY, mapOf(EventStream.PAYLOAD_FIELD to event.encode()))

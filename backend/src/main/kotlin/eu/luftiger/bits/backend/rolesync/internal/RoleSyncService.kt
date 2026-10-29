@@ -8,6 +8,7 @@ import eu.luftiger.bits.backend.feature.api.BitsFeature
 import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RoleSyncSetting
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -18,6 +19,7 @@ import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
@@ -45,12 +47,15 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * A sync leaves out what an admin switched off: without the role sync it has no rules and DSKs, so the bot changes no
  * roles; without nicknames nobody counts as opted in, so the bot sets and clears none; without the verification, it
- * leaves the status roles alone.
+ * leaves the status roles alone. Whether the bot holds back removals from many holders comes from
+ * [RemovalLimitService].
  */
 @Service
 class RoleSyncService(
     private val ruleInputs: RuleInputs,
     private val statusRoleLookup: StatusRoleLookup,
+    // Not RemovalLimitService, which needs the trigger and so this service.
+    private val settings: RoleSyncSettingRepository,
     private val nicknameOptIns: NicknameOptIns,
     private val features: FeatureToggles,
     private val accountLinks: AccountLinks,
@@ -210,6 +215,7 @@ class RoleSyncService(
                         statusRoles?.let {
                             StatusRoles(it.verifiedRoleId, it.unverifiedRoleId, linkedIds.sorted())
                         },
+                    removalLimit = settings.findByIdOrNull(RoleSyncSetting.SINGLE_ROW_ID)?.removalLimitEnabled ?: true,
                 ),
             )
         }

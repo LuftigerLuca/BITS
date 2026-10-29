@@ -45,7 +45,8 @@ data class RemovalLimit(
 
 /**
  * Roles whose removals in [changes] exceed [limit], given how many members hold each role now ([holders]). Only syncs
- * of all members are limited, and never for the roles of [RoleSyncEvent.confirmedRoleIds].
+ * of all members are limited, never for the roles of [RoleSyncEvent.confirmedRoleIds], and not at all while an admin
+ * switched the limit off, see [RoleSyncEvent.removalLimit].
  */
 fun rolesOverRemovalLimit(
     changes: List<RoleChange>,
@@ -53,7 +54,7 @@ fun rolesOverRemovalLimit(
     event: RoleSyncEvent,
     limit: RemovalLimit,
 ): Map<String, Int> {
-    if (event.discordUserIds != null) return emptyMap()
+    if (event.discordUserIds != null || !event.removalLimit) return emptyMap()
     return changes
         .filter { !it.add && it.roleId !in event.confirmedRoleIds }
         .groupingBy { it.roleId }

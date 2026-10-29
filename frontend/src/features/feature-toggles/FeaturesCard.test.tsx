@@ -70,6 +70,7 @@ describe('features', () => {
       'GET /web/votes/access': () => json({ canManage: true }),
       'GET /web/admin/role-sync/rules': () => json([]),
       'GET /web/admin/role-sync/status-roles': () => json({ verified: null, unverified: null }),
+      'GET /web/admin/role-sync/removal-limit': () => json({ enabled: true }),
       'GET /web/admin/role-sync/countries': () => json([]),
       'GET /web/admin/role-sync/roles': () => json([]),
     })
@@ -89,6 +90,7 @@ describe('features', () => {
       'GET /web/votes/access': () => json({ canManage: true }),
       'GET /web/admin/role-sync/rules': () => json([]),
       'GET /web/admin/role-sync/status-roles': () => json({ verified: null, unverified: null }),
+      'GET /web/admin/role-sync/removal-limit': () => json({ enabled: true }),
       'GET /web/admin/role-sync/countries': () => json([]),
       'GET /web/admin/role-sync/roles': () => json([]),
     })

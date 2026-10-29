@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { RoleRule } from '@/lib/api'
 import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
 import { NewRuleCard } from '@/features/role-sync/NewRuleCard'
+import { RemovalLimitCard } from '@/features/role-sync/RemovalLimitCard'
 import { RoleRulesCard } from '@/features/role-sync/RoleRulesCard'
 import { StatusRolesCard } from '@/features/role-sync/StatusRolesCard'
 
@@ -18,6 +19,7 @@ export function RolesPage() {
       <RoleRulesCard onEdit={setEditing} />
       <NewRuleCard editing={editing} onEdit={setEditing} onDone={() => setEditing(null)} />
       <StatusRolesCard />
+      <RemovalLimitCard />
     </div>
   )
 }

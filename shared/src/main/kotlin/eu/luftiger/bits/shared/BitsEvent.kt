@@ -84,6 +84,11 @@ data class RoleSyncEvent(
      * switched off.
      */
     val statusRoles: StatusRoles? = null,
+    /**
+     * Whether the bot holds back removals beyond its limit, see [confirmedRoleIds]; an admin can switch that off, e.g.
+     * when a real change takes a role from many members at once. `true` from a backend before the switch.
+     */
+    val removalLimit: Boolean = true,
 ) : BitsEvent
 
 /**
