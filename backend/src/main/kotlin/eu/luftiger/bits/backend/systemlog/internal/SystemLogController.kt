@@ -238,6 +238,7 @@ enum class SyncTriggerType {
     RULE_CHANGE,
     ACCOUNT_CHANGE,
     SETTING_CHANGE,
+    ADMIN_REQUEST,
     ;
 
     companion object {
@@ -247,6 +248,7 @@ enum class SyncTriggerType {
                 SyncTrigger.RULE_CHANGE -> RULE_CHANGE
                 SyncTrigger.ACCOUNT_CHANGE -> ACCOUNT_CHANGE
                 SyncTrigger.SETTING_CHANGE -> SETTING_CHANGE
+                SyncTrigger.ADMIN_REQUEST -> ADMIN_REQUEST
             }
     }
 }

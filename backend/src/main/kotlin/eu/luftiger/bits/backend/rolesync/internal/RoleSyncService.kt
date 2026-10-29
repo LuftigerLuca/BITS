@@ -134,13 +134,17 @@ class RoleSyncService(
     fun syncMembers(
         discordUserIds: Collection<String>,
         formerAccounts: Map<String, FormerAccount> = emptyMap(),
+        trigger: SyncTrigger = SyncTrigger.ACCOUNT_CHANGE,
     ) {
-        val links = discordUserIds.mapNotNull { id -> accountLinks.findByDiscordUserId(id)?.let { LinkedAccount(id, it.wareraUserId) } }
+        val links =
+            discordUserIds.mapNotNull { id ->
+                accountLinks.findByDiscordUserId(id)?.let { LinkedAccount(id, it.wareraUserId, it.wareraUsername) }
+            }
         sync(
             links,
             discordUserIds = discordUserIds.distinct(),
             refresh = true,
-            trigger = SyncTrigger.ACCOUNT_CHANGE,
+            trigger = trigger,
             formerAccounts = formerAccounts,
         )
     }

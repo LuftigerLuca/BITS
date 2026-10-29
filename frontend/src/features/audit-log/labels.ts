@@ -28,6 +28,8 @@ export const ACTIONS: Record<AuditAction, string> = {
   STATUS_ROLES_CHANGED: 'Statusrollen geändert',
   EMBASSY_THREADS_RENAME_REQUESTED: 'Botschafts-Threads umbenannt',
   REMOVAL_LIMIT_TOGGLED: 'Schutz vor Massenentzug umgeschaltet',
+  MEMBER_SYNC_REQUESTED: 'Mitglied abgeglichen',
+  MEMBER_UNLINKED: 'Verknüpfung eines Mitglieds gelöst',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

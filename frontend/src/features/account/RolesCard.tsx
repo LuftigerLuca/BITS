@@ -64,7 +64,8 @@ export function RolesCard() {
   )
 }
 
-function Rules({ rules }: { rules: AccountRole['rules'] }) {
+/** The blocks of a role with whether each is met, as `/rollen` lists them. */
+export function Rules({ rules }: { rules: AccountRole['rules'] }) {
   return (
     <ul className="flex flex-col gap-1">
       {rules.map((rule) => (

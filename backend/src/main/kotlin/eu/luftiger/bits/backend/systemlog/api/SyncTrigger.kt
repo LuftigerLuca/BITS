@@ -19,4 +19,7 @@ enum class SyncTrigger {
      * nicknames for everybody.
      */
     SETTING_CHANGE,
+
+    /** An admin asked for a sync of a single member in the dashboard. */
+    ADMIN_REQUEST,
 }

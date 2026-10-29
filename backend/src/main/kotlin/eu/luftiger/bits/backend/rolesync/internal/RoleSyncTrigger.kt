@@ -22,7 +22,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Starts syncs in the background: right away for a member who links or unlinks an account, for everybody after a
+ * Starts syncs in the background: right away for a member who links or unlinks an account or whom an admin asks for
+ * in the dashboard, for everybody after a
  * rule change or a change of the status roles, for a member who opts in to their WarEra name as nickname, for a member
  * who joins while status roles are set, and every hour with fresh WarEra data.
  *
@@ -62,6 +63,7 @@ class RoleSyncTrigger(
     private val pendingConfirmedRoleIds = HashSet<String>()
     private val pendingRevokedRoleIds = HashSet<String>()
     private val pendingMembers = LinkedHashSet<String>()
+    private var adminRequestPending = false
     private val pendingFormerAccounts = HashMap<String, FormerAccount>()
     private var draining = false
 
@@ -85,6 +87,19 @@ class RoleSyncTrigger(
             syncAllPending = true
             settingChangePending = true
         }
+
+    /**
+     * Syncs [discordUserId] with fresh WarEra data, as an admin asked for in the dashboard. Returns `false` if the
+     * request is dropped, since the role sync, nicknames and status roles are all switched off.
+     */
+    fun syncMemberOnRequest(discordUserId: String): Boolean {
+        if (!active()) return false
+        request {
+            pendingMembers += discordUserId
+            adminRequestPending = true
+        }
+        return true
+    }
 
     /** The previous Discord account of a relinked WarEra account loses its roles and the nickname from it. */
     @ApplicationModuleListener
@@ -174,18 +189,22 @@ class RoleSyncTrigger(
                         revokedRoleIds = pendingRevokedRoleIds.toList(),
                         members = pendingMembers.toList(),
                         formerAccounts = pendingFormerAccounts.toMap(),
+                        adminRequest = adminRequestPending,
                     ).also {
                         syncAllPending = false
                         settingChangePending = false
                         pendingConfirmedRoleIds.clear()
                         pendingRevokedRoleIds.clear()
                         pendingMembers.clear()
+                        adminRequestPending = false
                         pendingFormerAccounts.clear()
                     }
                 }
             // Members first: a single lookup each, while the sync of everybody may have to load users it has not seen.
             if (pending.members.isNotEmpty()) {
-                attempt(SyncTrigger.ACCOUNT_CHANGE) { syncService.syncMembers(pending.members, pending.formerAccounts) }
+                // Merged like the sync of all members: it counts as asked for by an admin if one of the requests was.
+                val trigger = if (pending.adminRequest) SyncTrigger.ADMIN_REQUEST else SyncTrigger.ACCOUNT_CHANGE
+                attempt(trigger) { syncService.syncMembers(pending.members, pending.formerAccounts, trigger) }
             }
             if (pending.syncAll) {
                 // Only rule changes confirm roles, see syncAllWithCachedData.
@@ -207,6 +226,7 @@ class RoleSyncTrigger(
         val revokedRoleIds: List<String>,
         val members: List<String>,
         val formerAccounts: Map<String, FormerAccount>,
+        val adminRequest: Boolean,
     )
 
     private fun attempt(

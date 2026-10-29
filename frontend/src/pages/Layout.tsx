@@ -11,6 +11,7 @@ import {
   SettingsIcon,
   ShieldIcon,
   SwordsIcon,
+  UsersIcon,
   VoteIcon,
 } from 'lucide-react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
@@ -91,6 +92,9 @@ export function Layout() {
                         <>
                           <NavItem to="/admin/roles" icon={<ShieldIcon />}>
                             Rollen
+                          </NavItem>
+                          <NavItem to="/admin/members" icon={<UsersIcon />}>
+                            Mitglieder
                           </NavItem>
                           <NavItem to="/admin/military-units" icon={<SwordsIcon />}>
                             Militäreinheiten

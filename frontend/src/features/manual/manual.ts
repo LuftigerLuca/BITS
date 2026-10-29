@@ -225,11 +225,11 @@ export const MANUAL_PAGES: ManualPage[] = [
     slug: 'admins',
     icon: SettingsIcon,
     title: 'Admins',
-    summary: 'Rollenregeln, Botschaften, Einstellungen und Logs im Dashboard.',
+    summary: 'Rollenregeln, Mitglieder, Botschaften, Einstellungen und Logs im Dashboard.',
     intro:
       'Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, ist im Dashboard Admin und sieht in ' +
-      'der Seitenleiste die Bereiche „Admin“ mit Rollen, Botschaften und Abstimmungen und „System“ mit Verwaltung ' +
-      'und den Logs.',
+      'der Seitenleiste die Bereiche „Admin“ mit Rollen, Mitgliedern, Botschaften und Abstimmungen und „System“ mit ' +
+      'Verwaltung und den Logs.',
     buildsOn: ['mitglieder', 'abstimmungen'],
     topics: [
       {
@@ -384,12 +384,36 @@ export const MANUAL_PAGES: ManualPage[] = [
           'nach jeder Regeländerung, jeder Änderung an einer DSK, die ihre Rolle betrifft, und jeder Änderung der ' +
             'Statusrollen für alle, mit den WarEra-Daten des letzten Abgleichs',
           'stündlich für alle mit frischen WarEra-Daten',
+          'wenn ein Admin unter „Mitglieder“ „Jetzt abgleichen“ wählt, für das Mitglied mit frischen WarEra-Daten',
         ],
         tips: [
           'Kann BITS ein Mitglied, seine Firmen, eine Regierung, die Parteien eines Landes oder eine Military Unit ' +
             'gerade nicht laden, bleiben die betroffenen Rollen, wie sie sind, außer ein anderer Block der Regel ist ' +
             'erfüllt oder jeder betroffene Block hat eine andere Bedingung, die sicher nicht erfüllt ist.',
           'Regierungen, Parteien und Military Units können dabei bis zu 10 Minuten alt sein.',
+        ],
+      },
+      {
+        id: 'members',
+        title: 'Mitglieder nachschlagen',
+        intro:
+          'Fragt ein Mitglied nach seinen Rollen, findest du es unter „Mitglieder“ über seinen Discord-Namen, seinen ' +
+          'WarEra-Namen oder seine Discord-ID.',
+        points: [
+          'die Verknüpfung: mit welchem WarEra-Account und seit wann',
+          'die Rollen, die BITS verwaltet, mit frischen WarEra-Daten geprüft wie bei /rollen, und ob das Mitglied ' +
+            'sie gerade hat',
+          'die letzten Einträge des System-Logs zu dem Mitglied, mit einem Link zu allen',
+          '„Jetzt abgleichen“: gleicht das Mitglied sofort mit frischen WarEra-Daten ab; das Ergebnis steht kurz ' +
+            'danach im System-Log',
+          '„Verknüpfung lösen“: wirkt nach einer Rückfrage wie /unverify, das Mitglied verliert die Rollen beim ' +
+            'folgenden Abgleich',
+        ],
+        tips: [
+          'Beide Aktionen stehen im Audit-Log.',
+          'Der WarEra-Name ist der beim Verknüpfen. Hat sich das Mitglied in WarEra umbenannt, findest du es über ' +
+            'den alten Namen.',
+          'Eine Verknüpfung von Hand anlegen oder Rollen außerhalb der Regeln vergeben geht hier nicht.',
         ],
       },
       {
