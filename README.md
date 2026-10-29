@@ -41,7 +41,7 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 |--------------------------------------------------|----------------------------|-------------------------------------|-----------------------------------------------------------------------------|
 | Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profil` | bis zum Lösen, zum Verlassen des Servers oder zu einer neuen Verknüpfung    |
 | Discord-ID, Zeitpunkt                            | `nickname_opt_in`          | Nickname aus WarEra                 | bis `/nickname aus` oder zum Verlassen des Servers                          |
-| Discord-IDs der Mitglieder                       | Speicher des Backends      | Kennzahlen, Abgleich der Links      | bis zur nächsten Meldung des Bots oder zum Neustart                         |
+| Discord-IDs, -Namen und Rollen der Mitglieder    | Speicher des Backends      | Kennzahlen, Links, Mitgliedersuche  | bis zur nächsten Meldung des Bots oder zum Neustart                         |
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung                | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
 | Discord-ID, WarEra-ID, Stimme                    | `vote_ballot`              | laufende Abstimmung                 | bis zur Auswertung oder zum Abbruch                                         |
 | Discord-ID und -Name der Rollenmitglieder        | `vote_elector`             | Auswertung einer Abstimmung         | bis zur Auswertung                                                          |
@@ -50,15 +50,17 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | Discord-ID, Name, Grund der Thread-Mitglieder    | `embassy_thread_member`    | Botschafts-Threads im Dashboard     | bis zur nächsten Meldung des Bots oder zum Aufheben der Zuordnung           |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
+| Name des Mitglieds bei Abgleich oder Lösen       | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |
 | Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot               | 7 Tage                                                                      |
 | Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                         | im Deployment höchstens 5 × 10 MB pro Dienst                                |
 | alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                   | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
 
 WarEra-Daten der Nutzer hält das Backend nur im Speicher. Ein Hinweis in `/verify` sagt, was gespeichert wird.
-Mit `/unverify` oder unter „Mein Account“ im Dashboard löscht ein Nutzer seine Verknüpfung und einen offenen Code;
-die Rollen, die BITS verwaltet, verliert er beim folgenden Abgleich. Wer den Server verlässt, verliert beides ebenso,
-spätestens beim nächsten Start des Bots. Abgelaufene Codes und alte Pings löscht ein Job jede Stunde.
+Mit `/unverify` oder unter „Mein Account“ im Dashboard löscht ein Nutzer seine Verknüpfung und einen offenen Code, ein
+Admin ebenso unter „Mitglieder“; die Rollen, die BITS verwaltet, verliert der Nutzer beim folgenden Abgleich. Wer den
+Server verlässt, verliert beides ebenso, spätestens beim nächsten Start des Bots. Abgelaufene Codes und alte Pings löscht
+ein Job jede Stunde.
 
 Auskunft holt sich jedes Mitglied selbst unter „Mein Account“: Der Download enthält alle Zeilen der Tabellen oben, die
 seine Discord-ID betreffen, aus dem System-Log aber nur seine eigene Seite eines Eintrags und aus dem Audit-Log nur, was

@@ -19,6 +19,7 @@ export const TRIGGERS: Record<SyncTrigger, string> = {
   ACCOUNT_CHANGE: 'nach Verknüpfung',
   // Older runs of the role sync carry it for turning on nicknames, embassy syncs for a change on their page.
   SETTING_CHANGE: 'nach Einstellungsänderung',
+  ADMIN_REQUEST: 'auf Anfrage eines Admins',
 }
 
 export const STATUS: Record<SyncRunStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {

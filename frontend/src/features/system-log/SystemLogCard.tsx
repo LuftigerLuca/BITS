@@ -1,5 +1,6 @@
 import { Fragment, useState, type FormEvent } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
+import { useSearchParams } from 'react-router'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,10 +19,12 @@ const ALL = 'all'
 
 /** What BITS did on its own, newest first: sync runs with their role changes, account links and errors. */
 export function SystemLogCard() {
+  // The page of a member links here with `?member=<Discord ID>`.
+  const [searchParams] = useSearchParams()
   const [category, setCategory] = useState(ALL)
   const [roleId, setRoleId] = useState(ALL)
-  const [memberInput, setMemberInput] = useState('')
-  const [member, setMember] = useState('')
+  const [memberInput, setMemberInput] = useState(() => searchParams.get('member') ?? '')
+  const [member, setMember] = useState(() => searchParams.get('member') ?? '')
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const filter: SystemLogFilter = {
     category: category === ALL ? null : (category as LogCategory),

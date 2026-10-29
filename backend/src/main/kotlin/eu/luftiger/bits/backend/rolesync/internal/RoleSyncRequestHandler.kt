@@ -11,4 +11,6 @@ class RoleSyncRequestHandler(
         confirmedRoleIds: Collection<String>,
         revokedRoleIds: Collection<String>,
     ) = syncTrigger.syncAllWithCachedData(confirmedRoleIds + revokedRoleIds, revokedRoleIds)
+
+    override fun syncMember(discordUserId: String) = syncTrigger.syncMemberOnRequest(discordUserId)
 }

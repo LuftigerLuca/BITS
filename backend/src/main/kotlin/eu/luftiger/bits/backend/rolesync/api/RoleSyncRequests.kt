@@ -18,4 +18,11 @@ interface RoleSyncRequests {
         confirmedRoleIds: Collection<String>,
         revokedRoleIds: Collection<String> = emptyList(),
     )
+
+    /**
+     * Syncs [discordUserId] alone in the background with fresh WarEra data, as an admin asked for; a member without
+     * link loses the managed roles. Returns `false` if nothing is synced, since the role sync, nicknames and status
+     * roles are all switched off.
+     */
+    fun syncMember(discordUserId: String): Boolean
 }

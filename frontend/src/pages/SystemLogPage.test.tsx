@@ -127,6 +127,15 @@ describe('system log page', () => {
     expect(systemLogCalls().at(-1)).toBe('category=ERROR&member=Luca&roleId=r-citizen')
   })
 
+  it('filters by the member a link names', async () => {
+    stubLog([])
+    renderApp('/admin/system-log?member=1')
+
+    expect(await screen.findByText('Keine Einträge für diesen Filter.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Mitglied')).toHaveValue('1')
+    expect(systemLogCalls().at(-1)).toBe('member=1')
+  })
+
   it('is linked from the sidebar', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),

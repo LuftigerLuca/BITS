@@ -6,4 +6,6 @@ import org.springframework.modulith.NamedInterface
 data class LinkedAccount(
     val discordUserId: String,
     val wareraUserId: String,
+    /** Username at the time of linking, like [LinkedWareraAccount.wareraUsername]. */
+    val wareraUsername: String,
 )

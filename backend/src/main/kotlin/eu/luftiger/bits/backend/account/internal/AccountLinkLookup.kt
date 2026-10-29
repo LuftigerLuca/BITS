@@ -13,5 +13,8 @@ class AccountLinkLookup(
     override fun findByDiscordUserId(discordUserId: String): LinkedWareraAccount? =
         linkRepository.findByIdOrNull(discordUserId)?.let { LinkedWareraAccount(it.wareraUserId, it.wareraUsername) }
 
-    override fun findAll(): List<LinkedAccount> = linkRepository.findAll().map { LinkedAccount(it.discordUserId, it.wareraUserId) }
+    override fun findAll(): List<LinkedAccount> =
+        linkRepository.findAll().map {
+            LinkedAccount(it.discordUserId, it.wareraUserId, it.wareraUsername)
+        }
 }

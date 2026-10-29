@@ -131,7 +131,8 @@ database again on startup. Dumps can also be inspected without touching the stac
 
 What BITS stores and for how long is listed under "Datenschutz" in the [README](../README.md#datenschutz). Members
 handle most requests themselves: they delete their link with `/unverify` or on the dashboard page "Mein Account", and
-download what is stored about them there as JSON. Point them there first. For a member who cannot log in to the
+download what is stored about them there as JSON. Point them there first. Admins can also delete a member's link on
+the dashboard page "Mitglieder", which is recorded in the audit log. For a member who cannot log in to the
 dashboard, e.g. because they left the server, or for anything the download leaves out, look up their Discord ID:
 
 ```sh
@@ -152,7 +153,8 @@ SQL
 ```
 
 Evaluated votes keep names only: who started or ended them (`vote`) and who did not vote (`vote_non_voter`); search
-those by the member's display name.
+those by the member's display name. The same holds for audit entries of admins who synced or unlinked the member
+(`MEMBER_SYNC_REQUESTED`, `MEMBER_UNLINKED`), whose description names them.
 
 To delete it for them, run the same with `DELETE FROM` instead of `SELECT * FROM`. The hourly sync then takes the
 managed roles away. The dumps in `BACKUP_PATH` still hold the data until they rotate out, at most four weeks; the
