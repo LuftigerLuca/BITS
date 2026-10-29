@@ -14,9 +14,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 /**
- * Explains to a member which managed roles they meet and why, for `/rollen`. It judges with the [RuleEvaluator] of the
- * role sync, but always with a fresh WarEra user and companies (the governments, parties and military units may be
- * cached for a few minutes), and changes nothing: the next sync brings the roles in line.
+ * Explains to a member which managed roles they meet and why, for `/rollen`, the roles of DSKs included. It judges with
+ * the [RuleEvaluator] of the role sync, but always with a fresh WarEra user and companies (the governments, parties and
+ * military units may be cached for a few minutes), and changes nothing: the next sync brings the roles in line.
  */
 @Service
 class RoleExplanationService(
@@ -31,7 +31,8 @@ class RoleExplanationService(
     fun explain(discordUserId: String): RoleExplanationResponse {
         val link = accountLinks.findByDiscordUserId(discordUserId) ?: return RoleExplanationResponse.NotLinked
         val rules = ruleInputs.activeRules()
-        if (rules.isEmpty()) return RoleExplanationResponse.Explained(link.wareraUsername, emptyList())
+        val dsks = ruleInputs.activeDskRoles()
+        if (rules.isEmpty() && dsks.isEmpty()) return RoleExplanationResponse.Explained(link.wareraUsername, emptyList())
         val user = wareraClient.getUser(link.wareraUserId)
         val companyCount =
             if (rules.any { rule -> rule.conditions.any { it.type == ConditionType.COMPANIES } }) {
@@ -40,24 +41,41 @@ class RoleExplanationService(
                 null
             }
         val positions = roleRepository.findAll().associate { it.id to it.position }
-        val roles =
-            RuleEvaluator(rules, ruleInputs.ruleData(rules, listOfNotNull(user.mu)))
-                .check(user, companyCount)
-                .sortedByDescending { positions[it.roleId] }
-                .map { role ->
-                    ManagedRoleExplanation(
-                        roleId = role.roleId,
-                        outcome =
-                            when (role.outcome) {
-                                RoleOutcome.MET -> ManagedRoleOutcome.MET
-                                RoleOutcome.NOT_MET -> ManagedRoleOutcome.NOT_MET
-                                RoleOutcome.UNDECIDED -> ManagedRoleOutcome.UNDECIDED
-                            },
-                        rules = role.blocks.map { RuleExplanation(it.block.label, it.met, detail(it, user, companyCount)) },
-                    )
-                }
+        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, listOfNotNull(user.mu)), dsks)
+        val ruleRoles =
+            evaluator.check(user, companyCount).map { role ->
+                ManagedRoleExplanation(
+                    roleId = role.roleId,
+                    outcome = outcome(role.outcome),
+                    rules = role.blocks.map { RuleExplanation(it.block.label, it.met, detail(it, user, companyCount)) },
+                )
+            }
+        val roles = (ruleRoles + evaluator.checkDsks(user).map(::dskExplanation)).sortedByDescending { positions[it.roleId] }
         return RoleExplanationResponse.Explained(user.username, roles)
     }
+
+    /** A DSK as a single block: the military unit the member is in, or that they are in none of the DSK. */
+    private fun dskExplanation(check: DskCheck): ManagedRoleExplanation {
+        val met = check.outcome == RoleOutcome.MET
+        val explanation =
+            if (met) {
+                RuleExplanation(requireNotNull(check.label), met = true, detail = null)
+            } else {
+                RuleExplanation(
+                    "Mitglied einer MU der ${check.dsk.name}",
+                    met = false,
+                    detail = "nicht Mitglied einer MU der ${check.dsk.name}",
+                )
+            }
+        return ManagedRoleExplanation(check.dsk.roleId, outcome(check.outcome), listOf(explanation))
+    }
+
+    private fun outcome(outcome: RoleOutcome) =
+        when (outcome) {
+            RoleOutcome.MET -> ManagedRoleOutcome.MET
+            RoleOutcome.NOT_MET -> ManagedRoleOutcome.NOT_MET
+            RoleOutcome.UNDECIDED -> ManagedRoleOutcome.UNDECIDED
+        }
 
     /**
      * What the user lacks for a block, in German: the conditions that fail, or if none fails, those that cannot be

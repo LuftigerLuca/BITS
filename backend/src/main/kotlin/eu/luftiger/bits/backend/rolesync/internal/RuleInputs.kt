@@ -1,5 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
+import eu.luftiger.bits.backend.rolesync.api.DskRoles
+import eu.luftiger.bits.backend.rolesync.api.dto.DskRole
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Component
 class RuleInputs(
     private val ruleRepository: RoleRuleRepository,
     private val roleRepository: DiscordRoleRepository,
+    private val dskRoles: DskRoles,
     private val wareraClient: WareraClient,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -28,6 +31,12 @@ class RuleInputs(
     fun activeRules(): List<RoleRule> {
         val assignable = roleRepository.findAll().filter { it.assignable }.mapTo(HashSet()) { it.id }
         return ruleRepository.findAll().filter { it.roleId in assignable }
+    }
+
+    /** Like [activeRules], the DSKs whose role exists and can be given by the bot. */
+    fun activeDskRoles(): List<DskRole> {
+        val assignable = roleRepository.findAll().filter { it.assignable }.mapTo(HashSet()) { it.id }
+        return dskRoles.all().filter { it.roleId in assignable }
     }
 
     /**

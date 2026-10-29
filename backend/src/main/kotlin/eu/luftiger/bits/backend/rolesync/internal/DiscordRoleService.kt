@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
+import eu.luftiger.bits.backend.rolesync.api.DskRoles
 import eu.luftiger.bits.backend.rolesync.domain.DiscordRole
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -11,19 +12,19 @@ import org.springframework.transaction.annotation.Transactional
 class DiscordRoleService(
     private val roleRepository: DiscordRoleRepository,
     private val ruleRepository: RoleRuleRepository,
+    private val dskRoles: DskRoles,
     private val systemLog: SystemLog,
 ) {
     /**
-     * Rules of roles missing from [roles] become orphaned; they are kept, but no longer run. A role with rules that the
-     * bot could give until now and no longer can is recorded in the [SystemLog] once, not on every report.
+     * Rules of roles missing from [roles] become orphaned; they are kept, but no longer run, and so do DSKs. A role with
+     * rules or of a DSK that the bot could give until now and no longer can is recorded in the [SystemLog] once, not on
+     * every report.
      */
     @Transactional
     fun replaceAll(roles: List<DiscordRoleDto>) {
         val assignableBefore = roleRepository.findAssignableIds().toSet()
         val reported = roles.associateBy { it.id }
-        ruleRepository
-            .findAll()
-            .map { it.roleId }
+        (ruleRepository.findAll().map { it.roleId } + dskRoles.all().map { it.roleId })
             .distinct()
             .filter { it in assignableBefore && reported[it]?.assignable != true }
             .forEach { roleId -> systemLog.recordProblem(SystemProblem.RoleNotAssignable(roleId, reported[roleId]?.name)) }

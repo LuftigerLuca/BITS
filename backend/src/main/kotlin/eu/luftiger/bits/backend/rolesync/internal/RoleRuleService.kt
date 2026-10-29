@@ -3,6 +3,7 @@ package eu.luftiger.bits.backend.rolesync.internal
 import eu.luftiger.bits.backend.audit.api.AuditAction
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
+import eu.luftiger.bits.backend.rolesync.api.DskRoles
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.DiscordRole
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
@@ -31,20 +32,22 @@ import java.time.Clock
 class RoleRuleService(
     private val ruleRepository: RoleRuleRepository,
     private val roleRepository: DiscordRoleRepository,
+    private val dskRoles: DskRoles,
     private val wareraClient: WareraClient,
     private val syncTrigger: RoleSyncTrigger,
     private val auditLog: AuditLog,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
 ) {
-    /** Roles the bot can give, highest first; the others cannot be picked for a rule. */
+    /** Roles the bot can give, highest first; the others, and those of a DSK, cannot be picked for a rule. */
     fun assignableRoles(): List<RoleResponse> {
         val managed = ruleRepository.findAll().mapTo(HashSet()) { it.roleId }
+        val dsks = dskRoles.all().associate { it.roleId to it.name }
         return roleRepository
             .findAll()
             .filter { it.assignable }
             .sortedByDescending { it.position }
-            .map { RoleResponse(it.id, it.name, it.color, managed = it.id in managed) }
+            .map { RoleResponse(it.id, it.name, it.color, managed = it.id in managed, dskName = dsks[it.id]) }
     }
 
     fun rules(): List<RuleResponse> {
@@ -128,11 +131,14 @@ class RoleRuleService(
      *
      * @throws ResponseStatusException 400 if the role cannot be given; there are no or too many blocks, or a block has
      * no or too many conditions; a condition is incomplete or unknown; or the same condition stands twice in a block, or
-     * the same block twice in the rule
+     * the same block twice in the rule. 409 if the role belongs to a DSK, which gives it instead.
      */
     fun newBlocks(request: RuleRequest): Pair<DiscordRole, List<RuleBlock>> {
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
+        if (dskRoles.all().any { it.roleId == role.id }) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} belongs to a DSK")
+        }
         if (request.blocks.isEmpty()) throw badRequest("Blocks missing")
         if (request.blocks.size > MAX_BLOCKS) throw badRequest("At most $MAX_BLOCKS blocks")
         // The countries for every condition at once, and only if needed.

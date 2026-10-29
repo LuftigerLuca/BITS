@@ -40,7 +40,7 @@ export function errorMessage(error: unknown): string {
     if (error.status === 400) {
       return 'Die Regel ist unvollständig, hat eine Bedingung oder einen Block doppelt oder die Rolle kann nicht vergeben werden.'
     }
-    if (error.status === 409) return 'Für diese Rolle gibt es schon eine Regel.'
+    if (error.status === 409) return 'Für diese Rolle gibt es schon eine Regel, oder sie gehört zu einer DSK.'
   }
   return 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'
 }

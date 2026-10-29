@@ -309,10 +309,35 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie, auch wenn sie von Hand vergeben wurde.',
           'Löschst du die Regel, verwaltet BITS die Rolle nicht mehr; niemand verliert sie dadurch.',
           'Regeln für Rollen, die in Discord gelöscht wurden, gelten als verwaist und wirken nicht.',
+          'Die Rolle einer DSK kann keine Regel bekommen, siehe „DSKs und ihre Military Units“.',
         ],
         tips: [
           'Die Vorschau rechnet mit den WarEra-Daten des letzten Abgleichs. Mitglieder ohne solche Daten zählen als ' +
             '„unbekannt“. Kurz nach einem Neustart von BITS ist sie ungenau; das Dashboard sagt das dazu.',
+        ],
+      },
+      {
+        id: 'dsks',
+        title: 'DSKs und ihre Military Units',
+        intro:
+          'Unter „Militäreinheiten“ fasst du die Military Units des Landes unter „Verwaltung“ zu DSKs zusammen. Wer ' +
+          'verknüpft ist und in einer MU einer DSK ist, bekommt die Rolle der DSK; alle anderen verlieren sie.',
+        steps: [
+          'Lege unter „DSK anlegen“ eine DSK mit Namen an, etwa „DSK1“, und wähle ihre Rolle.',
+          'Suche bei der DSK eine MU nach ihrem Namen und klicke auf „Hinzufügen“.',
+        ],
+        points: [
+          'Die Suche zeigt nur MUs des Landes unter „Verwaltung“. Ist dort keins ausgewählt, kannst du keine MU ' +
+            'zuordnen. Das Land wird nur beim Zuordnen geprüft; zieht eine MU später um, bleibt sie in ihrer DSK.',
+          'WarEra liefert nur die besten Treffer. Fehlt eine MU mit sehr allgemeinem Namen, suche genauer.',
+          'Eine MU gehört höchstens zu einer DSK.',
+          'Eine Rolle gehört entweder zu einer DSK oder hat eine Regel unter „Rollen“, nie beides. Das Dashboard ' +
+            'bietet belegte Rollen nicht an.',
+          'Eine DSK ohne Rolle bewirkt nichts.',
+          'Entfernst du eine MU, löschst die DSK oder nimmst ihr die Rolle, verlieren die Mitglieder die Rolle ' +
+            'beim folgenden Abgleich.',
+          'In /rollen und im Audit-Log von Discord steht als Grund etwa „Mitglied der MU Bundeswehr (DSK1)“.',
+          'Ist der Rollen-Sync ausgeschaltet, vergibt und entzieht BITS auch die Rollen der DSKs nicht.',
         ],
       },
       {
@@ -323,7 +348,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'ersten erfüllten Block der Regel.',
         points: [
           'beim Verknüpfen für das Mitglied',
-          'nach jeder Regeländerung für alle, mit den WarEra-Daten des letzten Abgleichs',
+          'nach jeder Regeländerung und jeder Änderung an einer DSK, die ihre Rolle betrifft, für alle, mit den ' +
+            'WarEra-Daten des letzten Abgleichs',
           'stündlich für alle mit frischen WarEra-Daten',
         ],
         tips: [

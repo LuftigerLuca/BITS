@@ -65,7 +65,7 @@ describe('layout', () => {
     expect(current.map((link) => link.textContent)).toEqual(['Audit-Log'])
   })
 
-  it('shows admins the roles, embassies and votes, and apart from them the admin area with both logs', async () => {
+  it('shows admins the roles, military units, embassies and votes, and apart from them the admin area with both logs', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
       'GET /web/admin/overview': () => json({}),
@@ -83,6 +83,7 @@ describe('layout', () => {
       ['Start', '/'],
       ['Mein Account', '/account'],
       ['Rollen', '/admin/roles'],
+      ['Militäreinheiten', '/admin/military-units'],
       ['Botschaften', '/admin/embassies'],
       ['Abstimmungen', '/votes'],
       ['Verwaltung', '/admin'],

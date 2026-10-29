@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend
 
+import eu.luftiger.bits.backend.rolesync.api.dto.DskRole
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.MilitaryUnitRole
@@ -48,6 +49,21 @@ class RuleEvaluatorTest {
         )
         val other = WareraUser(id = "u2", username = "B", country = "fr", militaryRank = 50)
         assertEquals(listOf("congress", "veteran"), evaluator.evaluate(other)!!.grants.map { it.roleId })
+    }
+
+    @Test
+    fun `members of a military unit of a DSK get its role, members who cannot be loaded keep it`() {
+        val dsk = DskRole("dsk1", "DSK1", mapOf("m1" to "Marine", "m2" to "Luftwaffe"))
+        val evaluator = RuleEvaluator(listOf(level), RuleData(), listOf(dsk))
+
+        val member = WareraUser(id = "u1", username = "A", mu = "m2", leveling = WareraUser.Leveling(20))
+        assertEquals(
+            MemberRoles(listOf(RoleGrant("veteran", "BITS: Level ab 20"), RoleGrant("dsk1", "BITS: Mitglied der MU Luftwaffe (DSK1)"))),
+            evaluator.evaluate(member),
+        )
+        assertNull(evaluator.evaluate(WareraUser(id = "u2", username = "B", mu = "m3")))
+        assertNull(evaluator.evaluate(WareraUser(id = "u3", username = "C")))
+        assertEquals(MemberRoles(emptyList(), listOf("veteran", "dsk1")), evaluator.evaluate(null))
     }
 
     @Test

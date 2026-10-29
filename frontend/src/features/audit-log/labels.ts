@@ -19,6 +19,11 @@ export const ACTIONS: Record<AuditAction, string> = {
   EMBASSY_SETTINGS_CHANGED: 'Botschafts-Einstellungen geändert',
   FEATURE_TOGGLED: 'Funktion umgeschaltet',
   BOT_PRESENCE_CHANGED: 'Bot-Status geändert',
+  DSK_CREATED: 'DSK angelegt',
+  DSK_UPDATED: 'DSK geändert',
+  DSK_DELETED: 'DSK gelöscht',
+  DSK_MILITARY_UNIT_ADDED: 'MU einer DSK zugeordnet',
+  DSK_MILITARY_UNIT_REMOVED: 'MU aus DSK entfernt',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

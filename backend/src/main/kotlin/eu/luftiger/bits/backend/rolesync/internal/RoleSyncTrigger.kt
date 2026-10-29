@@ -54,19 +54,24 @@ class RoleSyncTrigger(
     private val lock = Any()
     private var syncAllPending = false
     private val pendingConfirmedRoleIds = HashSet<String>()
+    private val pendingRevokedRoleIds = HashSet<String>()
     private val pendingMembers = LinkedHashSet<String>()
     private val pendingFormerAccounts = HashMap<String, FormerAccount>()
     private var draining = false
 
     /**
      * Syncs all members with the WarEra data loaded last. [confirmedRoleIds] are roles whose rules an admin just
-     * changed, see [eu.luftiger.bits.shared.RoleSyncEvent.confirmedRoleIds].
+     * changed, see [eu.luftiger.bits.shared.RoleSyncEvent.confirmedRoleIds]; [revokedRoleIds] are roles to take from
+     * everybody once, see [RoleSyncService.syncAll].
      */
-    fun syncAllWithCachedData(confirmedRoleIds: Collection<String> = emptyList()) =
-        request {
-            syncAllPending = true
-            pendingConfirmedRoleIds += confirmedRoleIds
-        }
+    fun syncAllWithCachedData(
+        confirmedRoleIds: Collection<String> = emptyList(),
+        revokedRoleIds: Collection<String> = emptyList(),
+    ) = request {
+        syncAllPending = true
+        pendingConfirmedRoleIds += confirmedRoleIds
+        pendingRevokedRoleIds += revokedRoleIds
+    }
 
     /** The previous Discord account of a relinked WarEra account loses its roles and the nickname from it. */
     @ApplicationModuleListener
@@ -145,11 +150,13 @@ class RoleSyncTrigger(
                     Pending(
                         syncAll = syncAllPending,
                         confirmedRoleIds = pendingConfirmedRoleIds.toList(),
+                        revokedRoleIds = pendingRevokedRoleIds.toList(),
                         members = pendingMembers.toList(),
                         formerAccounts = pendingFormerAccounts.toMap(),
                     ).also {
                         syncAllPending = false
                         pendingConfirmedRoleIds.clear()
+                        pendingRevokedRoleIds.clear()
                         pendingMembers.clear()
                         pendingFormerAccounts.clear()
                     }
@@ -161,7 +168,7 @@ class RoleSyncTrigger(
             if (pending.syncAll) {
                 // Only rule changes confirm roles, see syncAllWithCachedData.
                 val trigger = if (pending.confirmedRoleIds.isEmpty()) SyncTrigger.HOURLY else SyncTrigger.RULE_CHANGE
-                attempt(trigger) { syncService.syncAll(pending.confirmedRoleIds, trigger) }
+                attempt(trigger) { syncService.syncAll(pending.confirmedRoleIds, trigger, pending.revokedRoleIds) }
             }
         }
     }
@@ -169,6 +176,7 @@ class RoleSyncTrigger(
     private class Pending(
         val syncAll: Boolean,
         val confirmedRoleIds: List<String>,
+        val revokedRoleIds: List<String>,
         val members: List<String>,
         val formerAccounts: Map<String, FormerAccount>,
     )
