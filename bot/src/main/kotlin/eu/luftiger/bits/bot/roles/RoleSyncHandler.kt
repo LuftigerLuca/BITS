@@ -15,14 +15,17 @@ import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.exceptions.ErrorResponseException
 import net.dv8tion.jda.api.requests.ErrorResponse
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /**
  * Brings the managed roles of the members to the target state from the backend. A change that fails is logged and
  * skipped instead of failing the event, since the next sync tries again anyway. Members whose roles a newer sync has
  * set already are left alone, and a role that a sync would take from too many of its holders stays, see
- * [RemovalLimit]. The status roles go to every member but bots and are never held back, see [statusRoleChanges]. If
- * the event carries nicknames, it sets them too, see [nicknameChange]. What it changed, skipped and
- * failed goes to [onApplied] for the backend's system log, with the names of members and roles as they are now.
+ * [RemovalLimit]. All changes of one member go to Discord in one request, see [applyRoleChanges]. The status roles go
+ * to every member but bots and are never held back, see [statusRoleChanges]. If the event carries nicknames, it sets
+ * them too, see [nicknameChange]. What it changed, skipped and failed goes to [onApplied] for the backend's system log,
+ * with the names of members and roles as they are now.
  */
 class RoleSyncHandler(
     private val jda: JDA,
@@ -62,28 +65,9 @@ class RoleSyncHandler(
         val changes = proposed.filterNot { !it.add && it.roleId in heldBack } + statusChanges
         val outcomes = mutableListOf<Pair<RoleChange, Outcome>>()
         proposed.filter { !it.add && it.roleId in heldBack }.forEach { outcomes += it to Outcome(RoleChangeOutcome.SKIPPED, HELD_BACK) }
-        var applied = 0
-        changes.forEach { change ->
-            val role = guild.getRoleById(change.roleId)
-            if (role == null || !guild.selfMember.canInteract(role)) {
-                log.warn("Skipping role {} for member {}: it is gone or above the bot", change.roleId, change.discordUserId)
-                outcomes += change to Outcome(RoleChangeOutcome.SKIPPED, NOT_ASSIGNABLE)
-                return@forEach
-            }
-            try {
-                val member = membersById.getValue(change.discordUserId)
-                val action = if (change.add) guild.addRoleToMember(member, role) else guild.removeRoleFromMember(member, role)
-                action.reason(change.reason).submit().await()
-                applied++
-                outcomes += change to Outcome(if (change.add) RoleChangeOutcome.GRANTED else RoleChangeOutcome.REMOVED)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.error("Changing role {} of member {} failed", change.roleId, change.discordUserId, e)
-                // Short, so that the backend takes the report; it allows 1000 characters.
-                outcomes += change to Outcome(RoleChangeOutcome.FAILED, "Discord hat die Änderung abgelehnt: ${e.message?.take(500)}")
-            }
-        }
+        val results = applyRoleChanges(guild, membersById, changes)
+        changes.forEach { outcomes += it to results.getValue(it) }
+        val applied = results.values.count { it.outcome in APPLIED_ROLES }
         val nicknameChanges = applyNicknames(guild, members, event)
         appliedSyncs.record(event)
         event.syncId?.let { syncId ->
@@ -113,6 +97,62 @@ class RoleSyncHandler(
             members.size,
             stale.size,
         )
+    }
+
+    /**
+     * Applies the changes of each member with one request, since Discord limits how many role changes a guild may
+     * make: a sync that gives one member a role and takes another costs one request instead of two. A failing request
+     * fails all changes of its member.
+     */
+    private suspend fun applyRoleChanges(
+        guild: Guild,
+        membersById: Map<String, Member>,
+        changes: List<RoleChange>,
+    ): Map<RoleChange, Outcome> {
+        val results = HashMap<RoleChange, Outcome>()
+        val started = TimeSource.Monotonic.markNow()
+        val (assignable, unassignable) =
+            changes.partition { change -> guild.getRoleById(change.roleId)?.let { guild.selfMember.canInteract(it) } == true }
+        unassignable.forEach { change ->
+            log.warn("Skipping role {} for member {}: it is gone or above the bot", change.roleId, change.discordUserId)
+            results[change] = Outcome(RoleChangeOutcome.SKIPPED, NOT_ASSIGNABLE)
+        }
+        assignable.groupBy { it.discordUserId }.forEach { (discordUserId, memberChanges) ->
+            val (adds, removes) = memberChanges.partition { it.add }
+            try {
+                guild
+                    .modifyMemberRoles(
+                        membersById.getValue(discordUserId),
+                        adds.map { guild.getRoleById(it.roleId)!! },
+                        removes.map { guild.getRoleById(it.roleId)!! },
+                    ).reason(
+                        memberChanges
+                            .map { it.reason }
+                            .distinct()
+                            .joinToString("; ")
+                            .take(MAX_REASON_LENGTH),
+                    ).submit()
+                    .await()
+                memberChanges.forEach {
+                    results[it] = Outcome(if (it.add) RoleChangeOutcome.GRANTED else RoleChangeOutcome.REMOVED)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("Changing the roles of member {} failed", discordUserId, e)
+                // Short, so that the backend takes the report; it allows 1000 characters.
+                val outcome = Outcome(RoleChangeOutcome.FAILED, "Discord hat die Änderung abgelehnt: ${e.message?.take(500)}")
+                memberChanges.forEach { results[it] = outcome }
+            }
+        }
+        if (assignable.isNotEmpty()) {
+            log.info(
+                "Changed roles of {} members in {}",
+                assignable.distinctBy { it.discordUserId }.size,
+                started.elapsedNow().inWholeSeconds.seconds,
+            )
+        }
+        return results
     }
 
     /** The owner and members above the bot cannot be renamed by any bot; that is skipped, not failed. */
@@ -178,7 +218,11 @@ class RoleSyncHandler(
         const val HELD_BACK = "Zurückgehalten: Der Sync hätte die Rolle zu vielen Mitgliedern entzogen."
         const val NOT_ASSIGNABLE = "Die Rolle fehlt in Discord oder steht über der Rolle des Bots."
         const val NO_NICKNAME_PERMISSION = "Dem Bot fehlt die Berechtigung „Nicknames verwalten“."
+        val APPLIED_ROLES = setOf(RoleChangeOutcome.GRANTED, RoleChangeOutcome.REMOVED)
         val APPLIED_NICKNAMES = setOf(NicknameChangeOutcome.SET, NicknameChangeOutcome.RESET)
+
+        /** Discord's limit for the reason in the audit log. */
+        const val MAX_REASON_LENGTH = 512
         const val MEMBER_ABOVE_BOT = "Das Mitglied besitzt den Server oder steht über der Rolle des Bots."
     }
 }
