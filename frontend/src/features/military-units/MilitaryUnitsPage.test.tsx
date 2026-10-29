@@ -10,9 +10,9 @@ const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername
 
 const militaryUnits: MilitaryUnits = {
   roles: [
-    { id: 'r-dsk1', name: 'DSK1', color: 0x0000ff, hasRule: false, dskId: 1 },
-    { id: 'r-dsk2', name: 'DSK2', color: null, hasRule: false, dskId: null },
-    { id: 'r-veteran', name: 'Veteran', color: null, hasRule: true, dskId: null },
+    { id: 'r-dsk1', name: 'DSK1', color: 0x0000ff, hasRule: false, statusRole: false, dskId: 1 },
+    { id: 'r-dsk2', name: 'DSK2', color: null, hasRule: false, statusRole: false, dskId: null },
+    { id: 'r-veteran', name: 'Veteran', color: null, hasRule: true, statusRole: false, dskId: null },
   ],
   dsks: [
     {

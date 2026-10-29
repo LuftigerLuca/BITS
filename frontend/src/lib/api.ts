@@ -67,6 +67,8 @@ export interface DiscordRole {
   managed: boolean
   /** The DSK the role belongs to, `null` if none; such a role cannot get a rule. */
   dskName: string | null
+  /** Whether it is the role for verified or unverified members; such a role cannot get a rule. */
+  statusRole: boolean
 }
 
 export type ConditionType =
@@ -187,6 +189,37 @@ export async function getRoles(): Promise<DiscordRole[]> {
   return (await request(`${ROLE_SYNC}/roles`)).json()
 }
 
+/** A role for verified or unverified members; like a rule, only an active one is given. */
+export interface StatusRole {
+  roleId: string
+  /** `null` if the role was deleted in Discord. */
+  roleName: string | null
+  roleColor: number | null
+  status: RuleStatus
+}
+
+export interface StatusRoles {
+  /** `null` if none is set. */
+  verified: StatusRole | null
+  unverified: StatusRole | null
+}
+
+export async function getStatusRoles(): Promise<StatusRoles> {
+  return (await request(`${ROLE_SYNC}/status-roles`)).json()
+}
+
+/** `null` for none. 400 if both are the same or a new one cannot be given, 409 if it has a rule or belongs to a DSK. */
+export async function setStatusRoles(roles: {
+  verifiedRoleId: string | null
+  unverifiedRoleId: string | null
+}): Promise<void> {
+  await request(`${ROLE_SYNC}/status-roles`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(roles),
+  })
+}
+
 export async function getRoleRules(): Promise<RoleRule[]> {
   return (await request(`${ROLE_SYNC}/rules`)).json()
 }
@@ -240,12 +273,13 @@ export async function searchMilitaryUnits(query: string): Promise<Option[]> {
   return (await request(`${ROLE_SYNC}/military-units?${new URLSearchParams({ query })}`)).json()
 }
 
-/** A role a DSK may get: only one without a rule and of no other DSK. */
+/** A role a DSK may get: only one without a rule, no status role and of no other DSK. */
 export interface DskRoleOption {
   id: string
   name: string
   color: number | null
   hasRule: boolean
+  statusRole: boolean
   dskId: number | null
 }
 
@@ -355,6 +389,7 @@ export type AuditAction =
   | 'DSK_DELETED'
   | 'DSK_MILITARY_UNIT_ADDED'
   | 'DSK_MILITARY_UNIT_REMOVED'
+  | 'STATUS_ROLES_CHANGED'
   | 'BOT_PRESENCE_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */

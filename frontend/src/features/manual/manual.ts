@@ -309,11 +309,43 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie, auch wenn sie von Hand vergeben wurde.',
           'Löschst du die Regel, verwaltet BITS die Rolle nicht mehr; niemand verliert sie dadurch.',
           'Regeln für Rollen, die in Discord gelöscht wurden, gelten als verwaist und wirken nicht.',
-          'Die Rolle einer DSK kann keine Regel bekommen, siehe „DSKs und ihre Military Units“.',
+          'Die Rolle einer DSK kann keine Regel bekommen, siehe „DSKs und ihre Military Units“, ebenso wenig eine ' +
+            'Statusrolle.',
         ],
         tips: [
           'Die Vorschau rechnet mit den WarEra-Daten des letzten Abgleichs. Mitglieder ohne solche Daten zählen als ' +
             '„unbekannt“. Kurz nach einem Neustart von BITS ist sie ungenau; das Dashboard sagt das dazu.',
+        ],
+      },
+      {
+        id: 'status-roles',
+        title: 'Statusrollen für Verifizierte und Unverifizierte',
+        intro:
+          'Unter „Rollen“ wählst du in der Karte „Statusrollen“ eine Rolle für Verifizierte und eine für ' +
+          'Unverifizierte, jede für sich oder beide. Verifiziert ist, wer seinen WarEra-Account verknüpft hat; ein ' +
+          'offener Code zählt nicht.',
+        steps: [
+          'Wähle die Rolle für Verifizierte, die für Unverifizierte oder beide.',
+          'Klicke auf „Speichern“. BITS gleicht sofort alle Mitglieder ab.',
+        ],
+        points: [
+          'Alle verknüpften Mitglieder bekommen die Rolle für Verifizierte, alle anderen die für Unverifizierte. Bots ' +
+            'bekommen keine.',
+          'Nach /verify wechselt das Mitglied sofort von der einen zur anderen Rolle, beim Lösen der Verknüpfung ' +
+            'umgekehrt. Neue Mitglieder bekommen die Rolle für Unverifizierte direkt beim Beitritt.',
+          'Eine Statusrolle hat keine Regel und gehört zu keiner DSK, und beide müssen verschiedene Rollen sein.',
+          'Stellst du eine Rolle um oder leerst die Auswahl, entfernt BITS die bisherige Rolle nicht: Wer sie hat, ' +
+            'behält sie. Entferne sie bei Bedarf in Discord.',
+          'Ist die Verifizierung ausgeschaltet, ändert BITS an den Statusrollen nichts. Der Rollen-Sync spielt ' +
+            'dafür keine Rolle.',
+          '/rollen und die Rollenkarte im Konto nennen die Statusrolle mit dem Grund „Verifiziert“.',
+          'Wurde eine Statusrolle in Discord gelöscht oder steht sie über der Rolle des Bots, zeigt die Karte das an ' +
+            'und BITS vergibt sie nicht.',
+        ],
+        tips: [
+          'Sperre einen Kanal in Discord für @everyone und öffne ihn nur für die Rolle für Verifizierte. Den ' +
+            'Verifizierungskanal öffnest du für die Rolle für Unverifizierte, dann sehen Unverifizierte nur ihn.',
+          'Jede Änderung steht im Audit-Log.',
         ],
       },
       {
@@ -347,9 +379,10 @@ export const MANUAL_PAGES: ManualPage[] = [
           'BITS gibt und nimmt Rollen bei jedem Abgleich und nennt dabei im Audit-Log von Discord den Grund: den ' +
           'ersten erfüllten Block der Regel.',
         points: [
-          'beim Verknüpfen für das Mitglied',
-          'nach jeder Regeländerung und jeder Änderung an einer DSK, die ihre Rolle betrifft, für alle, mit den ' +
-            'WarEra-Daten des letzten Abgleichs',
+          'beim Verknüpfen und beim Lösen der Verknüpfung für das Mitglied',
+          'beim Beitritt für das neue Mitglied, solange Statusrollen gewählt sind',
+          'nach jeder Regeländerung, jeder Änderung an einer DSK, die ihre Rolle betrifft, und jeder Änderung der ' +
+            'Statusrollen für alle, mit den WarEra-Daten des letzten Abgleichs',
           'stündlich für alle mit frischen WarEra-Daten',
         ],
         tips: [

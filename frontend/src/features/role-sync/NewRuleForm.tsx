@@ -114,8 +114,10 @@ export function NewRuleForm({
     })
   }
 
-  // The roles of DSKs are given by their DSK, see the page "Militäreinheiten".
-  const roleItems = roles.filter((r) => r.dskName === null).map((r) => ({ value: r.id, label: r.name }))
+  // The roles of DSKs are given by their DSK, see the page "Militäreinheiten", the status roles by the verification.
+  const roleItems = roles
+    .filter((r) => r.dskName === null && !r.statusRole)
+    .map((r) => ({ value: r.id, label: r.name }))
   const colors = new Map(roles.map((r) => [r.id, r.color]))
   const action = editing ? 'Regel speichern' : 'Regel anlegen'
 

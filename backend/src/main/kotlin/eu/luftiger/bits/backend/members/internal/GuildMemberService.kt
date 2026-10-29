@@ -4,11 +4,14 @@ import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.account.api.AccountRemoval
 import eu.luftiger.bits.backend.account.api.dto.DepartedMember
 import eu.luftiger.bits.backend.members.api.GuildMembers
+import eu.luftiger.bits.backend.members.api.MemberJoined
 import eu.luftiger.bits.backend.members.api.dto.GuildMember
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import org.slf4j.LoggerFactory
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * Keeps the members of the guild in memory and deletes the links of those who left. A full list from the bot also
@@ -17,12 +20,16 @@ import org.springframework.stereotype.Service
  * A list that would delete more than half of all links, and at least [MIN_REFUSED_REMOVALS], looks more like a bug
  * than like members leaving, so it is refused as a whole: nothing is deleted and the previous list stays. The refusal
  * is recorded in the [SystemLog] once, not on every report that follows.
+ *
+ * A member who joins is announced as [MemberJoined], e.g. for the role of unverified members.
  */
 @Service
 class GuildMemberService(
     private val accountLinks: AccountLinks,
     private val accountRemoval: AccountRemoval,
     private val systemLog: SystemLog,
+    private val applicationEvents: ApplicationEventPublisher,
+    private val transactionTemplate: TransactionTemplate,
 ) : GuildMembers {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -62,6 +69,8 @@ class GuildMemberService(
     fun joined(discordUserId: String) {
         members = members?.plus(discordUserId)
         roles = roles?.plus(discordUserId to GuildMember(discordUserId, name = null, roleIds = emptySet()))
+        // In a transaction, so the event publication registry keeps it until the listeners are done.
+        transactionTemplate.executeWithoutResult { applicationEvents.publishEvent(MemberJoined(discordUserId)) }
     }
 
     /** Deletes the link right away, without the check of [replaceAll]: a single departure is no sign of a broken list. */

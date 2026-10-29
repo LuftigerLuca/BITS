@@ -22,7 +22,7 @@ import java.time.Clock
 /**
  * The page "Militäreinheiten" of the dashboard, admins only: the DSKs, their roles and their military units.
  *
- * A role belongs either to one DSK or to a rule of the role sync, never to both. Military units of any country can be
+ * A role belongs either to one DSK, to a rule of the role sync or is a status role, never more than one. Military units of any country can be
  * assigned, as DSKs also take in units based abroad.
  *
  * Every change is recorded in the audit log in its transaction. A change that affects who gets a role syncs all members
@@ -48,11 +48,19 @@ class DskService(
         val assignable = guildRoles.assignable()
         val assignableIds = assignable.mapTo(HashSet()) { it.id }
         val withRule = guildRoles.withRuleIds()
+        val status = guildRoles.statusIds()
         val dskByRole = dsks.filter { it.roleId != null }.associateBy { requireNotNull(it.roleId) }
         return MilitaryUnitsResponse(
             roles =
                 assignable.map {
-                    DskRoleOption(it.id, it.name, it.color, hasRule = it.id in withRule, dskId = dskByRole[it.id]?.id)
+                    DskRoleOption(
+                        it.id,
+                        it.name,
+                        it.color,
+                        hasRule = it.id in withRule,
+                        statusRole = it.id in status,
+                        dskId = dskByRole[it.id]?.id,
+                    )
                 },
             dsks =
                 dsks.map { dsk ->
@@ -235,12 +243,13 @@ class DskService(
     }
 
     /**
-     * @throws ResponseStatusException 400 if the bot cannot give the role; 409 if it has a rule of the role sync, which
-     * gives it instead
+     * @throws ResponseStatusException 400 if the bot cannot give the role; 409 if it has a rule of the role sync or is a
+     * status role, which gives it instead
      */
     private fun validRole(roleId: String): String {
         if (guildRoles.assignable().none { it.id == roleId }) throw badRequest("Role $roleId cannot be assigned")
         if (roleId in guildRoles.withRuleIds()) throw conflict("Role $roleId has a rule")
+        if (roleId in guildRoles.statusIds()) throw conflict("Role $roleId is a status role")
         return roleId
     }
 

@@ -6,6 +6,7 @@ import eu.luftiger.bits.backend.account.api.NicknameOptedIn
 import eu.luftiger.bits.backend.feature.api.BitsFeature
 import eu.luftiger.bits.backend.feature.api.FeatureToggled
 import eu.luftiger.bits.backend.feature.api.FeatureToggles
+import eu.luftiger.bits.backend.members.api.MemberJoined
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService.FormerAccount
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
@@ -22,7 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Starts syncs in the background: right away for a member who links or unlinks an account, for everybody after a
- * rule change, for a member who opts in to their WarEra name as nickname, and every hour with fresh WarEra data.
+ * rule change or a change of the status roles, for a member who opts in to their WarEra name as nickname, for a member
+ * who joins while status roles are set, and every hour with fresh WarEra data.
  *
  * Two lanes keep the quick syncs from waiting behind the hourly one. The hourly refresh loads every linked user, about
  * one per second, on a lane of its own and publishes nothing; once done, it asks for a sync of all members with the
@@ -37,14 +39,17 @@ import java.util.concurrent.atomic.AtomicBoolean
  * A sync that fails is recorded in the [SystemLog]; a merged sync of all members counts as a rule change if one of the
  * requests was.
  *
- * While both the role sync and nicknames are switched off, requests are dropped and the hourly refresh does not run.
- * Switching one of them on starts a refresh, which catches up on the account changes missed meanwhile.
+ * While the role sync and nicknames are switched off and no status roles are given (see [StatusRoleLookup.active]),
+ * requests are dropped and the hourly sync does not run. With only status roles, it syncs without loading WarEra data,
+ * which they do not need. Switching one of them on starts a refresh, which catches up on the account changes missed
+ * meanwhile.
  */
 @Component
 class RoleSyncTrigger(
     private val syncService: RoleSyncService,
     private val systemLog: SystemLog,
     private val features: FeatureToggles,
+    private val statusRoles: StatusRoleLookup,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val syncs = Executors.newSingleThreadExecutor { Thread(it, "role-sync") }
@@ -53,6 +58,7 @@ class RoleSyncTrigger(
 
     private val lock = Any()
     private var syncAllPending = false
+    private var settingChangePending = false
     private val pendingConfirmedRoleIds = HashSet<String>()
     private val pendingRevokedRoleIds = HashSet<String>()
     private val pendingMembers = LinkedHashSet<String>()
@@ -72,6 +78,13 @@ class RoleSyncTrigger(
         pendingConfirmedRoleIds += confirmedRoleIds
         pendingRevokedRoleIds += revokedRoleIds
     }
+
+    /** Syncs all members after an admin changed the status roles. */
+    fun syncAllAfterSettingChange() =
+        request {
+            syncAllPending = true
+            settingChangePending = true
+        }
 
     /** The previous Discord account of a relinked WarEra account loses its roles and the nickname from it. */
     @ApplicationModuleListener
@@ -95,6 +108,12 @@ class RoleSyncTrigger(
     @ApplicationModuleListener
     fun onNicknameOptedIn(event: NicknameOptedIn) = request { pendingMembers += event.discordUserId }
 
+    /** A new member gets the role for unverified members; without status roles, a sync would change nothing. */
+    @ApplicationModuleListener
+    fun onMemberJoined(event: MemberJoined) {
+        if (statusRoles.active() != null) request { pendingMembers += event.discordUserId }
+    }
+
     @ApplicationModuleListener
     fun onFeatureToggled(event: FeatureToggled) {
         if (event.enabled && event.feature in SYNCED_FEATURES) hourly()
@@ -107,9 +126,10 @@ class RoleSyncTrigger(
             log.warn("Role sync refresh still running, skipping this one")
             return
         }
+        val withWareraData = WARERA_FEATURES.any(features::isEnabled)
         refreshes.execute {
             try {
-                syncService.refreshUsers()
+                if (withWareraData) syncService.refreshUsers()
                 syncAllWithCachedData()
             } catch (e: Exception) {
                 log.error("Role sync refresh failed", e)
@@ -126,7 +146,7 @@ class RoleSyncTrigger(
         syncs.submit {}.get(timeout.toMillis(), TimeUnit.MILLISECONDS)
     }
 
-    private fun active() = SYNCED_FEATURES.any(features::isEnabled)
+    private fun active() = WARERA_FEATURES.any(features::isEnabled) || statusRoles.active() != null
 
     private fun request(add: () -> Unit) {
         if (!active()) return
@@ -149,12 +169,14 @@ class RoleSyncTrigger(
                     }
                     Pending(
                         syncAll = syncAllPending,
+                        settingChange = settingChangePending,
                         confirmedRoleIds = pendingConfirmedRoleIds.toList(),
                         revokedRoleIds = pendingRevokedRoleIds.toList(),
                         members = pendingMembers.toList(),
                         formerAccounts = pendingFormerAccounts.toMap(),
                     ).also {
                         syncAllPending = false
+                        settingChangePending = false
                         pendingConfirmedRoleIds.clear()
                         pendingRevokedRoleIds.clear()
                         pendingMembers.clear()
@@ -167,7 +189,12 @@ class RoleSyncTrigger(
             }
             if (pending.syncAll) {
                 // Only rule changes confirm roles, see syncAllWithCachedData.
-                val trigger = if (pending.confirmedRoleIds.isEmpty()) SyncTrigger.HOURLY else SyncTrigger.RULE_CHANGE
+                val trigger =
+                    when {
+                        pending.confirmedRoleIds.isNotEmpty() -> SyncTrigger.RULE_CHANGE
+                        pending.settingChange -> SyncTrigger.SETTING_CHANGE
+                        else -> SyncTrigger.HOURLY
+                    }
                 attempt(trigger) { syncService.syncAll(pending.confirmedRoleIds, trigger, pending.revokedRoleIds) }
             }
         }
@@ -175,6 +202,7 @@ class RoleSyncTrigger(
 
     private class Pending(
         val syncAll: Boolean,
+        val settingChange: Boolean,
         val confirmedRoleIds: List<String>,
         val revokedRoleIds: List<String>,
         val members: List<String>,
@@ -205,7 +233,10 @@ class RoleSyncTrigger(
     }
 
     private companion object {
-        /** What a sync sets, see [RoleSyncService]. */
-        val SYNCED_FEATURES = listOf(BitsFeature.ROLE_SYNC, BitsFeature.NICKNAMES)
+        /** What a sync sets from WarEra data, see [RoleSyncService]. */
+        val WARERA_FEATURES = listOf(BitsFeature.ROLE_SYNC, BitsFeature.NICKNAMES)
+
+        /** What a sync sets; the verification decides about the status roles. */
+        val SYNCED_FEATURES = WARERA_FEATURES + BitsFeature.VERIFICATION
     }
 }

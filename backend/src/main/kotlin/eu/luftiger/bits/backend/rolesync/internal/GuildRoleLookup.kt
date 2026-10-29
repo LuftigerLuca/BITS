@@ -9,6 +9,7 @@ class GuildRoleLookup(
     private val roleRepository: DiscordRoleRepository,
     private val ruleRepository: RoleRuleRepository,
     private val ruleInputs: RuleInputs,
+    private val statusRoles: StatusRoleLookup,
 ) : GuildRoles {
     // The bot reports `@everyone` at position -1, every other role from 0 up.
     override fun all(): List<GuildRole> =
@@ -35,4 +36,6 @@ class GuildRoleLookup(
     }
 
     override fun withRuleIds(): Set<String> = ruleRepository.findAll().mapTo(HashSet()) { it.roleId }
+
+    override fun statusIds(): Set<String> = statusRoles.saved().ids
 }

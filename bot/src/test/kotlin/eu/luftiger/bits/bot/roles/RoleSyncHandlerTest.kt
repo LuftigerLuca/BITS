@@ -6,6 +6,7 @@ import eu.luftiger.bits.shared.RoleChangeOutcome
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.RoleSyncReport
+import eu.luftiger.bits.shared.StatusRoles
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -269,6 +270,47 @@ class RoleSyncHandlerTest {
             )
         }
 
+    @Test
+    fun `gives every member but bots the status role that fits and takes the other`() =
+        runTest {
+            listOf("verified", "unverified").forEach(::role)
+            member("1", "unverified")
+            member("2", "verified")
+            member("3", "verified")
+            member("4")
+            member("5", bot = true)
+
+            handler().handle(sync(emptyMap(), statusRoles = StatusRoles("verified", "unverified", listOf("1", "3"))))
+
+            assertEquals(listOf("+verified@1", "-unverified@1", "+unverified@2", "-verified@2", "+unverified@4"), applied)
+            assertEquals(
+                listOf(VERIFIED_REASON, VERIFIED_REASON, UNVERIFIED_REASON, UNVERIFIED_REASON, UNVERIFIED_REASON),
+                reasons,
+            )
+        }
+
+    @Test
+    fun `status roles are never held back by the removal limit`() =
+        runTest {
+            role("verified")
+            (1..20).forEach { member("$it", "verified") }
+
+            handler().handle(sync(emptyMap(), statusRoles = StatusRoles("verified", null, emptyList())))
+
+            assertEquals((1..20).map { "-verified@$it" }, applied)
+        }
+
+    @Test
+    fun `leaves status roles alone while the event carries none`() =
+        runTest {
+            role("verified")
+            member("1", "verified")
+
+            handler().handle(sync(emptyMap(), managed = emptyList()))
+
+            assertEquals(emptyList(), applied)
+        }
+
     private fun handler() = RoleSyncHandler(jda, "100")
 
     private fun sync(
@@ -279,6 +321,7 @@ class RoleSyncHandlerTest {
         syncId: Long? = null,
         nicknames: Map<String, String>? = null,
         resets: Map<String, String> = emptyMap(),
+        statusRoles: StatusRoles? = null,
     ) = RoleSyncEvent(
         managedRoleIds = managed,
         discordUserIds = discordUserIds,
@@ -287,6 +330,7 @@ class RoleSyncHandlerTest {
         syncId = syncId,
         nicknames = nicknames,
         nicknameResets = resets,
+        statusRoles = statusRoles,
     )
 
     private fun grants(vararg roleIds: String) = MemberRoles(grants = roleIds.map { RoleGrant(it, "BITS: $it") })
@@ -306,12 +350,14 @@ class RoleSyncHandlerTest {
         id: String,
         vararg roleIds: String,
         nickname: String? = null,
+        bot: Boolean = false,
     ): Member {
         memberRoles[id] = roleIds.toMutableSet()
         nicknames[id] = nickname
         val member = mockk<Member>()
         every { member.id } returns id
         every { member.effectiveName } returns "Member $id"
+        every { member.user } returns mockk { every { isBot } returns bot }
         every { member.nickname } answers { nicknames[id] }
         every { member.roles } answers { memberRoles.getValue(id).map { roleId: String -> roles[roleId] ?: roleMock(roleId) } }
         members[id] = member

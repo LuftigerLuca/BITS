@@ -56,12 +56,12 @@ export function DsksCard({ data }: { data: MilitaryUnits }) {
   )
 }
 
-/** Roles the DSK [dskId] may get, `null` for a new one: without rules and of no other DSK. */
+/** Roles the DSK [dskId] may get, `null` for a new one: without rules, no status role and of no other DSK. */
 function roleItems(data: MilitaryUnits, dskId: number | null) {
   return [
     { value: NO_ROLE, label: 'Keine Rolle', pinned: true },
     ...data.roles
-      .filter((r) => !r.hasRule && (r.dskId === null || r.dskId === dskId))
+      .filter((r) => !r.hasRule && !r.statusRole && (r.dskId === null || r.dskId === dskId))
       .map((r) => ({ value: r.id, label: r.name })),
   ]
 }

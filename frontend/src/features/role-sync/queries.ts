@@ -5,8 +5,10 @@ import {
   getParties,
   getRoleRules,
   getRoles,
+  getStatusRoles,
   previewDeleteRoleRule,
   previewRoleRule,
+  setStatusRoles,
   updateRoleRule,
   type CreateRoleRule,
 } from '@/lib/api'
@@ -31,6 +33,25 @@ export function useParties(countryId: string | null) {
     queryFn: () => getParties(countryId!),
     enabled: countryId !== null,
     staleTime: Infinity,
+  })
+}
+
+export function useStatusRoles() {
+  return useQuery({
+    queryKey: [...ROLE_SYNC, 'status-roles'],
+    queryFn: getStatusRoles,
+  })
+}
+
+export function useSetStatusRoles() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: setStatusRoles,
+    onSuccess: () => {
+      notify.success('Statusrollen gespeichert', 'Discord wird gleich abgeglichen.')
+      return queryClient.invalidateQueries({ queryKey: ROLE_SYNC })
+    },
+    onError: (error) => notify.error(errorMessage(error)),
   })
 }
 

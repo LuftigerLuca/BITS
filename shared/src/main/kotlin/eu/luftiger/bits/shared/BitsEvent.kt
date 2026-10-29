@@ -79,7 +79,26 @@ data class RoleSyncEvent(
      * is still that name; one the member chose stays. Only members who opted in.
      */
     val nicknameResets: Map<String, String> = emptyMap(),
+    /**
+     * The roles for verified and unverified members; `null` if BITS leaves them alone, e.g. because the verification is
+     * switched off.
+     */
+    val statusRoles: StatusRoles? = null,
 ) : BitsEvent
+
+/**
+ * Every member of the sync but bots gets the role of their status and loses the other one. Unlike the managed roles,
+ * they follow the database, not WarEra, so no limit holds them back.
+ */
+@Serializable
+data class StatusRoles(
+    /** `null` if no role is set for verified members. */
+    val verifiedRoleId: String?,
+    /** `null` if no role is set for unverified members. */
+    val unverifiedRoleId: String?,
+    /** The linked members among those of the sync, all of them for a sync of all members; everybody else is unverified. */
+    val verifiedDiscordUserIds: List<String>,
+)
 
 @Serializable
 data class MemberRoles(
