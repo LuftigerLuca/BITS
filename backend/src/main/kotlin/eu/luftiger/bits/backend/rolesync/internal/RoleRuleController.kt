@@ -116,6 +116,8 @@ data class RoleResponse(
     val managed: Boolean,
     /** Name of the DSK the role belongs to, `null` if none; such a role cannot get a rule. */
     val dskName: String?,
+    /** Whether it is the role for verified or unverified members; such a role cannot get a rule. */
+    val statusRole: Boolean,
 )
 
 /** The rule of a role, the only one it has. */

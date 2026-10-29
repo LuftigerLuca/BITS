@@ -13,6 +13,7 @@ import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleSyncEvent
+import eu.luftiger.bits.shared.StatusRoles
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
@@ -40,13 +41,16 @@ import java.util.concurrent.ConcurrentHashMap
  * their link the name to clear again. With opt-ins, a sync runs even without rules.
  *
  * Besides the rules, the DSKs give their roles to the members of their military units; that needs only the users.
+ * The status roles need no WarEra data at all: whoever has a link is verified, see [StatusRoleLookup].
  *
  * A sync leaves out what an admin switched off: without the role sync it has no rules and DSKs, so the bot changes no
- * roles; without nicknames nobody counts as opted in, so the bot sets and clears none.
+ * roles; without nicknames nobody counts as opted in, so the bot sets and clears none; without the verification, it
+ * leaves the status roles alone.
  */
 @Service
 class RoleSyncService(
     private val ruleInputs: RuleInputs,
+    private val statusRoleLookup: StatusRoleLookup,
     private val nicknameOptIns: NicknameOptIns,
     private val features: FeatureToggles,
     private val accountLinks: AccountLinks,
@@ -150,14 +154,16 @@ class RoleSyncService(
         val dsks = if (roleSync) ruleInputs.activeDskRoles() else emptyList()
         val revoked = if (roleSync) revokedRoleIds else emptyList()
         val optedIn = if (features.isEnabled(BitsFeature.NICKNAMES)) nicknameOptIns.discordUserIds() else emptySet()
-        if (rules.isEmpty() && dsks.isEmpty() && revoked.isEmpty() && optedIn.isEmpty()) {
+        val statusRoles = statusRoleLookup.active()
+        if (rules.isEmpty() && dsks.isEmpty() && revoked.isEmpty() && optedIn.isEmpty() && statusRoles == null) {
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
         val withCompanies = needsCompanies(rules)
         val pace = Pace()
+        val needsUsers = rules.isNotEmpty() || dsks.isNotEmpty() || optedIn.isNotEmpty()
         val loadedUsers =
-            links.associateWith { link ->
+            (if (needsUsers) links else emptyList()).associateWith { link ->
                 val cached = users[link.wareraUserId]?.takeUnless { refresh }
                 when {
                     cached == null -> load(link.wareraUserId, withCompanies, pace)
@@ -178,7 +184,7 @@ class RoleSyncService(
             if (user != null && link.discordUserId in optedIn) nicknames[link.discordUserId] = user.username
             evaluator.evaluate(user, loaded.companyCount)?.let { members[link.discordUserId] = it }
         }
-        if (discordUserIds == null) loadedAll = true
+        if (discordUserIds == null && needsUsers) loadedAll = true
         if (unavailable.isNotEmpty()) systemLog.recordProblem(SystemProblem.WareraUsersUnavailable(unavailable))
         val linkedIds = links.mapTo(HashSet()) { it.discordUserId }
         // The nickname was set from the data loaded last, which may be newer than the name at the time of linking.
@@ -200,6 +206,10 @@ class RoleSyncService(
                     syncId = syncId,
                     nicknames = nicknames,
                     nicknameResets = nicknameResets,
+                    statusRoles =
+                        statusRoles?.let {
+                            StatusRoles(it.verifiedRoleId, it.unverifiedRoleId, linkedIds.sorted())
+                        },
                 ),
             )
         }

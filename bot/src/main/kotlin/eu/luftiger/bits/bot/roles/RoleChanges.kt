@@ -60,3 +60,31 @@ fun rolesOverRemovalLimit(
         .eachCount()
         .filter { (roleId, removals) -> removals >= limit.minRemovals && removals > limit.maxShare * (holders[roleId] ?: 0) }
 }
+
+/**
+ * Changes that give a member, who has [currentRoleIds] now, the status role of [RoleSyncEvent.statusRoles] that fits
+ * and take the other one; none if the event leaves the status roles alone.
+ */
+fun statusRoleChanges(
+    discordUserId: String,
+    currentRoleIds: Set<String>,
+    event: RoleSyncEvent,
+): List<RoleChange> {
+    val status = event.statusRoles ?: return emptyList()
+    val verified = discordUserId in status.verifiedDiscordUserIds
+    val reason = if (verified) VERIFIED_REASON else UNVERIFIED_REASON
+    val (granted, taken) =
+        if (verified) {
+            status.verifiedRoleId to status.unverifiedRoleId
+        } else {
+            status.unverifiedRoleId to
+                status.verifiedRoleId
+        }
+    return listOfNotNull(
+        granted?.takeIf { it !in currentRoleIds }?.let { RoleChange(discordUserId, it, add = true, reason = reason) },
+        taken?.takeIf { it in currentRoleIds }?.let { RoleChange(discordUserId, it, add = false, reason = reason) },
+    )
+}
+
+const val VERIFIED_REASON = "BITS: verifiziert"
+const val UNVERIFIED_REASON = "BITS: nicht verifiziert"

@@ -30,6 +30,12 @@ The roles of DSKs need nothing from WarEra but the member: a member who cannot b
 as it is. Assigned military units are not looked up again, so their names in the dashboard and in `/rollen` are those
 from the time they were assigned.
 
+The status roles need nothing from WarEra: whoever has a link is verified, so they work while WarEra is down. A
+member who joins while the backend is down does not get the role for unverified members until the next hourly sync,
+since the bot reports the join only once and the backend starts the sync of the member; the same holds while Postgres
+or Redis is down, or while the bot misses the join. While the bot is down, the sync waits in the stream like any
+other. While the verification is off, BITS leaves the status roles as they are.
+
 The embassy sync follows the role sync. Without WarEra, a thread whose government cannot be loaded loses nobody,
 its members keep the ambassador role, and the system log records it once per sync; members added by hand and the
 members of the host roles are still added. Without the bot, the syncs wait in the stream and the dashboard shows the

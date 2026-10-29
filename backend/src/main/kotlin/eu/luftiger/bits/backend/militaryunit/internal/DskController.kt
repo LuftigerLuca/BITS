@@ -111,13 +111,15 @@ data class MilitaryUnitsResponse(
     val dsks: List<DskResponse>,
 )
 
-/** A role for a DSK; only free if it has no rule and belongs to no other DSK. */
+/** A role for a DSK; only free if it has no rule, is no status role and belongs to no other DSK. */
 @Serializable
 data class DskRoleOption(
     val id: String,
     val name: String,
     val color: Int?,
     val hasRule: Boolean,
+    /** Whether it is the role for verified or unverified members. */
+    val statusRole: Boolean,
     /** The DSK the role belongs to, `null` if none. */
     val dskId: Long?,
 )

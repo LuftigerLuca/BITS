@@ -12,8 +12,8 @@ import { expectToast } from '@/test/toast'
 import { NewRuleCard } from './NewRuleCard'
 import { RoleRulesCard } from './RoleRulesCard'
 
-const veteran: DiscordRole = { id: 'r-veteran', name: 'Veteran', color: null, managed: true, dskName: null }
-const citizen: DiscordRole = { id: 'r-citizen', name: 'Bürger', color: 0xff0000, managed: false, dskName: null }
+const veteran: DiscordRole = { id: 'r-veteran', name: 'Veteran', color: null, managed: true, dskName: null, statusRole: false }
+const citizen: DiscordRole = { id: 'r-citizen', name: 'Bürger', color: 0xff0000, managed: false, dskName: null, statusRole: false }
 
 function rule(role: DiscordRole, label: string, blocks: RoleRule['blocks'] = [{ label, conditions: [] }]): RoleRule {
   return { roleId: role.id, roleName: role.name, roleColor: role.color, label, blocks, status: 'ACTIVE' }
@@ -381,7 +381,7 @@ describe('rule form', () => {
     await userEvent.click(submit())
     await confirm('Regel anlegen')
 
-    await expectToast('error', 'Für diese Rolle gibt es schon eine Regel, oder sie gehört zu einer DSK.')
+    await expectToast('error', 'Für diese Rolle gibt es schon eine Regel, oder sie gehört zu einer DSK oder ist eine Statusrolle.')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 

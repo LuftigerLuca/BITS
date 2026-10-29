@@ -20,7 +20,8 @@ import org.slf4j.LoggerFactory
  * Brings the managed roles of the members to the target state from the backend. A change that fails is logged and
  * skipped instead of failing the event, since the next sync tries again anyway. Members whose roles a newer sync has
  * set already are left alone, and a role that a sync would take from too many of its holders stays, see
- * [RemovalLimit]. If the event carries nicknames, it sets them too, see [nicknameChange]. What it changed, skipped and
+ * [RemovalLimit]. The status roles go to every member but bots and are never held back, see [statusRoleChanges]. If
+ * the event carries nicknames, it sets them too, see [nicknameChange]. What it changed, skipped and
  * failed goes to [onApplied] for the backend's system log, with the names of members and roles as they are now.
  */
 class RoleSyncHandler(
@@ -50,7 +51,15 @@ class RoleSyncHandler(
                 holders[roleId],
             )
         }
-        val changes = proposed.filterNot { !it.add && it.roleId in heldBack }
+        val statusChanges =
+            if (event.statusRoles == null) {
+                emptyList()
+            } else {
+                members
+                    .filterNot { it.user.isBot }
+                    .flatMap { member -> statusRoleChanges(member.id, member.roles.mapTo(HashSet()) { it.id }, event) }
+            }
+        val changes = proposed.filterNot { !it.add && it.roleId in heldBack } + statusChanges
         val outcomes = mutableListOf<Pair<RoleChange, Outcome>>()
         proposed.filter { !it.add && it.roleId in heldBack }.forEach { outcomes += it to Outcome(RoleChangeOutcome.SKIPPED, HELD_BACK) }
         var applied = 0

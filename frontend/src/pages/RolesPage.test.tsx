@@ -15,6 +15,7 @@ describe('roles page', () => {
       'GET /web/admin/role-sync/countries': () => json([]),
       'GET /web/admin/role-sync/roles': () => json([]),
       'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/role-sync/status-roles': () => json({ verified: null, unverified: null }),
     })
     const router = renderApp('/admin')
 

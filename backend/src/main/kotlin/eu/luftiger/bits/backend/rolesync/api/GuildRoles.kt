@@ -17,4 +17,7 @@ interface GuildRoles {
 
     /** IDs of the roles that have a rule, whether it runs or not; such a role cannot belong to a DSK. */
     fun withRuleIds(): Set<String>
+
+    /** IDs of the roles for verified and unverified members, whether they exist or not; such a role cannot belong to a DSK. */
+    fun statusIds(): Set<String>
 }

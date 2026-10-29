@@ -22,6 +22,7 @@ import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.RuleExplanation
+import eu.luftiger.bits.shared.StatusRoles
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraApiException
@@ -105,7 +106,7 @@ class RoleSyncTest {
         awaitBackgroundWork()
         jdbc.execute(
             "TRUNCATE account_link, account_verification, role_rule, role_rule_condition, discord_role, event_publication, " +
-                "nickname_opt_in, feature_setting",
+                "nickname_opt_in, feature_setting, status_role_setting",
         )
         redisTemplate.delete(EventStream.KEY)
         memberService.forget()
@@ -125,7 +126,7 @@ class RoleSyncTest {
     @AfterTest
     fun deleteNicknameOptIns() {
         awaitBackgroundWork()
-        jdbc.execute("TRUNCATE nickname_opt_in, feature_setting")
+        jdbc.execute("TRUNCATE nickname_opt_in, feature_setting, status_role_setting")
     }
 
     @Test
@@ -1107,6 +1108,118 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `status roles go to linked and unlinked members after saving, verifying, unlinking and joining`() {
+        reportStatusRoles()
+        link("1", "w1")
+
+        setStatusRoles("""{"verifiedRoleId":"r-verified","unverifiedRoleId":"r-unverified"}""").andExpect { status { isNoContent() } }
+
+        val all = awaitEvents(1).single() as RoleSyncEvent
+        assertEquals(null, all.discordUserIds)
+        assertEquals(StatusRoles("r-verified", "r-unverified", listOf("1")), all.statusRoles)
+        // Status roles need no WarEra data.
+        assertEquals(emptyList(), warera.lookups)
+        assertEquals(
+            "Verifiziert: @Verified, Unverifiziert: @Unverified (vorher: Verifiziert: keine, Unverifiziert: keine)",
+            jdbc.queryForObject(
+                "SELECT description FROM audit_entry WHERE action = 'STATUS_ROLES_CHANGED' ORDER BY id DESC LIMIT 1",
+                String::class.java,
+            ),
+        )
+        mockMvc
+            .get("/web/admin/role-sync/status-roles") { cookie(admin) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.verified.roleName") { value("Verified") }
+                jsonPath("$.unverified.status") { value("ACTIVE") }
+            }
+
+        verify("2", "Other")
+        assertEquals(StatusRoles("r-verified", "r-unverified", listOf("2")), (awaitEvents(2).last() as RoleSyncEvent).statusRoles)
+
+        unlink("2")
+        assertEquals(StatusRoles("r-verified", "r-unverified", emptyList()), (awaitEvents(3).last() as RoleSyncEvent).statusRoles)
+
+        memberJoined("3")
+        val joined = awaitEvents(4).last() as RoleSyncEvent
+        assertEquals(listOf("3"), joined.discordUserIds)
+        assertEquals(StatusRoles("r-verified", "r-unverified", emptyList()), joined.statusRoles)
+    }
+
+    @Test
+    fun `status roles are left alone while the verification is off`() {
+        reportStatusRoles()
+        setStatusRoles("""{"verifiedRoleId":"r-verified"}""").andExpect { status { isNoContent() } }
+        awaitEvents(1)
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
+        awaitEvents(2)
+
+        setFeature("VERIFICATION", false)
+        memberJoined("3")
+        syncTrigger.hourly()
+
+        // The hourly sync still runs for the rules, but carries no status roles; the join starts no sync.
+        val events = awaitEvents(3)
+        assertEquals(null, (events.last() as RoleSyncEvent).statusRoles)
+    }
+
+    @Test
+    fun `a joining member starts no sync without status roles`() {
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
+        awaitEvents(1)
+
+        memberJoined("3")
+
+        awaitEvents(1)
+    }
+
+    @Test
+    fun `status roles must differ, be assignable and belong to no rule, and no rule may take them`() {
+        reportStatusRoles()
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isCreated() } }
+
+        setStatusRoles("""{"verifiedRoleId":"r-verified","unverifiedRoleId":"r-verified"}""").andExpect { status { isBadRequest() } }
+        setStatusRoles("""{"verifiedRoleId":"r-mod"}""").andExpect { status { isBadRequest() } }
+        setStatusRoles("""{"verifiedRoleId":"r-veteran"}""").andExpect { status { isConflict() } }
+        setStatusRoles("""{"unverifiedRoleId":"r-unverified"}""").andExpect { status { isNoContent() } }
+
+        createRule("""{"roleId":"r-unverified","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isConflict() } }
+        mockMvc
+            .get("/web/admin/role-sync/roles") { cookie(admin) }
+            .andExpect { jsonPath("$[?(@.id == 'r-unverified')].statusRole") { value(true) } }
+
+        // Cleared, the role stays with the members: no sync takes it.
+        setStatusRoles("{}").andExpect { status { isNoContent() } }
+        awaitEvents(2)
+        val user = session(SessionUser.discord("42", "Luca", "https://avatar", Role.USER))
+        setStatusRoles("{}", user).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `role explanation names the status roles of a linked member`() {
+        reportStatusRoles()
+        link("1", "w1")
+        setStatusRoles("""{"verifiedRoleId":"r-verified","unverifiedRoleId":"r-unverified"}""")
+        awaitEvents(1)
+
+        assertEquals(
+            RoleExplanationResponse.Explained(
+                "Luftiger",
+                // Highest first, like the rules.
+                listOf(
+                    ManagedRoleExplanation("r-verified", ManagedRoleOutcome.MET, listOf(RuleExplanation("Verifiziert", true, null))),
+                    ManagedRoleExplanation(
+                        "r-unverified",
+                        ManagedRoleOutcome.NOT_MET,
+                        listOf(RuleExplanation("Nicht verifiziert", false, "du bist verifiziert")),
+                    ),
+                ),
+            ),
+            explain("1"),
+        )
+    }
+
+    @Test
     fun `countries and military units can be picked`() {
         assertEquals(listOf("France", "Germany"), mockMvc.get("/web/admin/role-sync/countries") { cookie(admin) }.read("$[*].name"))
         mockMvc
@@ -1136,6 +1249,35 @@ class RoleSyncTest {
                 content = """{"roles":[${roles.joinToString(",")}]}"""
             }.andExpect { status { isNoContent() } }
     }
+
+    /** The roles of [reset] and two for the status, Unverified below Verified. */
+    private fun reportStatusRoles() =
+        reportRoles(
+            """{"id":"r-citizen","name":"Bürger Deutschland","color":16711680,"position":3,"assignable":true}""",
+            """{"id":"r-minister","name":"Minister","color":null,"position":2,"assignable":true}""",
+            """{"id":"r-veteran","name":"Veteran","color":null,"position":1,"assignable":true}""",
+            """{"id":"r-mod","name":"Moderator","color":null,"position":9,"assignable":false}""",
+            """{"id":"r-verified","name":"Verified","color":null,"position":5,"assignable":true}""",
+            """{"id":"r-unverified","name":"Unverified","color":null,"position":4,"assignable":true}""",
+        )
+
+    private fun setStatusRoles(
+        body: String,
+        session: Cookie = admin,
+    ): ResultActionsDsl =
+        mockMvc.put("/web/admin/role-sync/status-roles") {
+            cookie(session)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }
+
+    private fun memberJoined(discordUserId: String) =
+        mockMvc
+            .post("/api/discord-members/joined") {
+                header("Authorization", "Bearer test-service-token-at-least-32-chars")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"discordUserId":"$discordUserId","memberName":"Member $discordUserId"}"""
+            }.andExpect { status { isNoContent() } }
 
     private fun explain(discordUserId: String): RoleExplanationResponse =
         BitsJson.decodeFromString(

@@ -17,10 +17,13 @@ import org.springframework.stereotype.Service
  * Explains to a member which managed roles they meet and why, for `/rollen`, the roles of DSKs included. It judges with
  * the [RuleEvaluator] of the role sync, but always with a fresh WarEra user and companies (the governments, parties and
  * military units may be cached for a few minutes), and changes nothing: the next sync brings the roles in line.
+ *
+ * The status roles come along as well: a linked member meets the one for verified members and not the other.
  */
 @Service
 class RoleExplanationService(
     private val ruleInputs: RuleInputs,
+    private val statusRoles: StatusRoleLookup,
     private val roleRepository: DiscordRoleRepository,
     private val accountLinks: AccountLinks,
     private val wareraClient: WareraClient,
@@ -32,7 +35,11 @@ class RoleExplanationService(
         val link = accountLinks.findByDiscordUserId(discordUserId) ?: return RoleExplanationResponse.NotLinked
         val rules = ruleInputs.activeRules()
         val dsks = ruleInputs.activeDskRoles()
-        if (rules.isEmpty() && dsks.isEmpty()) return RoleExplanationResponse.Explained(link.wareraUsername, emptyList())
+        val positions = roleRepository.findAll().associate { it.id to it.position }
+        val status = statusExplanations()
+        if (rules.isEmpty() && dsks.isEmpty()) {
+            return RoleExplanationResponse.Explained(link.wareraUsername, status.sortedByDescending { positions[it.roleId] })
+        }
         val user = wareraClient.getUser(link.wareraUserId)
         val companyCount =
             if (rules.any { rule -> rule.conditions.any { it.type == ConditionType.COMPANIES } }) {
@@ -40,7 +47,6 @@ class RoleExplanationService(
             } else {
                 null
             }
-        val positions = roleRepository.findAll().associate { it.id to it.position }
         val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, listOfNotNull(user.mu)), dsks)
         val ruleRoles =
             evaluator.check(user, companyCount).map { role ->
@@ -50,8 +56,25 @@ class RoleExplanationService(
                     rules = role.blocks.map { RuleExplanation(it.block.label, it.met, detail(it, user, companyCount)) },
                 )
             }
-        val roles = (ruleRoles + evaluator.checkDsks(user).map(::dskExplanation)).sortedByDescending { positions[it.roleId] }
+        val roles = (ruleRoles + evaluator.checkDsks(user).map(::dskExplanation) + status).sortedByDescending { positions[it.roleId] }
         return RoleExplanationResponse.Explained(user.username, roles)
+    }
+
+    /** For a linked member, whom only the verification is asked about. */
+    private fun statusExplanations(): List<ManagedRoleExplanation> {
+        val roles = statusRoles.active() ?: return emptyList()
+        return listOfNotNull(
+            roles.verifiedRoleId?.let {
+                ManagedRoleExplanation(it, ManagedRoleOutcome.MET, listOf(RuleExplanation(VERIFIED, met = true, detail = null)))
+            },
+            roles.unverifiedRoleId?.let {
+                ManagedRoleExplanation(
+                    it,
+                    ManagedRoleOutcome.NOT_MET,
+                    listOf(RuleExplanation(UNVERIFIED, met = false, detail = "du bist verifiziert")),
+                )
+            },
+        )
     }
 
     /** A DSK as a single block: the military unit the member is in, or that they are in none of the DSK. */
@@ -138,4 +161,9 @@ class RoleExplanationService(
         }
 
     private fun threshold(condition: RuleCondition) = requireNotNull(condition.threshold)
+
+    private companion object {
+        const val VERIFIED = "Verifiziert"
+        const val UNVERIFIED = "Nicht verifiziert"
+    }
 }
