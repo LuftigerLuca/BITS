@@ -9,6 +9,7 @@ import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.StatusRoles
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.Permission
@@ -52,8 +53,9 @@ class RoleSyncHandlerTest {
         every { guild.getRoleById(any<String>()) } answers { roles[firstArg()] }
         every { guild.getMemberById(any<String>()) } answers { members[firstArg()] }
         every { self.canInteract(any<Role>()) } answers { firstArg<Role>().id != "above-bot" }
-        every { guild.addRoleToMember(any<Member>(), any()) } answers { change("+", firstArg(), secondArg()) }
-        every { guild.removeRoleFromMember(any<Member>(), any()) } answers { change("-", firstArg(), secondArg()) }
+        every { guild.modifyMemberRoles(any<Member>(), any<Collection<Role>>(), any<Collection<Role>>()) } answers {
+            changes(firstArg(), secondArg(), thirdArg())
+        }
         every { self.canInteract(any<Member>()) } answers { firstArg<Member>().id !in aboveBot }
         every { self.hasPermission(Permission.NICKNAME_MANAGE) } answers { mayManageNicknames }
         every { guild.modifyNickname(any(), any()) } answers { rename(firstArg(), secondArg()) }
@@ -68,7 +70,24 @@ class RoleSyncHandlerTest {
             handler().handle(sync(mapOf("1" to grants("citizen"))))
 
             assertEquals(listOf("+citizen@1", "-veteran@1"), applied)
-            assertEquals(listOf("BITS: citizen", REMOVE_REASON), reasons)
+            assertEquals(listOf("BITS: citizen; $REMOVE_REASON"), reasons)
+        }
+
+    @Test
+    fun `changes all roles of a member with one request and fails them together`() =
+        runTest {
+            role("verified")
+            member("1", "veteran")
+            failing += "-veteran@1"
+            val reports = mutableListOf<RoleSyncReport>()
+
+            RoleSyncHandler(jda, "100") { _, report -> reports += report }.handle(
+                sync(mapOf("1" to grants("citizen")), syncId = 1, statusRoles = StatusRoles("verified", null, listOf("1"))),
+            )
+
+            verify(exactly = 1) { guild.modifyMemberRoles(any<Member>(), any<Collection<Role>>(), any<Collection<Role>>()) }
+            assertEquals(emptyList(), applied)
+            assertEquals(List(3) { RoleChangeOutcome.FAILED }, reports.single().changes.map { it.outcome })
         }
 
     @Test
@@ -284,7 +303,7 @@ class RoleSyncHandlerTest {
 
             assertEquals(listOf("+verified@1", "-unverified@1", "+unverified@2", "-verified@2", "+unverified@4"), applied)
             assertEquals(
-                listOf(VERIFIED_REASON, VERIFIED_REASON, UNVERIFIED_REASON, UNVERIFIED_REASON, UNVERIFIED_REASON),
+                listOf(VERIFIED_REASON, UNVERIFIED_REASON, UNVERIFIED_REASON),
                 reasons,
             )
         }
@@ -383,24 +402,25 @@ class RoleSyncHandlerTest {
         nickname: String?,
     ): AuditableRestAction<Void> = action("$nickname@${member.id}")
 
-    private fun change(
-        sign: String,
+    private fun changes(
         member: Member,
-        role: Role,
-    ): AuditableRestAction<Void> = action("$sign${role.id}@${member.id}")
+        adds: Collection<Role>,
+        removes: Collection<Role>,
+    ): AuditableRestAction<Void> =
+        action(*(adds.map { "+${it.id}@${member.id}" } + removes.map { "-${it.id}@${member.id}" }).toTypedArray())
 
-    /** Applies [key] on submit, unless it is [failing]. */
-    private fun action(key: String): AuditableRestAction<Void> {
+    /** Applies all [keys] on submit, or none if one of them is [failing]. */
+    private fun action(vararg keys: String): AuditableRestAction<Void> {
         val action = mockk<AuditableRestAction<Void>>()
         every { action.reason(any()) } answers {
             reasons += firstArg<String>()
             action
         }
         every { action.submit() } answers {
-            if (key in failing) {
+            if (keys.any { it in failing }) {
                 CompletableFuture.failedFuture(IllegalStateException("Missing permissions"))
             } else {
-                applied += key
+                applied += keys
                 CompletableFuture.completedFuture(null)
             }
         }
