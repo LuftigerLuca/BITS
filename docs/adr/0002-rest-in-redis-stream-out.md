@@ -13,7 +13,7 @@ lost when the bot is down or restarts, and an event must not reach the bot for a
 - **Bot → backend:** REST under `/api/**`, authenticated with a service token, reachable only inside the compose
   network.
 - **Backend → bot:** a Redis stream (`bits:events`) that the bot reads with the consumer group `bot` and
-  acknowledges with `XACK`. Events are stored with the transaction that causes them (Spring Modulith's event
+  acknowledges with `XACK`; role syncs have a group of their own (0009). Events are stored with the transaction that causes them (Spring Modulith's event
   publication registry in Postgres) and written to the stream after the commit, again every minute until that
   works. The stream is trimmed to a week. Events the bot cannot handle after a few deliveries move to
   `bits:events:dead`.

@@ -16,6 +16,7 @@ import eu.luftiger.bits.bot.embassies.EmbassyThreadRenamer
 import eu.luftiger.bits.bot.embassies.JdaEmbassyGuild
 import eu.luftiger.bits.bot.embassies.ThreadReporter
 import eu.luftiger.bits.bot.events.EventHandler
+import eu.luftiger.bits.bot.events.EventLane
 import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import eu.luftiger.bits.bot.features.FeatureGate
@@ -162,19 +163,26 @@ fun main() {
                 else -> Unit
             }
         }
-    val consumer = RedisStreamEventConsumer(redis, events, onDeadLetter = systemLog::reportUndeliveredEvent)
-    // The consumer only ends when it is stopped. Anything else would leave a bot that answers commands but never
+    // One consumer per lane, so that a role sync that changes the roles of every member does not hold up the result
+    // of a verification check. Each passes only the events of its lane to the handler.
+    val consumers =
+        EventLane.entries.map { lane ->
+            RedisStreamEventConsumer(redis, events, lane = lane, onDeadLetter = systemLog::reportUndeliveredEvent)
+        }
+    // A consumer only ends when it is stopped. Anything else would leave a bot that answers commands but never
     // handles events again, so the process ends and Docker starts it anew.
-    scope.launch(
-        CoroutineExceptionHandler { _, e ->
-            log.error("Event consumer died, exiting", e)
-            // exitProcess blocks until the shutdown hook is done, which waits for this very coroutine.
-            thread(name = "exit") { exitProcess(1) }
-        },
-    ) { consumer.run() }
+    consumers.forEach { consumer ->
+        scope.launch(
+            CoroutineExceptionHandler { _, e ->
+                log.error("Event consumer died, exiting", e)
+                // exitProcess blocks until the shutdown hook is done, which waits for this very coroutine.
+                thread(name = "exit") { exitProcess(1) }
+            },
+        ) { consumer.run() }
+    }
 
     Runtime.getRuntime().addShutdownHook(
-        Thread { shutdown(jda, consumer, job, backend, redis) },
+        Thread { shutdown(jda, consumers, job, backend, redis) },
     )
 }
 
@@ -184,14 +192,14 @@ fun main() {
  */
 private fun shutdown(
     jda: JDA,
-    consumer: RedisStreamEventConsumer,
+    consumers: List<RedisStreamEventConsumer>,
     job: Job,
     backend: KtorBackendClient,
     redis: RedisClient,
 ) {
     log.info("Shutting down")
     jda.registeredListeners.forEach { jda.removeEventListener(it) }
-    consumer.stop()
+    consumers.forEach { it.stop() }
     runBlocking {
         val done = withTimeoutOrNull(SHUTDOWN_GRACE.toMillis()) { job.children.toList().joinAll() }
         if (done == null) log.warn("Work still running after {}, cancelling it", SHUTDOWN_GRACE)

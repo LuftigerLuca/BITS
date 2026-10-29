@@ -57,6 +57,10 @@ answer after a start everything is on; while the backend is down, the bot keeps 
 at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;
 switching them on again syncs everybody.
 
+A large role sync, e.g. the first one after status roles are set on a large guild, can take a while, since Discord
+throttles role changes. Meanwhile further role syncs wait behind it, but the other events, like the result of a
+verification check, do not (ADR 0009).
+
 The bot's status and activity reach it as an event; while the bot is down, the event waits in the stream, and the bot
 also asks the backend for them on start, with backoff until it answers. Until then it shows as online without activity.
 

@@ -21,7 +21,7 @@ Login ins Dashboard ruft das Backend Discord im Namen des Nutzers auf (OAuth2).
 - **Dashboard → Backend:** `/auth/**` und `/web/**` über denselben Origin (nginx bzw. Vite-Dev-Proxy), mit
   der Sitzung als HttpOnly-Cookie. `/api/**` des Bots ist von außen nicht erreichbar.
 - **Backend → Bot:** Events im Redis Stream `bits:events` (`EventPublisher`). Der Bot liest sie über die
-  Consumer Group `bot` und bestätigt jedes verarbeitete Event mit `XACK`.
+  Consumer Groups `bot` und, für Role-Syncs, `bot-role-sync` und bestätigt jedes verarbeitete Event mit `XACK`.
 
 Der Command `/ping` geht als Smoke-Test einmal durch alle Teile: Der Bot ruft `POST /api/ping` auf, das Backend
 speichert den Ping, fragt die WarEra-API ab und publiziert ein `PingEvent`, das der Bot verarbeitet und bestätigt.

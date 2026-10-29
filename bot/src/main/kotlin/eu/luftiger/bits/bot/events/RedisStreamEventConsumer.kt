@@ -27,8 +27,8 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 
 /**
- * Reads events from the Redis stream [EventStream.KEY] as member of the consumer group [EventStream.BOT_GROUP] and
- * acknowledges each one with `XACK` once [handler] has processed it.
+ * Reads events from the Redis stream [EventStream.KEY] as member of the consumer group of [lane] and acknowledges each
+ * one with `XACK` once [handler] has processed it. Events of the other lanes are acknowledged without handling them.
  *
  * An event that fails stays pending and is tried again once it has been idle for [Settings.retryAfter], also after
  * a restart. After [Settings.maxDeliveries] deliveries it is moved to [EventStream.DEAD_LETTER_KEY] and acknowledged,
@@ -38,11 +38,14 @@ import java.time.Duration
  * Every event given up on goes to [onDeadLetter] as well, for the backend's system log.
  *
  * The consumer survives Redis going away: it reconnects with backoff and creates the group again if it is lost.
+ * It creates the groups of all lanes before it reads, [EventLane.MAIN] first: a lane added by an update starts where
+ * that group is, so it gets the events the bot had not handled yet before the update, see [createGroups].
  */
 class RedisStreamEventConsumer(
     private val redisClient: RedisClient,
     private val handler: EventHandler,
     private val settings: Settings = Settings(),
+    private val lane: EventLane = EventLane.MAIN,
     consumerName: String = "bot",
     private val onDeadLetter: (UndeliveredEventReport) -> Unit = {},
 ) {
@@ -58,7 +61,7 @@ class RedisStreamEventConsumer(
     )
 
     private val log = LoggerFactory.getLogger(javaClass)
-    private val consumer = Consumer.from(EventStream.BOT_GROUP, consumerName)
+    private val consumer = Consumer.from(lane.group, consumerName)
 
     @Volatile
     private var running = true
@@ -78,7 +81,7 @@ class RedisStreamEventConsumer(
                     // Fail fast when Redis goes away, instead of after Lettuce's default of a minute.
                     connection.timeout = settings.blockTimeout + COMMAND_TIMEOUT_MARGIN
                     val commands = connection.sync()
-                    createGroup(commands, groupStart)
+                    createGroups(commands, groupStart)
                     groupStart = "0"
                     reconnectDelay = settings.minReconnectDelay
                     consume(commands)
@@ -88,7 +91,7 @@ class RedisStreamEventConsumer(
             } catch (e: Exception) {
                 if (!running) break
                 if (e.isNoGroup()) {
-                    log.warn("Consumer group {} is gone, creating it again", EventStream.BOT_GROUP)
+                    log.warn("Consumer group {} is gone, creating it again", lane.group)
                 } else {
                     log.error("Reading events failed, reconnecting in {}", reconnectDelay, e)
                     delay(reconnectDelay.toMillis())
@@ -116,7 +119,7 @@ class RedisStreamEventConsumer(
             commands.xpending(
                 EventStream.KEY,
                 XPendingArgs.Builder
-                    .xpending(EventStream.BOT_GROUP, Range.unbounded(), Limit.from(BATCH_SIZE))
+                    .xpending(lane.group, Range.unbounded(), Limit.from(BATCH_SIZE))
                     .idle(settings.retryAfter),
             )
         for (pending in due) {
@@ -135,8 +138,9 @@ class RedisStreamEventConsumer(
         commands: RedisCommands<String, String>,
         message: StreamMessage<String, String>,
     ) {
-        if (process(message.id, message.body[EventStream.PAYLOAD_FIELD])) {
-            commands.xack(EventStream.KEY, EventStream.BOT_GROUP, message.id)
+        val payload = message.body[EventStream.PAYLOAD_FIELD]
+        if (!lane.handles(eventType(payload)) || process(message.id, payload)) {
+            commands.xack(EventStream.KEY, lane.group, message.id)
         }
     }
 
@@ -177,7 +181,7 @@ class RedisStreamEventConsumer(
             XAddArgs.Builder.maxlen(DEAD_LETTER_MAX_LENGTH).approximateTrimming(),
             message.body + mapOf(ORIGINAL_ID_FIELD to message.id),
         )
-        commands.xack(EventStream.KEY, EventStream.BOT_GROUP, message.id)
+        commands.xack(EventStream.KEY, lane.group, message.id)
         log.error("Giving up on event {} after {} deliveries, moved it to {}", message.id, deliveries, EventStream.DEAD_LETTER_KEY)
         onDeadLetter(UndeliveredEventReport(message.id, eventType(message.body[EventStream.PAYLOAD_FIELD]), deliveries))
     }
@@ -196,16 +200,51 @@ class RedisStreamEventConsumer(
             null
         }
 
+    /**
+     * Creates the group of [EventLane.MAIN] at [start] if it is missing, then those of the other lanes where the main
+     * group is: before its oldest pending event, or else after the last one it read. The consumers of all lanes do
+     * this before they read, so the main group cannot move on past a role sync before the role sync lane exists.
+     */
+    private fun createGroups(
+        commands: RedisCommands<String, String>,
+        start: String,
+    ) {
+        createGroup(commands, EventLane.MAIN.group, start)
+        val existing = groups(commands)
+        for (other in EventLane.entries - EventLane.MAIN) {
+            if (other.group !in existing) createGroup(commands, other.group, positionOfMain(commands, existing) ?: start)
+        }
+    }
+
+    /** The groups of the stream, by name, with the ID of the last entry each read. */
+    private fun groups(commands: RedisCommands<String, String>): Map<String, String> =
+        commands.xinfoGroups(EventStream.KEY).associate { group ->
+            val fields = (group as List<*>).chunked(2).associate { (key, value) -> key.toString() to value.toString() }
+            fields.getValue("name") to fields.getValue("last-delivered-id")
+        }
+
+    /** The ID a new group starts after to get what [EventLane.MAIN] has not handled yet; `null` without that group. */
+    private fun positionOfMain(
+        commands: RedisCommands<String, String>,
+        groups: Map<String, String>,
+    ): String? {
+        val lastDelivered = groups[EventLane.MAIN.group] ?: return null
+        val pending = commands.xpending(EventStream.KEY, EventLane.MAIN.group)
+        return if (pending.count > 0) idBefore(pending.messageIds.lower.value) else lastDelivered
+    }
+
     private fun createGroup(
         commands: RedisCommands<String, String>,
+        group: String,
         start: String,
     ) {
         try {
             commands.xgroupCreate(
                 XReadArgs.StreamOffset.from(EventStream.KEY, start),
-                EventStream.BOT_GROUP,
+                group,
                 XGroupCreateArgs.Builder.mkstream(),
             )
+            if (group != EventLane.MAIN.group) log.info("Created consumer group {} after entry {}", group, start)
         } catch (_: RedisBusyException) {
             // The group exists already.
         }
@@ -221,11 +260,17 @@ class RedisStreamEventConsumer(
     private fun preview(payload: String?) =
         if (payload == null) "no payload" else "${payload.length} chars, starting with ${payload.take(PREVIEW_LENGTH)}"
 
-    private companion object {
-        val COMMAND_TIMEOUT_MARGIN: Duration = Duration.ofSeconds(3)
-        const val BATCH_SIZE = 10L
-        const val PREVIEW_LENGTH = 40
-        const val DEAD_LETTER_MAX_LENGTH = 1_000L
-        const val ORIGINAL_ID_FIELD = "originalId"
+    internal companion object {
+        private val COMMAND_TIMEOUT_MARGIN: Duration = Duration.ofSeconds(3)
+        private const val BATCH_SIZE = 10L
+        private const val PREVIEW_LENGTH = 40
+        private const val DEAD_LETTER_MAX_LENGTH = 1_000L
+        private const val ORIGINAL_ID_FIELD = "originalId"
+
+        /** The largest stream ID below [id]; a group created there reads [id] first. */
+        internal fun idBefore(id: String): String {
+            val (millis, sequence) = id.split('-').map { it.toULong() }
+            return if (sequence > 0u) "$millis-${sequence - 1u}" else "${millis - 1u}-${ULong.MAX_VALUE}"
+        }
     }
 }
