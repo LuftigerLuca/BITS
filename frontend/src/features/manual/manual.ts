@@ -320,15 +320,15 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'dsks',
         title: 'DSKs und ihre Military Units',
         intro:
-          'Unter „Militäreinheiten“ fasst du die Military Units des Landes unter „Verwaltung“ zu DSKs zusammen. Wer ' +
-          'verknüpft ist und in einer MU einer DSK ist, bekommt die Rolle der DSK; alle anderen verlieren sie.',
+          'Unter „Militäreinheiten“ fasst du Military Units zu DSKs zusammen, auch solche, die nicht in Deutschland ' +
+          'ansässig sind. Wer verknüpft ist und in einer MU einer DSK ist, bekommt die Rolle der DSK; alle anderen ' +
+          'verlieren sie.',
         steps: [
           'Lege unter „DSK anlegen“ eine DSK mit Namen an, etwa „DSK1“, und wähle ihre Rolle.',
           'Suche bei der DSK eine MU nach ihrem Namen und klicke auf „Hinzufügen“.',
         ],
         points: [
-          'Die Suche zeigt nur MUs des Landes unter „Verwaltung“. Ist dort keins ausgewählt, kannst du keine MU ' +
-            'zuordnen. Das Land wird nur beim Zuordnen geprüft; zieht eine MU später um, bleibt sie in ihrer DSK.',
+          'Die Suche zeigt MUs aller Länder, jeweils mit dem Land, in dem sie ansässig sind.',
           'WarEra liefert nur die besten Treffer. Fehlt eine MU mit sehr allgemeinem Namen, suche genauer.',
           'Eine MU gehört höchstens zu einer DSK.',
           'Eine Rolle gehört entweder zu einer DSK oder hat eine Regel unter „Rollen“, nie beides. Das Dashboard ' +

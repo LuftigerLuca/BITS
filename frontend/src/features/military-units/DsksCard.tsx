@@ -149,7 +149,7 @@ function DskSection({ dsk, data }: { dsk: Dsk; data: MilitaryUnits }) {
             ))}
           </ul>
         )}
-        {data.country !== null && <MilitaryUnitSearch dsk={dsk} countryName={data.country.name} />}
+        <MilitaryUnitSearch dsk={dsk} />
       </div>
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
         <AlertDialogContent>
@@ -246,8 +246,8 @@ function DskFields({
   )
 }
 
-/** Searches the military units of the selected country by name and assigns one to the DSK. */
-function MilitaryUnitSearch({ dsk, countryName }: { dsk: Dsk; countryName: string }) {
+/** Searches the military units of all countries by name and assigns one to the DSK. */
+function MilitaryUnitSearch({ dsk }: { dsk: Dsk }) {
   const [query, setQuery] = useState('')
   const [submitted, setSubmitted] = useState<string | null>(null)
   const search = useMilitaryUnitSearch(submitted)
@@ -265,7 +265,7 @@ function MilitaryUnitSearch({ dsk, countryName }: { dsk: Dsk; countryName: strin
         <Input
           id={inputId}
           value={query}
-          placeholder={`Name einer MU aus ${countryName}`}
+          placeholder="Name einer MU"
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -282,7 +282,7 @@ function MilitaryUnitSearch({ dsk, countryName }: { dsk: Dsk; countryName: strin
       {search.isError && <ErrorState message={errorMessage(search.error)} onRetry={() => search.refetch()} />}
       {search.data && !search.isFetching && search.data.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Keine MU aus {countryName} gefunden. WarEra liefert nur die besten Treffer, versuche einen genaueren Namen.
+          Keine MU gefunden. WarEra liefert nur die besten Treffer, versuche einen genaueren Namen.
         </p>
       )}
       {search.data && !search.isFetching && search.data.length > 0 && (
@@ -291,6 +291,7 @@ function MilitaryUnitSearch({ dsk, countryName }: { dsk: Dsk; countryName: strin
             <li key={mu.id} className="flex items-center gap-2 text-sm">
               <span className="flex-1 truncate">
                 {mu.name}
+                {mu.countryName && <span className="text-muted-foreground"> · {mu.countryName}</span>}
                 {mu.dskName && <span className="text-muted-foreground"> ({mu.dskName})</span>}
               </span>
               <Button

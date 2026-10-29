@@ -5,8 +5,6 @@ import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.militaryunit.domain.Dsk
 import eu.luftiger.bits.backend.militaryunit.domain.DskMilitaryUnit
-import eu.luftiger.bits.backend.overview.api.OverviewCountry
-import eu.luftiger.bits.backend.overview.api.dto.SelectedCountry
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
 import eu.luftiger.bits.backend.rolesync.api.RoleSyncRequests
 import eu.luftiger.bits.warera.WareraBadRequestException
@@ -24,8 +22,8 @@ import java.time.Clock
 /**
  * The page "Militäreinheiten" of the dashboard, admins only: the DSKs, their roles and their military units.
  *
- * A role belongs either to one DSK or to a rule of the role sync, never to both. Military units can only be assigned if
- * they belong to the country under "Verwaltung", which is checked once, when assigning.
+ * A role belongs either to one DSK or to a rule of the role sync, never to both. Military units of any country can be
+ * assigned, as DSKs also take in units based abroad.
  *
  * Every change is recorded in the audit log in its transaction. A change that affects who gets a role syncs all members
  * once committed, and confirms the role like a rule change, so the bot takes it from as many members as it takes. A role
@@ -37,7 +35,6 @@ class DskService(
     private val dskRepository: DskRepository,
     private val militaryUnitRepository: DskMilitaryUnitRepository,
     private val guildRoles: GuildRoles,
-    private val overviewCountry: OverviewCountry,
     private val wareraClient: WareraClient,
     private val auditLog: AuditLog,
     private val syncRequests: RoleSyncRequests,
@@ -53,7 +50,6 @@ class DskService(
         val withRule = guildRoles.withRuleIds()
         val dskByRole = dsks.filter { it.roleId != null }.associateBy { requireNotNull(it.roleId) }
         return MilitaryUnitsResponse(
-            country = overviewCountry.selected()?.let { CountryOption(it.id, it.name) },
             roles =
                 assignable.map {
                     DskRoleOption(it.id, it.name, it.color, hasRule = it.id in withRule, dskId = dskByRole[it.id]?.id)
@@ -158,37 +154,36 @@ class DskService(
     }
 
     /**
-     * Military units of the country under "Verwaltung" whose name matches [query]. WarEra's search returns the best few
-     * matches of all countries, each of which needs a call of its own; those of other countries are left out.
-     *
-     * @throws ResponseStatusException 400 if no country is set
+     * Military units of all countries whose name matches [query]. WarEra's search returns the best few matches, each of
+     * which needs a call of its own.
      */
     fun searchMilitaryUnits(query: String): List<MilitaryUnitOption> {
-        val country = selectedCountry()
         val text = query.trim()
         if (text.isEmpty()) return emptyList()
         val assigned = militaryUnitRepository.findAll().associate { it.muId to it.dskId }
         val names = dskRepository.findAll().associate { it.id to it.name }
-        return wareraClient
-            .searchMilitaryUnitIds(text)
-            .take(MAX_SEARCH_RESULTS)
-            .map(wareraClient::getMilitaryUnit)
-            .filter { it.country == country.id }
-            .map { MilitaryUnitOption(it.id, it.name, dskName = assigned[it.id]?.let(names::get)) }
+        val units = wareraClient.searchMilitaryUnitIds(text).take(MAX_SEARCH_RESULTS).map(wareraClient::getMilitaryUnit)
+        val countries = if (units.isEmpty()) emptyMap() else wareraClient.getAllCountries().associate { it.id to it.name }
+        return units.map {
+            MilitaryUnitOption(
+                it.id,
+                it.name,
+                countryName = it.country?.let { id -> countries[id] ?: id },
+                dskName = assigned[it.id]?.let(names::get),
+            )
+        }
     }
 
     /**
-     * @throws ResponseStatusException 400 if no country is set, or WarEra does not know the unit or it belongs to another
-     * country; 404 if the DSK does not exist; 409 if the unit belongs to a DSK already
+     * @throws ResponseStatusException 400 if WarEra does not know the unit; 404 if the DSK does not exist; 409 if the unit
+     * belongs to a DSK already
      */
     fun addMilitaryUnit(
         dskId: Long,
         muId: String,
         actor: AuditActor,
     ) {
-        val country = selectedCountry()
         val mu = knownMilitaryUnit(muId)
-        if (mu.country != country.id) throw badRequest("Military unit $muId does not belong to ${country.name}")
         val roleId =
             transactionTemplate.execute {
                 val dsk = dskRepository.findByIdOrNull(dskId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
@@ -248,8 +243,6 @@ class DskService(
         if (roleId in guildRoles.withRuleIds()) throw conflict("Role $roleId has a rule")
         return roleId
     }
-
-    private fun selectedCountry(): SelectedCountry = overviewCountry.selected() ?: throw badRequest("No country selected")
 
     private fun knownMilitaryUnit(muId: String): WareraMilitaryUnit =
         try {

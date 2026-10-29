@@ -266,8 +266,6 @@ export interface Dsk {
 }
 
 export interface MilitaryUnits {
-  /** The country under „Verwaltung“, whose military units can be assigned; `null` while none is set. */
-  country: Option | null
   /** The roles the bot can give, highest first. */
   roles: DskRoleOption[]
   dsks: Dsk[]
@@ -276,6 +274,8 @@ export interface MilitaryUnits {
 export interface MilitaryUnitOption {
   id: string
   name: string
+  /** The country the unit is based in, `null` if WarEra names none. */
+  countryName: string | null
   /** The DSK the unit belongs to already, `null` if none. */
   dskName: string | null
 }
@@ -312,7 +312,7 @@ export async function deleteDsk(id: number): Promise<void> {
   await request(`${MILITARY_UNITS}/dsks/${id}`, { method: 'DELETE' })
 }
 
-/** Military units of the selected country whose name matches [query]. */
+/** Military units of all countries whose name matches [query]. */
 export async function searchDskMilitaryUnits(query: string): Promise<MilitaryUnitOption[]> {
   return (await request(`${MILITARY_UNITS}/search?${new URLSearchParams({ query })}`)).json()
 }
