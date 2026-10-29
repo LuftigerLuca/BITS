@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
+import eu.luftiger.bits.backend.rolesync.api.dto.DskRole
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleBlock
@@ -13,11 +14,15 @@ import eu.luftiger.bits.warera.WareraUser
  * rule is. A condition whose WarEra data is missing is neither met nor failed, and so is a block that no other condition
  * fails: unless another block is met, the member keeps the role as it is, so an unreachable WarEra API never takes roles
  * away.
+ *
+ * The role of a DSK goes to the members of its military units; a member who could not be loaded keeps it as it is.
  */
 class RuleEvaluator(
     /** Rules of the roles BITS manages, i.e. only those whose role exists and is assignable; one per role. */
     private val rules: List<RoleRule>,
     private val data: RuleData,
+    /** Like [rules], the DSKs whose role BITS manages; a role has either a rule or a DSK. */
+    private val dsks: List<DskRole> = emptyList(),
 ) {
     /**
      * Target roles of a linked member, or `null` if the member gets and keeps nothing. [user] is `null` if it could not be
@@ -33,6 +38,13 @@ class RuleEvaluator(
             when (role.outcome) {
                 RoleOutcome.MET -> grants += RoleGrant(role.roleId, "BITS: ${requireNotNull(role.metBy).label}")
                 RoleOutcome.UNDECIDED -> keep += role.roleId
+                RoleOutcome.NOT_MET -> Unit
+            }
+        }
+        checkDsks(user).forEach { dsk ->
+            when (dsk.outcome) {
+                RoleOutcome.MET -> grants += RoleGrant(dsk.dsk.roleId, "BITS: ${requireNotNull(dsk.label)}")
+                RoleOutcome.UNDECIDED -> keep += dsk.dsk.roleId
                 RoleOutcome.NOT_MET -> Unit
             }
         }
@@ -52,6 +64,9 @@ class RuleEvaluator(
                 },
             )
         }
+
+    /** Whether [user] is in a military unit of each DSK, in their order. */
+    fun checkDsks(user: WareraUser?): List<DskCheck> = dsks.map { DskCheck(it, user) }
 
     /** `null` if the data to decide is missing. */
     private fun matches(
@@ -115,6 +130,25 @@ class RoleCheck(
             blocks.any { it.met == null } -> RoleOutcome.UNDECIDED
             else -> RoleOutcome.NOT_MET
         }
+}
+
+/** [user] is `null` if the member could not be loaded. */
+class DskCheck(
+    val dsk: DskRole,
+    user: WareraUser?,
+) {
+    /** Name of the military unit of the DSK the member is in, `null` if none. */
+    private val muName: String? = user?.mu?.let { dsk.militaryUnits[it] }
+
+    val outcome: RoleOutcome =
+        when {
+            user == null -> RoleOutcome.UNDECIDED
+            muName != null -> RoleOutcome.MET
+            else -> RoleOutcome.NOT_MET
+        }
+
+    /** German reason, e.g. "Mitglied der MU Deutsche Marine (DSK1)"; `null` unless [outcome] is [RoleOutcome.MET]. */
+    val label: String? = muName?.let { "Mitglied der MU $it (${dsk.name})" }
 }
 
 enum class RoleOutcome {

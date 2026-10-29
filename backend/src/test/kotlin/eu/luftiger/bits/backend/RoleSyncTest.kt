@@ -1351,7 +1351,7 @@ class RoleSyncTest {
         /** Parties by country ID. */
         val parties = mutableMapOf<String, List<WareraParty>>()
 
-        /** Military units by ID; without changes, only the Marine (m1), led by nobody. */
+        /** Military units by ID; without changes, only the Marine (m1) of Germany, led by nobody. */
         val militaryUnits = mutableMapOf<String, WareraMilitaryUnit>()
         val militaryUnitLookups = CopyOnWriteArrayList<String>()
         var militaryUnitsDown = false
@@ -1390,7 +1390,7 @@ class RoleSyncTest {
             failingUsers.clear()
             parties.clear()
             militaryUnits.clear()
-            militaryUnits["m1"] = WareraMilitaryUnit("m1", "Deutsche Marine")
+            militaryUnits["m1"] = WareraMilitaryUnit("m1", "Deutsche Marine", country = "de")
             militaryUnitLookups.clear()
             militaryUnitsDown = false
             governments.clear()
@@ -1447,7 +1447,8 @@ class RoleSyncTest {
                 governments[countryId] ?: WareraGovernment(country = countryId, president = "w2".takeIf { countryId == "de" })
             }
 
-        override fun searchMilitaryUnitIds(text: String) = available { listOf("m1") }
+        override fun searchMilitaryUnitIds(text: String) =
+            available { militaryUnits.values.filter { it.name.contains(text, ignoreCase = true) }.map { it.id } }
 
         override fun getMilitaryUnit(muId: String) =
             available {

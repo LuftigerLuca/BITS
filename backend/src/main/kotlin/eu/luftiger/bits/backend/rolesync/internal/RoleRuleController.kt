@@ -114,6 +114,8 @@ data class RoleResponse(
     val color: Int?,
     /** Whether a rule exists for the role already, i.e. BITS manages it. */
     val managed: Boolean,
+    /** Name of the DSK the role belongs to, `null` if none; such a role cannot get a rule. */
+    val dskName: String?,
 )
 
 /** The rule of a role, the only one it has. */

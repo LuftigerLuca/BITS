@@ -39,8 +39,10 @@ import java.util.concurrent.ConcurrentHashMap
  * The event also carries the WarEra names the bot sets as nicknames of members who opted in, and for those who lost
  * their link the name to clear again. With opt-ins, a sync runs even without rules.
  *
- * A sync leaves out what an admin switched off: without the role sync it has no rules, so the bot changes no roles;
- * without nicknames nobody counts as opted in, so the bot sets and clears none.
+ * Besides the rules, the DSKs give their roles to the members of their military units; that needs only the users.
+ *
+ * A sync leaves out what an admin switched off: without the role sync it has no rules and DSKs, so the bot changes no
+ * roles; without nicknames nobody counts as opted in, so the bot sets and clears none.
  */
 @Service
 class RoleSyncService(
@@ -97,13 +99,23 @@ class RoleSyncService(
 
     /**
      * Syncs all members of the guild with the WarEra data loaded last; users not loaded yet are loaded now.
-     * [confirmedRoleIds] are roles whose rules an admin changed, see [RoleSyncEvent.confirmedRoleIds].
+     * [confirmedRoleIds] are roles whose rules an admin changed, see [RoleSyncEvent.confirmedRoleIds]. [revokedRoleIds]
+     * are roles BITS no longer manages after such a change, e.g. of a deleted DSK: this sync still counts them as managed
+     * and gives them to nobody, so the bot takes them from everybody, unless a rule or DSK gives them meanwhile.
      */
     @Synchronized
     fun syncAll(
         confirmedRoleIds: List<String> = emptyList(),
         trigger: SyncTrigger = SyncTrigger.HOURLY,
-    ) = sync(accountLinks.findAll(), discordUserIds = null, refresh = false, trigger = trigger, confirmedRoleIds = confirmedRoleIds)
+        revokedRoleIds: List<String> = emptyList(),
+    ) = sync(
+        accountLinks.findAll(),
+        discordUserIds = null,
+        refresh = false,
+        trigger = trigger,
+        confirmedRoleIds = confirmedRoleIds,
+        revokedRoleIds = revokedRoleIds,
+    )
 
     /**
      * Syncs the given members only, with fresh WarEra data; members without a link lose all managed roles, and the
@@ -131,10 +143,14 @@ class RoleSyncService(
         trigger: SyncTrigger,
         confirmedRoleIds: List<String> = emptyList(),
         formerAccounts: Map<String, FormerAccount> = emptyMap(),
+        revokedRoleIds: List<String> = emptyList(),
     ) {
-        val rules = if (features.isEnabled(BitsFeature.ROLE_SYNC)) ruleInputs.activeRules() else emptyList()
+        val roleSync = features.isEnabled(BitsFeature.ROLE_SYNC)
+        val rules = if (roleSync) ruleInputs.activeRules() else emptyList()
+        val dsks = if (roleSync) ruleInputs.activeDskRoles() else emptyList()
+        val revoked = if (roleSync) revokedRoleIds else emptyList()
         val optedIn = if (features.isEnabled(BitsFeature.NICKNAMES)) nicknameOptIns.discordUserIds() else emptySet()
-        if (rules.isEmpty() && optedIn.isEmpty()) {
+        if (rules.isEmpty() && dsks.isEmpty() && revoked.isEmpty() && optedIn.isEmpty()) {
             systemLog.recordSyncWithoutRules(trigger)
             return
         }
@@ -152,7 +168,7 @@ class RoleSyncService(
             }
         // The users first, since a leadership rule for any military unit needs the units of the members.
         val memberMuIds = if (ruleInputs.needsMemberMilitaryUnits(rules)) loadedUsers.values.mapNotNull { it.user?.mu } else emptyList()
-        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, memberMuIds, systemLog::recordProblem))
+        val evaluator = RuleEvaluator(rules, ruleInputs.ruleData(rules, memberMuIds, systemLog::recordProblem), dsks)
         val unavailable = mutableListOf<String>()
         val members = HashMap<String, MemberRoles>()
         val nicknames = HashMap<String, String>()
@@ -176,7 +192,7 @@ class RoleSyncService(
             val syncId = systemLog.recordSyncRun(trigger, links.size)
             eventPublisher.publish(
                 RoleSyncEvent(
-                    managedRoleIds = rules.map { it.roleId }.distinct(),
+                    managedRoleIds = (rules.map { it.roleId } + dsks.map { it.roleId } + revoked).distinct(),
                     discordUserIds = discordUserIds,
                     members = members,
                     occurredAt = clock.millis(),

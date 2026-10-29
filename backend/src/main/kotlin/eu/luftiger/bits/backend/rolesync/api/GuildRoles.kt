@@ -9,6 +9,12 @@ interface GuildRoles {
     /** Highest first, without `@everyone`. */
     fun all(): List<GuildRole>
 
-    /** IDs of the roles BITS manages, i.e. those with an active rule, highest first. */
+    /** The roles the bot can give, highest first. */
+    fun assignable(): List<GuildRole>
+
+    /** IDs of the roles BITS manages, i.e. those with an active rule or of a DSK, highest first. */
     fun managedIds(): List<String>
+
+    /** IDs of the roles that have a rule, whether it runs or not; such a role cannot belong to a DSK. */
+    fun withRuleIds(): Set<String>
 }

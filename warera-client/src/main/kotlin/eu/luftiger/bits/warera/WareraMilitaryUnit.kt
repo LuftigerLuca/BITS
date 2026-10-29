@@ -11,6 +11,8 @@ data class WareraMilitaryUnit(
     /** User ID of the owner, `null` if WarEra names none. */
     @SerialName("user") val owner: String? = null,
     val roles: WareraMilitaryUnitRoles = WareraMilitaryUnitRoles(),
+    /** ID of the country the unit belongs to, `null` if WarEra names none. */
+    val country: String? = null,
 )
 
 /** Who leads a [WareraMilitaryUnit] besides its owner, as user IDs. The owner may be listed as a manager, too. */
