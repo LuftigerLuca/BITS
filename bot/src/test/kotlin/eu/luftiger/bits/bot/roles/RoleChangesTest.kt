@@ -71,4 +71,12 @@ class RoleChangesTest {
         assertEquals(emptyMap(), rolesOverRemovalLimit(changes, holders, event.copy(discordUserIds = listOf("1")), limit))
         assertEquals(emptyMap(), rolesOverRemovalLimit(changes, holders, event.copy(confirmedRoleIds = listOf("citizen")), limit))
     }
+
+    @Test
+    fun `nothing is limited while an admin switched the limit off`() {
+        val changes = removals("citizen", 30)
+        val holders = mapOf("citizen" to 30)
+
+        assertEquals(emptyMap(), rolesOverRemovalLimit(changes, holders, event.copy(removalLimit = false), limit))
+    }
 }

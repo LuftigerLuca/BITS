@@ -106,7 +106,7 @@ class RoleSyncTest {
         awaitBackgroundWork()
         jdbc.execute(
             "TRUNCATE account_link, account_verification, role_rule, role_rule_condition, discord_role, event_publication, " +
-                "nickname_opt_in, feature_setting, status_role_setting",
+                "nickname_opt_in, feature_setting, status_role_setting, role_sync_setting",
         )
         redisTemplate.delete(EventStream.KEY)
         memberService.forget()
@@ -126,7 +126,7 @@ class RoleSyncTest {
     @AfterTest
     fun deleteNicknameOptIns() {
         awaitBackgroundWork()
-        jdbc.execute("TRUNCATE nickname_opt_in, feature_setting, status_role_setting")
+        jdbc.execute("TRUNCATE nickname_opt_in, feature_setting, status_role_setting, role_sync_setting")
     }
 
     @Test
@@ -1164,6 +1164,46 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `switching the removal limit off syncs all members without it, switching it on syncs nothing`() {
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
+        assertEquals(true, (awaitEvents(1).single() as RoleSyncEvent).removalLimit)
+        mockMvc.get("/web/admin/role-sync/removal-limit") { cookie(admin) }.andExpect { jsonPath("$.enabled") { value(true) } }
+
+        setRemovalLimit(false).andExpect { status { isNoContent() } }
+
+        val off = awaitEvents(2).last() as RoleSyncEvent
+        assertEquals(null, off.discordUserIds)
+        assertEquals(false, off.removalLimit)
+        mockMvc.get("/web/admin/role-sync/removal-limit") { cookie(admin) }.andExpect { jsonPath("$.enabled") { value(false) } }
+        assertEquals(
+            "Schutz vor Massenentzug ausgeschaltet",
+            jdbc.queryForObject(
+                "SELECT description FROM audit_entry WHERE action = 'REMOVAL_LIMIT_TOGGLED' ORDER BY id DESC LIMIT 1",
+                String::class.java,
+            ),
+        )
+
+        // The same state again records nothing.
+        setRemovalLimit(false).andExpect { status { isNoContent() } }
+        setRemovalLimit(true).andExpect { status { isNoContent() } }
+        awaitEvents(2)
+        assertEquals(
+            2,
+            jdbc.queryForObject("SELECT COUNT(*) FROM audit_entry WHERE action = 'REMOVAL_LIMIT_TOGGLED'", Int::class.java),
+        )
+        syncTrigger.hourly()
+        assertEquals(true, (awaitEvents(3).last() as RoleSyncEvent).removalLimit)
+    }
+
+    @Test
+    fun `only admins switch the removal limit`() {
+        val user = session(SessionUser.discord("42", "Luca", "https://avatar", Role.USER))
+
+        mockMvc.get("/web/admin/role-sync/removal-limit") { cookie(user) }.andExpect { status { isForbidden() } }
+        setRemovalLimit(false, user).andExpect { status { isForbidden() } }
+    }
+
+    @Test
     fun `a joining member starts no sync without status roles`() {
         createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         awaitEvents(1)
@@ -1260,6 +1300,16 @@ class RoleSyncTest {
             """{"id":"r-verified","name":"Verified","color":null,"position":5,"assignable":true}""",
             """{"id":"r-unverified","name":"Unverified","color":null,"position":4,"assignable":true}""",
         )
+
+    private fun setRemovalLimit(
+        enabled: Boolean,
+        session: Cookie = admin,
+    ): ResultActionsDsl =
+        mockMvc.put("/web/admin/role-sync/removal-limit") {
+            cookie(session)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"enabled":$enabled}"""
+        }
 
     private fun setStatusRoles(
         body: String,

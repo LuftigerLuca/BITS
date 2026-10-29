@@ -220,6 +220,20 @@ export async function setStatusRoles(roles: {
   })
 }
 
+/** Whether the bot holds back a role that a sync of all members would take from many of its holders at once. */
+export async function getRemovalLimit(): Promise<{ enabled: boolean }> {
+  return (await request(`${ROLE_SYNC}/removal-limit`)).json()
+}
+
+/** Switching it off syncs all members right away, without the limit. */
+export async function setRemovalLimit(enabled: boolean): Promise<void> {
+  await request(`${ROLE_SYNC}/removal-limit`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
+}
+
 export async function getRoleRules(): Promise<RoleRule[]> {
   return (await request(`${ROLE_SYNC}/rules`)).json()
 }
@@ -391,6 +405,7 @@ export type AuditAction =
   | 'DSK_MILITARY_UNIT_REMOVED'
   | 'STATUS_ROLES_CHANGED'
   | 'EMBASSY_THREADS_RENAME_REQUESTED'
+  | 'REMOVAL_LIMIT_TOGGLED'
   | 'BOT_PRESENCE_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */

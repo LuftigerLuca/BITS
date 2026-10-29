@@ -29,5 +29,7 @@ changes can get lost.
   in a cycle.
 - A failed change costs at most an hour, so the bot can log and skip it instead of retrying.
 - Missing WarEra data must not look like change: members whose data cannot be loaded keep their roles, and a full
-  sync that would take a role from many of its holders at once is held back (`RemovalLimit`).
+  sync that would take a role from many of its holders at once is held back (`RemovalLimit`). Admins can switch that
+  limit off for a real change that takes a role from many members (`RoleSyncEvent.removalLimit`); while it is off, a
+  WarEra outage that drops fields can take roles from everybody.
 - Nicknames or other Discord state are not managed; adding them would follow the same pattern.

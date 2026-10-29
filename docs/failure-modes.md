@@ -26,6 +26,11 @@ down, it ends only with the next report or at its end date. If the
 vote's channel was deleted, the result is only in the dashboard. Without WarEra, admins cannot list the parties to pick their
 colours; result images are still drawn with the colours saved, and the preview uses invented parties.
 
+A field WarEra stops sending or renames looks like a real change, not like an outage. A sync of all members that would
+take a role from at least 10 members and more than a quarter of its holders is held back by the bot, unless an admin
+just changed the role's rule or switched the limit off under "Rollen". While it is off, such a change takes the role
+from everybody.
+
 The roles of DSKs need nothing from WarEra but the member: a member who cannot be loaded keeps the role of their DSK
 as it is. Assigned military units are not looked up again, so their names in the dashboard and in `/rollen` are those
 from the time they were assigned.

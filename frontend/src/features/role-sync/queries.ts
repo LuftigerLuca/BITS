@@ -5,9 +5,11 @@ import {
   getParties,
   getRoleRules,
   getRoles,
+  getRemovalLimit,
   getStatusRoles,
   previewDeleteRoleRule,
   previewRoleRule,
+  setRemovalLimit,
   setStatusRoles,
   updateRoleRule,
   type CreateRoleRule,
@@ -49,6 +51,28 @@ export function useSetStatusRoles() {
     mutationFn: setStatusRoles,
     onSuccess: () => {
       notify.success('Statusrollen gespeichert', 'Discord wird gleich abgeglichen.')
+      return queryClient.invalidateQueries({ queryKey: ROLE_SYNC })
+    },
+    onError: (error) => notify.error(errorMessage(error)),
+  })
+}
+
+export function useRemovalLimit() {
+  return useQuery({
+    queryKey: [...ROLE_SYNC, 'removal-limit'],
+    queryFn: getRemovalLimit,
+  })
+}
+
+export function useSetRemovalLimit() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: setRemovalLimit,
+    onSuccess: (_, enabled) => {
+      notify.success(
+        enabled ? 'Schutz vor Massenentzug eingeschaltet' : 'Schutz vor Massenentzug ausgeschaltet',
+        enabled ? undefined : 'Discord wird gleich abgeglichen.',
+      )
       return queryClient.invalidateQueries({ queryKey: ROLE_SYNC })
     },
     onError: (error) => notify.error(errorMessage(error)),

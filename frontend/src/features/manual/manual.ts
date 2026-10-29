@@ -462,6 +462,13 @@ export const MANUAL_PAGES: ManualPage[] = [
         points: [
           'Würde eine Liste mehr als die Hälfte und mindestens 10 Verknüpfungen auf einmal löschen, verwirft BITS sie ' +
             'und vermerkt das im System-Log.',
+          'Würde der stündliche Abgleich einer Rolle mindestens 10 Mitgliedern und mehr als einem Viertel ihrer ' +
+            'Inhaber auf einmal entziehen, hält BITS das zurück, denn meist fehlen dann WarEra-Daten. Das System-Log ' +
+            'zeigt diese Änderungen als „Zurückgehalten“. Für eine Rolle, deren Regel du gerade geändert hast, gilt ' +
+            'die Grenze nicht.',
+          'Ist so ein Entzug echt, schalte unter „Rollen“ in der Karte „Schutz vor Massenentzug“ den Schutz aus. BITS ' +
+            'gleicht dann sofort alle Mitglieder ohne Grenze ab. Schalte ihn danach wieder ein, sonst kann ein ' +
+            'Ausfall bei WarEra vielen Mitgliedern auf einmal Rollen nehmen.',
           'Rollen über der höchsten Rolle des Bots kann BITS nicht vergeben. Den Server-Besitzer und Mitglieder über ' +
             'der Rolle des Bots kann es nicht umbenennen; das steht im System-Log.',
         ],
