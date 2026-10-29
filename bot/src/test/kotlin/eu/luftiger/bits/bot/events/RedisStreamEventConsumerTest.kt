@@ -4,10 +4,14 @@ import com.github.dockerjava.api.model.PortBinding
 import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.PingEvent
+import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.encode
+import io.lettuce.core.Consumer
 import io.lettuce.core.Range
 import io.lettuce.core.RedisClient
+import io.lettuce.core.XGroupCreateArgs
+import io.lettuce.core.XReadArgs
 import io.lettuce.core.api.sync.RedisCommands
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -190,6 +194,71 @@ class RedisStreamEventConsumerTest {
         }
 
     @Test
+    fun `each lane handles only its own events and acknowledges the others`() =
+        runBlocking {
+            val roleSyncs: MutableList<BitsEvent> = Collections.synchronizedList(mutableListOf())
+            start()
+            start(consumer(lane = EventLane.ROLE_SYNC, handler = { roleSyncs += it }))
+
+            publish(roleSync("1"))
+            publish(ping("2"))
+            redis.xadd(EventStream.KEY, mapOf(EventStream.PAYLOAD_FIELD to "not json"))
+
+            awaitHandled(ping("2"))
+            eventually { assertEquals(listOf<BitsEvent>(roleSync("1")), roleSyncs.toList()) }
+            // Only the main lane gives up on what nobody can read, so it is reported once.
+            eventually { assertEquals(1, redis.xlen(EventStream.DEAD_LETTER_KEY)) }
+            awaitNoPending()
+            awaitNoPending(EventStream.BOT_ROLE_SYNC_GROUP)
+        }
+
+    @Test
+    fun `a long role sync does not hold up the other events`() =
+        runBlocking {
+            val release = CompletableDeferred<Unit>()
+            start()
+            start(consumer(lane = EventLane.ROLE_SYNC, handler = { release.await() }))
+
+            publish(roleSync("1"))
+            publish(ping("2"))
+
+            awaitHandled(ping("2"))
+            assertTrue(redis.xpending(EventStream.KEY, EventStream.BOT_ROLE_SYNC_GROUP).count > 0)
+            release.complete(Unit)
+            awaitNoPending(EventStream.BOT_ROLE_SYNC_GROUP)
+        }
+
+    @Test
+    fun `role sync lane added by an update starts where the main group is`() =
+        runBlocking {
+            // The bot before the update: it handled the first sync, is in the middle of the second and has not read the third.
+            redis.xgroupCreate(
+                XReadArgs.StreamOffset.from(EventStream.KEY, "$"),
+                EventStream.BOT_GROUP,
+                XGroupCreateArgs.Builder.mkstream(),
+            )
+            val oldBot = Consumer.from(EventStream.BOT_GROUP, "bot")
+            publish(roleSync("handled"))
+            val handledId = readAsOldBot(oldBot).single().id
+            redis.xack(EventStream.KEY, EventStream.BOT_GROUP, handledId)
+            publish(roleSync("pending"))
+            readAsOldBot(oldBot)
+            publish(roleSync("unread"))
+
+            val roleSyncs: MutableList<BitsEvent> = Collections.synchronizedList(mutableListOf())
+            start(consumer(lane = EventLane.ROLE_SYNC, handler = { roleSyncs += it }))
+
+            eventually { assertEquals(listOf<BitsEvent>(roleSync("pending"), roleSync("unread")), roleSyncs.toList()) }
+            awaitNoPending(EventStream.BOT_ROLE_SYNC_GROUP)
+        }
+
+    @Test
+    fun `id before another is the largest one below it`() {
+        assertEquals("5-2", RedisStreamEventConsumer.idBefore("5-3"))
+        assertEquals("4-18446744073709551615", RedisStreamEventConsumer.idBefore("5-0"))
+    }
+
+    @Test
     fun `unreadable entries are not handled`() =
         runTest {
             assertFalse(consumer().process("1-0", """{"type":"unknown"}"""))
@@ -201,7 +270,8 @@ class RedisStreamEventConsumerTest {
     private fun consumer(
         client: RedisClient = client(REDIS_URL),
         handler: EventHandler = EventHandler { handled += it },
-    ) = RedisStreamEventConsumer(client, handler, settings, onDeadLetter = { undelivered += it })
+        lane: EventLane = EventLane.MAIN,
+    ) = RedisStreamEventConsumer(client, handler, settings, lane, onDeadLetter = { undelivered += it })
 
     private fun consumer(handler: EventHandler) = consumer(client(REDIS_URL), handler)
 
@@ -220,9 +290,15 @@ class RedisStreamEventConsumerTest {
 
     private fun ping(discordUserId: String) = PingEvent(discordUserId, occurredAt = 0)
 
+    private fun roleSync(discordUserId: String) = RoleSyncEvent(emptyList(), listOf(discordUserId), emptyMap(), occurredAt = 0)
+
+    private fun readAsOldBot(consumer: Consumer<String>) =
+        redis.xreadgroup(consumer, XReadArgs.Builder.count(1), XReadArgs.StreamOffset.lastConsumed(EventStream.KEY))
+
     private suspend fun awaitHandled(vararg events: BitsEvent) = eventually { assertEquals(events.toSet(), handled.toSet()) }
 
-    private suspend fun awaitNoPending() = eventually { assertEquals(0, redis.xpending(EventStream.KEY, EventStream.BOT_GROUP).count) }
+    private suspend fun awaitNoPending(group: String = EventStream.BOT_GROUP) =
+        eventually { assertEquals(0, redis.xpending(EventStream.KEY, group).count) }
 
     /** Retries [assertion] for up to five seconds and fails with its last error. */
     private suspend fun eventually(assertion: () -> Unit) {

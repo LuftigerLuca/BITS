@@ -15,8 +15,11 @@ object EventStream {
      */
     val RETENTION: Duration = Duration.ofDays(7)
 
-    /** Consumer group of the bot. */
+    /** Consumer group of the bot for every event but role syncs. */
     const val BOT_GROUP = "bot"
+
+    /** Consumer group of the bot for role syncs, so that a long one does not hold up the other events. */
+    const val BOT_ROLE_SYNC_GROUP = "bot-role-sync"
 
     /** Events the bot gave up on after several failed deliveries, with the original stream ID in `originalId`. */
     const val DEAD_LETTER_KEY = "bits:events:dead"
