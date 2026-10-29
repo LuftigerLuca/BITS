@@ -11,6 +11,7 @@ import eu.luftiger.bits.bot.commands.RolesCommand
 import eu.luftiger.bits.bot.commands.UnverifyCommand
 import eu.luftiger.bits.bot.commands.VerifyCommand
 import eu.luftiger.bits.bot.embassies.EmbassySyncHandler
+import eu.luftiger.bits.bot.embassies.EmbassyThreadCreator
 import eu.luftiger.bits.bot.embassies.JdaEmbassyGuild
 import eu.luftiger.bits.bot.embassies.ThreadReporter
 import eu.luftiger.bits.bot.events.EventHandler
@@ -29,6 +30,7 @@ import eu.luftiger.bits.bot.votes.VoteEvents
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.BotPresenceChangedEvent
 import eu.luftiger.bits.shared.EmbassySyncEvent
+import eu.luftiger.bits.shared.EmbassyThreadCreationEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.VoteClosedEvent
@@ -137,7 +139,9 @@ fun main() {
     val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit, systemLog::reportRoleSync)
     val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
     val votes = VoteEvents(jda, config.guildId, backend)
-    val embassies = EmbassySyncHandler(JdaEmbassyGuild(jda, config.guildId), systemLog::reportEmbassySync)
+    val embassyGuild = JdaEmbassyGuild(jda, config.guildId)
+    val embassies = EmbassySyncHandler(embassyGuild, systemLog::reportEmbassySync)
+    val embassyThreads = EmbassyThreadCreator(embassyGuild, backend)
     val events =
         EventHandler { event ->
             logging.handle(event)
@@ -149,6 +153,7 @@ fun main() {
                 is VoteClosedEvent -> votes.onClosed(event)
                 is VoteEvaluatedEvent -> votes.onEvaluated(event)
                 is EmbassySyncEvent -> embassies.handle(event)
+                is EmbassyThreadCreationEvent -> embassyThreads.handle(event)
                 is BotPresenceChangedEvent -> presence.handle(event)
                 else -> Unit
             }

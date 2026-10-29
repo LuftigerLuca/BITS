@@ -25,6 +25,8 @@ class DiscordChannelController(
             BotInput.channelId(it.id)
             BotInput.channelName(it.name)
             it.category?.let(BotInput::channelName)
+            BotInput.roleCount(it.viewerRoleIds.size)
+            it.viewerRoleIds.forEach(BotInput::roleId)
         }
         channelService.replaceAll(report.channels)
     }

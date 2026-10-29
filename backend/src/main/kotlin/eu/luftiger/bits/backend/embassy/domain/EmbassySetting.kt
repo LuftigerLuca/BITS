@@ -6,13 +6,16 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.Instant
 
-/** The ambassador role; there is at most one row. */
+/** The ambassador role and the channel for new embassy threads; there is at most one row. */
 @Entity
 @Table(name = "embassy_setting")
 class EmbassySetting(
     /** `null` while none is set. */
     @Column(name = "ambassador_role_id")
     var ambassadorRoleId: String?,
+    /** Where the bot creates embassy threads; `null` while none is set. */
+    @Column(name = "channel_id")
+    var channelId: String?,
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant,
 ) {

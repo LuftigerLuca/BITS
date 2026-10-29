@@ -366,10 +366,13 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Diplomatie mit anderen Ländern läuft in privaten Threads, einer pro Land. Unter „Botschaften“ ordnest du ' +
           'einem Land seinen Thread zu, und BITS hält die Mitglieder aktuell.',
         steps: [
-          'Lege den privaten Thread in Discord im Botschafts-Kanal selbst an.',
           'Wähle unter „Botschaften“ die Ämter, die jemanden zum Botschafter machen (Standard: Präsident, ' +
-            'Vizepräsident, Außenminister), die Botschafter-Rolle und Gastgeber-Rollen wie die eigene Regierung.',
-          'Ordne unter „Botschafts-Threads“ den Thread einem Land zu.',
+            'Vizepräsident, Außenminister), die Botschafter-Rolle, Gastgeber-Rollen wie die eigene Regierung und den ' +
+            'Botschafts-Kanal.',
+          'Verknüpft sich jemand mit einem dieser Ämter in einem Land ohne Thread, legt der Bot im Botschafts-Kanal ' +
+            'den privaten Thread „Botschaft <Land>“ an und ordnet ihn zu.',
+          'Unter „Botschafts-Threads“ kannst du einem Land auch selbst einen bestehenden Thread zuordnen oder mit ' +
+            '„Automatisch anlegen“ einen Thread mit eigenem Namen anlegen lassen.',
           'Füge bei Bedarf Mitglieder von Hand hinzu.',
         ],
         points: [
@@ -380,11 +383,15 @@ export const MANUAL_PAGES: ManualPage[] = [
           'BITS gleicht die Threads nach jeder Verknüpfung, nach jeder Änderung auf der Seite und stündlich ab. Die ' +
             'Seite zeigt, wer in welchem Thread ist und warum.',
           'Kann BITS die Regierung eines Landes nicht laden, entfernt es aus dessen Thread niemanden.',
+          'Bis der Bot einen Thread angelegt hat, steht beim Land „Wird angelegt …“. Klappt es nicht innerhalb einer ' +
+            'Minute, zeigt die Seite den Grund. BITS versucht es dann nicht von selbst erneut: Lege ihn erneut an, ' +
+            'ordne einen anderen Thread zu oder verwirf den Fehler.',
+          'Hebst du eine Zuordnung auf, bleibt der Thread in Discord bestehen.',
         ],
         tips: [
-          'Der Bot braucht im Botschafts-Kanal die Rechte „Threads verwalten“ und „Nachrichten in Threads senden“, und ' +
-            'die Botschafter-Rolle muss den Kanal sehen dürfen. Diese Rechte richtest du selbst ein; fehlen sie, lehnt ' +
-            'das Dashboard die Zuordnung und die Einstellungen ab.',
+          'Der Bot braucht im Botschafts-Kanal die Rechte „Private Threads erstellen“, „Threads verwalten“ und ' +
+            '„Nachrichten in Threads senden“, und die Botschafter-Rolle muss den Kanal sehen dürfen. Diese Rechte ' +
+            'richtest du selbst ein; fehlen sie, lehnt das Dashboard die Zuordnung und die Einstellungen ab.',
         ],
       },
       {

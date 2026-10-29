@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/web/admin/embassies")
 class EmbassyController(
     private val embassyService: EmbassyService,
+    private val creationService: EmbassyThreadCreationService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -59,6 +60,24 @@ class EmbassyController(
         embassyService.assign(request.threadId, request.countryId, actor(session))
         log.info("Thread {} assigned to country {} by {}", request.threadId, request.countryId, session.subject)
     }
+
+    /** The bot creates the thread in the embassy channel; the page shows it as being created until then. */
+    @PostMapping("/creations")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun create(
+        @RequestBody request: CreateThreadRequest,
+        @AuthenticationPrincipal session: Jwt,
+    ) {
+        creationService.request(request.countryId, request.threadName, actor(session))
+        log.info("Embassy thread for country {} requested by {}", request.countryId, session.subject)
+    }
+
+    /** Only a creation that failed. */
+    @DeleteMapping("/creations/{creationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun dismissCreation(
+        @PathVariable creationId: Long,
+    ) = creationService.dismiss(creationId)
 
     @DeleteMapping("/threads/{threadId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -92,7 +111,7 @@ class EmbassyController(
         log.info("Member {} removed from embassy thread {} by {}", discordUserId, threadId, session.subject)
     }
 
-    /** Only when assigning a thread, which checks the country. */
+    /** Only when assigning or creating a thread, which checks the country. */
     @ExceptionHandler(WareraApiException::class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     fun wareraUnavailable(e: WareraApiException) {
@@ -109,10 +128,14 @@ data class EmbassiesResponse(
     val settings: EmbassySettingsRequest,
     /** Highest first, for picking the ambassador and host roles. */
     val roles: List<RoleOption>,
+    /** Text channels in the order of Discord, for picking the embassy channel. */
+    val channels: List<ChannelOption>,
     /** By country name. */
     val threads: List<EmbassyThreadResponse>,
     /** Private threads the bot reported that have no country yet. */
     val availableThreads: List<ThreadOption>,
+    /** Threads the bot is creating, or failed to create, by country name. */
+    val creations: List<ThreadCreationResponse>,
 )
 
 @Serializable
@@ -123,6 +146,8 @@ data class EmbassySettingsRequest(
     val ambassadorRoleId: String?,
     /** Roles whose members belong in every thread, without getting the ambassador role. */
     val hostRoleIds: List<String>,
+    /** Where the bot creates embassy threads; `null` for none, which leaves only assigning threads by hand. */
+    val channelId: String? = null,
 )
 
 @Serializable
@@ -130,6 +155,25 @@ data class RoleOption(
     val id: String,
     val name: String,
     val color: Int?,
+)
+
+@Serializable
+data class ChannelOption(
+    val id: String,
+    val name: String,
+    val category: String?,
+    /** Whether the bot may create and manage private threads there. */
+    val threadsCreatable: Boolean,
+)
+
+@Serializable
+data class ThreadCreationResponse(
+    val id: Long,
+    val countryId: String,
+    val countryName: String,
+    val threadName: String,
+    /** Why it failed, in German; `null` while the bot is creating it. */
+    val failure: String?,
 )
 
 @Serializable
@@ -177,6 +221,12 @@ data class ThreadOption(
 data class AssignThreadRequest(
     val threadId: String,
     val countryId: String,
+)
+
+@Serializable
+data class CreateThreadRequest(
+    val countryId: String,
+    val threadName: String,
 )
 
 @Serializable

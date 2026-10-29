@@ -210,6 +210,16 @@ class SystemLogService(
                                 },
                     ),
                 )
+            is SystemProblem.EmbassyThreadCreationFailed ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.EMBASSY_THREAD_CREATION_FAILED,
+                        message =
+                            "Der Botschafts-Thread ${problem.threadName} (${problem.countryName}) wurde nicht angelegt: " +
+                                problem.reason,
+                    ),
+                )
             is SystemProblem.RoleNotAssignable ->
                 entries.save(
                     SystemLogEntry(

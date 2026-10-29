@@ -1,8 +1,10 @@
 package eu.luftiger.bits.backend.embassy.internal
 
 import eu.luftiger.bits.backend.shared.BotInput
+import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.shared.DiscordThreadsReport
 import eu.luftiger.bits.shared.EmbassySyncReport
+import eu.luftiger.bits.shared.EmbassyThreadCreationReport
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class EmbassyBotController(
     private val reportService: EmbassyReportService,
+    private val creationService: EmbassyThreadCreationService,
+    private val syncTrigger: EmbassySyncTrigger,
 ) {
     /** The private threads of the guild, on start, every hour and whenever a thread or channel changes. */
     @PutMapping("/api/discord-threads")
@@ -62,5 +66,22 @@ class EmbassyBotController(
             it.reason?.let(BotInput::reason)
         }
         reportService.applyReport(syncId, report)
+    }
+
+    /** The thread the bot created for an admin, or why it could not; 410 if it is no longer wanted. */
+    @PostMapping("/api/embassies/thread-creations/{creationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun threadCreated(
+        @PathVariable creationId: Long,
+        @RequestBody report: EmbassyThreadCreationReport,
+    ) {
+        report.thread?.let {
+            BotInput.channelId(it.id)
+            BotInput.channelName(it.name)
+            BotInput.channelId(it.parentChannelId)
+            BotInput.channelName(it.parentChannelName)
+        }
+        // Synced right away, so the members are in before the next hourly sync.
+        if (creationService.applyReport(creationId, report)) syncTrigger.request(SyncTrigger.SETTING_CHANGE)
     }
 }

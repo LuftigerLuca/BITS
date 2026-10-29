@@ -17,6 +17,7 @@ export const ACTIONS: Record<AuditAction, string> = {
   EMBASSY_MEMBER_ADDED: 'Mitglied zur Botschaft hinzugefügt',
   EMBASSY_MEMBER_REMOVED: 'Mitglied aus Botschaft entfernt',
   EMBASSY_SETTINGS_CHANGED: 'Botschafts-Einstellungen geändert',
+  EMBASSY_THREAD_CREATION_REQUESTED: 'Botschafts-Thread angefordert',
   FEATURE_TOGGLED: 'Funktion umgeschaltet',
   BOT_PRESENCE_CHANGED: 'Bot-Status geändert',
   DSK_CREATED: 'DSK angelegt',

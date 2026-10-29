@@ -21,6 +21,7 @@ bits:
     cleanup-cron: "-"
   embassy:
     cron: "-"
+    creation-cron: "-"
   vote:
     cron: "-"
     user-lookup-interval: 0s

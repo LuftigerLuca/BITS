@@ -19,6 +19,7 @@ import eu.luftiger.bits.shared.DiscordThreadsReport
 import eu.luftiger.bits.shared.Elector
 import eu.luftiger.bits.shared.ElectorateReport
 import eu.luftiger.bits.shared.EmbassySyncReport
+import eu.luftiger.bits.shared.EmbassyThreadCreationReport
 import eu.luftiger.bits.shared.FeatureStates
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
@@ -192,6 +193,16 @@ class KtorBackendClient(
         report: EmbassySyncReport,
     ) {
         http.post("api/embassies/syncs/$syncId") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportThreadCreation(
+        creationId: Long,
+        report: EmbassyThreadCreationReport,
+    ) {
+        http.post("api/embassies/thread-creations/$creationId") {
             contentType(ContentType.Application.Json)
             setBody(report)
         }

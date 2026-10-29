@@ -13,6 +13,8 @@ import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.overview.api.OverviewCountry
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
+import eu.luftiger.bits.backend.vote.api.GuildChannels
+import eu.luftiger.bits.backend.vote.api.dto.GuildChannel
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import org.springframework.data.repository.findByIdOrNull
@@ -35,7 +37,9 @@ class EmbassyService(
     private val officeRepository: EmbassyOfficeRepository,
     private val hostRoleRepository: EmbassyHostRoleRepository,
     private val settingRepository: EmbassySettingRepository,
+    private val creationRepository: EmbassyThreadCreationRepository,
     private val guildRoles: GuildRoles,
+    private val guildChannels: GuildChannels,
     private val guildMembers: GuildMembers,
     private val overviewCountry: OverviewCountry,
     private val wareraClient: WareraClient,
@@ -54,6 +58,7 @@ class EmbassyService(
             ownCountryId = overviewCountry.selected()?.id,
             settings = settings(),
             roles = guildRoles.all().map { RoleOption(it.id, it.name, it.color) },
+            channels = guildChannels.all().map { ChannelOption(it.id, it.name, it.category, it.threadsCreatable) },
             threads =
                 assigned.map { thread ->
                     val current = reported[thread.threadId]
@@ -81,6 +86,11 @@ class EmbassyService(
                     .filter { it.id !in assigned.map(EmbassyThread::threadId) }
                     .sortedWith(compareBy({ it.parentChannelName.lowercase() }, { it.name.lowercase() }))
                     .map { ThreadOption(it.id, it.name, it.parentChannelName, it.archived, it.manageable) },
+            creations =
+                creationRepository
+                    .findAll()
+                    .sortedBy { it.countryName }
+                    .map { ThreadCreationResponse(it.id!!, it.countryId, it.countryName, it.threadName, it.failure) },
         )
     }
 
@@ -99,7 +109,8 @@ class EmbassyService(
 
     /**
      * @throws ResponseStatusException 400 for a thread the bot has not reported, a country WarEra does not know or the
-     * country under "Verwaltung"; 409 if the thread or the country has one already; 422 if the ambassador role or a
+     * country under "Verwaltung"; 409 if the thread or the country has one already, or the bot is creating one for the
+     * country; 422 if the ambassador role or a
      * host role may not see the thread's channel, since Discord would refuse to add their members
      * @throws WareraApiException if WarEra cannot be reached, which the dashboard gets as 503
      */
@@ -116,6 +127,11 @@ class EmbassyService(
         change {
             if (threadRepository.existsById(threadId) || threadRepository.existsByCountryId(countryId)) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Thread or country assigned already")
+            }
+            creationRepository.findByCountryId(countryId)?.let { creation ->
+                if (creation.pending) throw ResponseStatusException(HttpStatus.CONFLICT, "Thread being created for country")
+                // The country is free again after a failed creation; the failure is done with.
+                creationRepository.delete(creation)
             }
             threadRepository.save(EmbassyThread(thread.id, thread.name, thread.parentChannelId, country.id, country.name, clock.instant()))
             auditLog.record(actor, AuditAction.EMBASSY_THREAD_ASSIGNED, "Botschafts-Thread ${thread.name}: ${country.name}")
@@ -186,8 +202,9 @@ class EmbassyService(
     }
 
     /**
-     * @throws ResponseStatusException 400 for roles the bot has not reported, 422 if the ambassador role or a host role
-     * may not see the channel of a thread, since Discord would refuse to add their members
+     * @throws ResponseStatusException 400 for roles or an embassy channel the bot has not reported, 422 if the ambassador
+     * role or a host role may not see the channel of a thread or the embassy channel, since Discord would refuse to add
+     * their members, or if the bot may not create embassy threads in the embassy channel
      */
     fun setSettings(
         request: EmbassySettingsRequest,
@@ -200,6 +217,15 @@ class EmbassyService(
         val reported = discordThreadRepository.findAllById(threadRepository.findAll().map { it.threadId })
         val blind = blindRoles(reported, request)
         if (blind.isNotEmpty()) throw cannotView("Roles $blind cannot see the channel of every embassy thread")
+        val channel =
+            request.channelId?.let { channelId ->
+                guildChannels.all().firstOrNull { it.id == channelId } ?: throw badRequest("Unknown channel $channelId")
+            }
+        if (channel != null) {
+            if (!channel.threadsCreatable) throw cannotView("Bot may not create embassy threads in channel ${channel.id}")
+            val blindInChannel = blindRoles(channel, request)
+            if (blindInChannel.isNotEmpty()) throw cannotView("Roles $blindInChannel cannot see the embassy channel")
+        }
         val offices = request.offices.distinct().sortedBy { it.ordinal }
         change {
             officeRepository.deleteAllInBatch()
@@ -208,9 +234,10 @@ class EmbassyService(
             hostRoleRepository.saveAll(request.hostRoleIds.distinct().map(::EmbassyHostRole))
             val setting = settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)
             if (setting == null) {
-                settingRepository.save(EmbassySetting(request.ambassadorRoleId, clock.instant()))
+                settingRepository.save(EmbassySetting(request.ambassadorRoleId, request.channelId, clock.instant()))
             } else {
                 setting.ambassadorRoleId = request.ambassadorRoleId
+                setting.channelId = request.channelId
                 setting.updatedAt = clock.instant()
             }
             val hostNames =
@@ -223,17 +250,21 @@ class EmbassyService(
                     "Ämter: " + offices.joinToString { it.label }.ifEmpty { "keine" },
                     "Botschafter-Rolle: " + (request.ambassadorRoleId?.let { "@${roles.getValue(it).name}" } ?: "keine"),
                     "Gastgeber-Rollen: " + hostNames.joinToString { "@$it" }.ifEmpty { "keine" },
+                    "Botschafts-Kanal: " + (channel?.let { "#${it.name}" } ?: "keiner"),
                 ).joinToString("; ")
             auditLog.record(actor, AuditAction.EMBASSY_SETTINGS_CHANGED, "Botschaften: $description")
         }
     }
 
-    private fun settings() =
-        EmbassySettingsRequest(
+    private fun settings(): EmbassySettingsRequest {
+        val setting = settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)
+        return EmbassySettingsRequest(
             offices = officeRepository.findAll().map { it.office }.sortedBy { it.ordinal },
-            ambassadorRoleId = settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)?.ambassadorRoleId,
+            ambassadorRoleId = setting?.ambassadorRoleId,
             hostRoleIds = hostRoleRepository.findAll().map { it.roleId }.sorted(),
+            channelId = setting?.channelId,
         )
+    }
 
     /** The ambassador and host roles of [settings] that may not see the channel of one of [threads]. */
     private fun blindRoles(
@@ -243,6 +274,15 @@ class EmbassyService(
         (listOfNotNull(settings.ambassadorRoleId) + settings.hostRoleIds)
             .distinct()
             .filter { roleId -> threads.any { !it.visibleWith(listOf(roleId)) } }
+
+    /** The ambassador and host roles of [settings] that may not see the embassy [channel]. */
+    private fun blindRoles(
+        channel: GuildChannel,
+        settings: EmbassySettingsRequest,
+    ): List<String> =
+        (listOfNotNull(settings.ambassadorRoleId) + settings.hostRoleIds)
+            .distinct()
+            .filter { !channel.visibleWith(listOf(it)) }
 
     private fun memberNames(): Map<String, String> =
         guildMembers

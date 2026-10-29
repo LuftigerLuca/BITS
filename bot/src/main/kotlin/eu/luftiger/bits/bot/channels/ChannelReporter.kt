@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
 import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel
 import net.dv8tion.jda.api.events.channel.ChannelCreateEvent
 import net.dv8tion.jda.api.events.channel.ChannelDeleteEvent
@@ -20,7 +21,8 @@ import net.dv8tion.jda.api.events.role.update.GenericRoleUpdateEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
 
 /**
- * Tells the backend which text channels the guild has and in which of them the bot may post votes: on start, every
+ * Tells the backend which text channels the guild has, in which of them the bot may post votes or create embassy
+ * threads, and who may see them: on start, every
  * hour in case a gateway event got lost, and whenever a channel, its permissions or the bot's roles change. Reports go
  * through a [DebouncedReport].
  */
@@ -77,15 +79,35 @@ class ChannelReporter(
                 Permission.MESSAGE_HISTORY,
             )
 
+        /** What the bot needs to create a private embassy thread and keep its members in sync, see the embassy sync. */
+        val THREAD_PERMISSIONS =
+            listOf(
+                Permission.VIEW_CHANNEL,
+                Permission.CREATE_PRIVATE_THREADS,
+                Permission.MANAGE_THREADS,
+                Permission.MESSAGE_SEND_IN_THREADS,
+            )
+
         /** Text and announcement channels in the order of Discord's channel list. */
         internal fun channels(guild: Guild): List<DiscordChannelDto> =
             guild.channels.filterIsInstance<StandardGuildMessageChannel>().mapIndexed { index, channel ->
+                val everyoneCanView = guild.publicRole.hasPermission(channel, Permission.VIEW_CHANNEL)
                 DiscordChannelDto(
                     id = channel.id,
                     name = channel.name,
                     category = channel.parentCategory?.name,
                     position = index,
                     postable = guild.selfMember.hasPermission(channel, POST_PERMISSIONS),
+                    everyoneCanView = everyoneCanView,
+                    // With the permissions of @everyone and the channel's overwrites for @everyone and the role.
+                    viewerRoleIds =
+                        if (everyoneCanView) {
+                            emptyList()
+                        } else {
+                            guild.roles.filter { !it.isPublicRole && it.hasPermission(channel, Permission.VIEW_CHANNEL) }.map { it.id }
+                        },
+                    // Announcement channels have no private threads.
+                    threadsCreatable = channel is TextChannel && guild.selfMember.hasPermission(channel, THREAD_PERMISSIONS),
                 )
             }
     }

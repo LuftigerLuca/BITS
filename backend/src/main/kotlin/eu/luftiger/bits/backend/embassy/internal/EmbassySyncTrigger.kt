@@ -19,7 +19,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Starts embassy syncs in the background, one at a time on a thread of their own: right after a member links or
- * unlinks an account, after an admin changes something on the embassy page, and every hour.
+ * unlinks an account, after an admin changes something on the embassy page or the bot created a thread, and every
+ * hour. A sync also asks the bot for missing threads, see [EmbassySyncService].
  *
  * Every sync covers all threads, since a government has a handful of offices and the [eu.luftiger.bits.warera.WareraClient]
  * keeps it for a few minutes. Requests that arrive while a sync runs are merged into one that follows it, with the
@@ -38,10 +39,16 @@ class EmbassySyncTrigger(
 
     private val lock = Any()
     private var pending: SyncTrigger? = null
+    private val newWareraUserIds = HashSet<String>()
 
-    fun request(trigger: SyncTrigger) {
+    /** [newWareraUserId] is a user linked just now, whose country may need an embassy thread. */
+    fun request(
+        trigger: SyncTrigger,
+        newWareraUserId: String? = null,
+    ) {
         if (!features.isEnabled(BitsFeature.EMBASSIES)) return
         synchronized(lock) {
+            newWareraUserId?.let { newWareraUserIds += it }
             if (pending != null) return
             pending = trigger
         }
@@ -49,7 +56,7 @@ class EmbassySyncTrigger(
     }
 
     @ApplicationModuleListener
-    fun onAccountLinked(event: AccountLinked) = request(SyncTrigger.ACCOUNT_CHANGE)
+    fun onAccountLinked(event: AccountLinked) = request(SyncTrigger.ACCOUNT_CHANGE, event.wareraUserId)
 
     @ApplicationModuleListener
     fun onAccountUnlinked(event: AccountUnlinked) = request(SyncTrigger.ACCOUNT_CHANGE)
@@ -69,9 +76,14 @@ class EmbassySyncTrigger(
 
     private fun run() {
         // Taken right before the sync, so a request that comes in during it gets a sync of its own afterwards.
-        val trigger = synchronized(lock) { pending.also { pending = null } } ?: return
+        val (trigger, newUsers) =
+            synchronized(lock) {
+                val trigger = pending ?: return
+                pending = null
+                (trigger to newWareraUserIds.toSet()).also { newWareraUserIds.clear() }
+            }
         try {
-            syncService.sync(trigger)
+            syncService.sync(trigger, newUsers)
         } catch (e: Exception) {
             log.error("Embassy sync failed", e)
             try {

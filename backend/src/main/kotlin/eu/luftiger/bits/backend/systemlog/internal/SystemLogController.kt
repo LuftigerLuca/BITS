@@ -178,6 +178,7 @@ enum class LogEntryType {
     MEMBER_REPORT_REFUSED,
     VOTE_EVALUATION_DELAYED,
     EMBASSY_THREAD_UNAVAILABLE,
+    EMBASSY_THREAD_CREATION_FAILED,
     ;
 
     companion object {
@@ -199,6 +200,7 @@ enum class LogEntryType {
                 EntryKind.MEMBER_REPORT_REFUSED -> MEMBER_REPORT_REFUSED
                 EntryKind.VOTE_EVALUATION_DELAYED -> VOTE_EVALUATION_DELAYED
                 EntryKind.EMBASSY_THREAD_UNAVAILABLE -> EMBASSY_THREAD_UNAVAILABLE
+                EntryKind.EMBASSY_THREAD_CREATION_FAILED -> EMBASSY_THREAD_CREATION_FAILED
             }
     }
 }
