@@ -220,6 +220,20 @@ class SystemLogService(
                                 problem.reason,
                     ),
                 )
+            is SystemProblem.EmbassyThreadRenameFailed ->
+                entries.save(
+                    SystemLogEntry(
+                        now,
+                        EntryKind.EMBASSY_THREAD_RENAME_FAILED,
+                        message =
+                            "Der Botschafts-Thread ${problem.threadName} (${problem.countryName}) wurde nicht umbenannt: " +
+                                when (problem.cause) {
+                                    EmbassyThreadCause.MISSING -> "Er wurde gelöscht, oder der Bot sieht ihn nicht."
+                                    EmbassyThreadCause.NO_PERMISSION -> "Dem Bot fehlt im Kanal das Recht „Threads verwalten“."
+                                    EmbassyThreadCause.FAILED -> "Discord hat die Anfrage abgelehnt."
+                                },
+                    ),
+                )
             is SystemProblem.RoleNotAssignable ->
                 entries.save(
                     SystemLogEntry(

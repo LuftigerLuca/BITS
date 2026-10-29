@@ -298,6 +298,11 @@ class EmbassySyncHandlerTest {
                 archived = false
             }
 
+            override suspend fun rename(
+                name: String,
+                reason: String,
+            ) = null
+
             override suspend fun add(discordUserId: String) {
                 if (discordUserId in blind) throw MemberCannotViewException("botschaft", IllegalStateException())
                 apply("+$id@$discordUserId")

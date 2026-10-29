@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { RoleName } from '@/components/RoleName'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { OFFICES } from '@/features/role-sync/labels'
 import type { Embassies, EmbassySettings, GovernmentOffice } from '@/lib/api'
-import { CANNOT_VIEW } from './labels'
+import { CANNOT_VIEW, MAX_THREAD_NAME_LENGTH, PLACEHOLDER, templateError } from './labels'
 import { useSetEmbassySettings } from './queries'
 
 const ALL_OFFICES = Object.keys(OFFICES) as GovernmentOffice[]
@@ -14,7 +15,10 @@ const ALL_OFFICES = Object.keys(OFFICES) as GovernmentOffice[]
 /** Stands for "no ambassador role" or "no channel", since a select item needs a value. */
 const NONE = 'none'
 
-/** Which offices make someone an ambassador, the ambassador role, the host roles and the embassy channel. */
+/**
+ * Which offices make someone an ambassador, the ambassador role, the host roles, the embassy channel and the name of
+ * the threads.
+ */
 export function EmbassySettingsCard({ embassies }: { embassies: Embassies }) {
   const saved = embassies.settings
   return (
@@ -49,6 +53,8 @@ function SettingsForm({
   const [ambassadorRoleId, setAmbassadorRoleId] = useState(saved.ambassadorRoleId)
   const [hostRoleIds, setHostRoleIds] = useState(() => new Set(saved.hostRoleIds))
   const [channelId, setChannelId] = useState(saved.channelId)
+  const [template, setTemplate] = useState(saved.threadNameTemplate)
+  const invalidTemplate = templateError(template)
   const channel = channels.find((c) => c.id === channelId)
   const setSettings = useSetEmbassySettings(
     channel && !channel.threadsCreatable ? CANNOT_VIEW.channel : CANNOT_VIEW.roles,
@@ -59,17 +65,25 @@ function SettingsForm({
     roleId: string | null,
     hostSet: Set<string>,
     channel: string | null,
+    nameTemplate: string,
   ): EmbassySettings => ({
     offices: ALL_OFFICES.filter((office) => officeSet.has(office)),
     ambassadorRoleId: roleId,
     hostRoleIds: roles.filter((role) => hostSet.has(role.id)).map((role) => role.id),
     channelId: channel,
+    threadNameTemplate: nameTemplate.trim(),
   })
-  const settings = normalize(offices, ambassadorRoleId, hostRoleIds, channelId)
+  const settings = normalize(offices, ambassadorRoleId, hostRoleIds, channelId, template)
   const changed =
     JSON.stringify(settings) !==
     JSON.stringify(
-      normalize(new Set(saved.offices), saved.ambassadorRoleId, new Set(saved.hostRoleIds), saved.channelId),
+      normalize(
+        new Set(saved.offices),
+        saved.ambassadorRoleId,
+        new Set(saved.hostRoleIds),
+        saved.channelId,
+        saved.threadNameTemplate,
+      ),
     )
 
   function toggle<T>(set: Set<T>, value: T, checked: boolean): Set<T> {
@@ -133,6 +147,24 @@ function SettingsForm({
           und „Nachrichten in Threads senden“.
         </p>
       </div>
+      <div className="flex flex-col gap-1.5 sm:max-w-sm">
+        <Label htmlFor="embassy-thread-name">Thread-Name</Label>
+        <Input
+          id="embassy-thread-name"
+          value={template}
+          maxLength={MAX_THREAD_NAME_LENGTH}
+          aria-invalid={invalidTemplate !== null}
+          aria-describedby="embassy-thread-name-hint"
+          onChange={(event) => setTemplate(event.target.value)}
+        />
+        <p
+          id="embassy-thread-name-hint"
+          className={invalidTemplate ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}
+        >
+          {invalidTemplate ??
+            `So benennt der Bot neue Threads. ${PLACEHOLDER} steht für den englischen Ländernamen aus WarEra, z. B. „Germany“. Bestehende Threads benennst du unter „Botschafts-Threads“ um.`}
+        </p>
+      </div>
       <fieldset className="flex max-h-72 flex-col gap-2 overflow-y-auto">
         <legend className="mb-2 text-sm font-medium">Gastgeber-Rollen</legend>
         {roles.map((role) => (
@@ -147,7 +179,7 @@ function SettingsForm({
           </label>
         ))}
       </fieldset>
-      <Button type="submit" className="self-start" disabled={!changed || setSettings.isPending}>
+      <Button type="submit" className="self-start" disabled={!changed || invalidTemplate !== null || setSettings.isPending}>
         Speichern
       </Button>
     </form>

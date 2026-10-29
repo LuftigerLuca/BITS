@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { SparklesIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { PencilLineIcon, SparklesIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import {
   AlertDialog,
@@ -19,7 +19,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Embassies, EmbassyCreation, EmbassyThread } from '@/lib/api'
 import { useCountries } from '@/lib/countries'
-import { errorMessage } from './labels'
+import { errorMessage, MAX_THREAD_NAME_LENGTH, threadName } from './labels'
 import {
   useAddMember,
   useAssignThread,
@@ -27,11 +27,9 @@ import {
   useDismissCreation,
   useMemberSearch,
   useRemoveMember,
+  useRenameThreads,
   useUnassignThread,
 } from './queries'
-
-/** Discord's limit for thread names. */
-const MAX_THREAD_NAME_LENGTH = 100
 
 /** The embassy threads by country, who is in each and why, and the form to assign another one. */
 export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
@@ -47,6 +45,7 @@ export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
+        {embassies.threads.length > 0 && <RenameButton template={embassies.settings.threadNameTemplate} />}
         {embassies.creations.map((creation) => (
           <CreationSection key={creation.id} creation={creation} />
         ))}
@@ -58,6 +57,40 @@ export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
         <AssignForm embassies={embassies} />
       </CardContent>
     </Card>
+  )
+}
+
+/** Has the bot rename the assigned threads after the template, once confirmed. */
+function RenameButton({ template }: { template: string }) {
+  const rename = useRenameThreads()
+  const [confirming, setConfirming] = useState(false)
+  return (
+    <>
+      <Button variant="outline" size="sm" className="self-start" onClick={() => setConfirming(true)}>
+        <PencilLineIcon />
+        Bestehende umbenennen
+      </Button>
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bestehende Threads umbenennen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Der Bot benennt alle zugeordneten Threads nach der Vorlage „{template}“ um. Archivierte Threads überspringt
+              er, Threads mit passendem Namen bleiben unberührt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <Button
+              disabled={rename.isPending}
+              onClick={() => rename.mutate(undefined, { onSuccess: () => setConfirming(false) })}
+            >
+              Umbenennen
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -99,7 +132,7 @@ function CreationSection({ creation }: { creation: EmbassyCreation }) {
   )
 }
 
-/** Asks for the name of the thread the bot creates, "Botschaft <Land>" unless changed; mounted while open. */
+/** Asks for the name of the thread the bot creates, the one after the template unless changed; mounted while open. */
 function CreateDialog({
   countryId,
   countryName,
@@ -176,6 +209,7 @@ function ThreadSection({ thread }: { thread: EmbassyThread }) {
         </div>
         <div className="flex items-center gap-2">
           {thread.missing && <Badge variant="destructive">Fehlt in Discord</Badge>}
+          {thread.renameSkipped && <Badge variant="outline">Archiviert, beim Umbenennen übersprungen</Badge>}
           <Button
             variant="outline"
             size="sm"
@@ -377,7 +411,7 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
         <CreateDialog
           countryId={countryId}
           countryName={countryName}
-          initialName={`Botschaft ${countryName}`}
+          initialName={threadName(embassies.settings.threadNameTemplate, countryName)}
           onClose={() => setCreating(false)}
           onCreated={() => {
             setThreadId(null)

@@ -122,6 +122,9 @@ enum class EntryKind(
 
     /** The bot could not create an embassy thread. */
     EMBASSY_THREAD_CREATION_FAILED(Category.ERROR),
+
+    /** The bot could not rename an embassy thread. */
+    EMBASSY_THREAD_RENAME_FAILED(Category.ERROR),
     ;
 
     enum class Category {

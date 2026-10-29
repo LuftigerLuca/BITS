@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.shared.DiscordThreadsReport
 import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.EmbassyThreadCreationReport
+import eu.luftiger.bits.shared.EmbassyThreadRenameReport
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 class EmbassyBotController(
     private val reportService: EmbassyReportService,
     private val creationService: EmbassyThreadCreationService,
+    private val renameService: EmbassyThreadRenameService,
     private val syncTrigger: EmbassySyncTrigger,
 ) {
     /** The private threads of the guild, on start, every hour and whenever a thread or channel changes. */
@@ -83,5 +85,20 @@ class EmbassyBotController(
         }
         // Synced right away, so the members are in before the next hourly sync.
         if (creationService.applyReport(creationId, report)) syncTrigger.request(SyncTrigger.SETTING_CHANGE)
+    }
+
+    /** The threads the bot could not rename after an admin asked for it. */
+    @PostMapping("/api/embassies/thread-renames")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun threadsRenamed(
+        @RequestBody report: EmbassyThreadRenameReport,
+    ) {
+        BotInput.threadCount(report.failures.size)
+        report.failures.forEach {
+            BotInput.channelId(it.threadId)
+            it.threadName?.let(BotInput::channelName)
+            BotInput.countryName(it.countryName)
+        }
+        renameService.applyReport(report)
     }
 }

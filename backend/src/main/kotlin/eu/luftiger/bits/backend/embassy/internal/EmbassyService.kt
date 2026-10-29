@@ -54,9 +54,10 @@ class EmbassyService(
         val manual = manualMemberRepository.findAll().groupBy { it.threadId }
         val members = threadMemberRepository.findAll().groupBy { it.threadId }
         val names = memberNames()
+        val settings = settings()
         return EmbassiesResponse(
             ownCountryId = overviewCountry.selected()?.id,
-            settings = settings(),
+            settings = settings,
             roles = guildRoles.all().map { RoleOption(it.id, it.name, it.color) },
             channels = guildChannels.all().map { ChannelOption(it.id, it.name, it.category, it.threadsCreatable) },
             threads =
@@ -69,6 +70,10 @@ class EmbassyService(
                         countryId = thread.countryId,
                         countryName = thread.countryName,
                         missing = current == null,
+                        renameSkipped =
+                            current != null &&
+                                current.archived &&
+                                current.name != EmbassyThreadName.of(settings.threadNameTemplate, thread.countryName),
                         members =
                             members[thread.threadId]
                                 .orEmpty()
@@ -204,7 +209,8 @@ class EmbassyService(
     /**
      * @throws ResponseStatusException 400 for roles or an embassy channel the bot has not reported, 422 if the ambassador
      * role or a host role may not see the channel of a thread or the embassy channel, since Discord would refuse to add
-     * their members, or if the bot may not create embassy threads in the embassy channel
+     * their members, or if the bot may not create embassy threads in the embassy channel; 400 for a thread name
+     * template without `{land}` exactly once or with more than 100 characters
      */
     fun setSettings(
         request: EmbassySettingsRequest,
@@ -226,6 +232,8 @@ class EmbassyService(
             val blindInChannel = blindRoles(channel, request)
             if (blindInChannel.isNotEmpty()) throw cannotView("Roles $blindInChannel cannot see the embassy channel")
         }
+        if (!EmbassyThreadName.isValid(request.threadNameTemplate)) throw badRequest("Malformed thread name template")
+        val template = request.threadNameTemplate.trim()
         val offices = request.offices.distinct().sortedBy { it.ordinal }
         change {
             officeRepository.deleteAllInBatch()
@@ -234,10 +242,11 @@ class EmbassyService(
             hostRoleRepository.saveAll(request.hostRoleIds.distinct().map(::EmbassyHostRole))
             val setting = settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)
             if (setting == null) {
-                settingRepository.save(EmbassySetting(request.ambassadorRoleId, request.channelId, clock.instant()))
+                settingRepository.save(EmbassySetting(request.ambassadorRoleId, request.channelId, template, clock.instant()))
             } else {
                 setting.ambassadorRoleId = request.ambassadorRoleId
                 setting.channelId = request.channelId
+                setting.threadNameTemplate = template
                 setting.updatedAt = clock.instant()
             }
             val hostNames =
@@ -251,6 +260,7 @@ class EmbassyService(
                     "Botschafter-Rolle: " + (request.ambassadorRoleId?.let { "@${roles.getValue(it).name}" } ?: "keine"),
                     "Gastgeber-Rollen: " + hostNames.joinToString { "@$it" }.ifEmpty { "keine" },
                     "Botschafts-Kanal: " + (channel?.let { "#${it.name}" } ?: "keiner"),
+                    "Thread-Name: $template",
                 ).joinToString("; ")
             auditLog.record(actor, AuditAction.EMBASSY_SETTINGS_CHANGED, "Botschaften: $description")
         }
@@ -263,6 +273,7 @@ class EmbassyService(
             ambassadorRoleId = setting?.ambassadorRoleId,
             hostRoleIds = hostRoleRepository.findAll().map { it.roleId }.sorted(),
             channelId = setting?.channelId,
+            threadNameTemplate = setting?.threadNameTemplate ?: EmbassyThreadName.DEFAULT_TEMPLATE,
         )
     }
 

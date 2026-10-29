@@ -16,14 +16,19 @@ import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.EmbassyThreadCreationEvent
 import eu.luftiger.bits.shared.EmbassyThreadCreationReport
+import eu.luftiger.bits.shared.EmbassyThreadRename
+import eu.luftiger.bits.shared.EmbassyThreadRenameEvent
+import eu.luftiger.bits.shared.EmbassyThreadRenameReport
 import eu.luftiger.bits.shared.EmbassyThreadStatus
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.FailedThreadRename
 import eu.luftiger.bits.shared.ReportedEmbassyChange
 import eu.luftiger.bits.shared.ReportedEmbassyThread
 import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.ReportedThreadMember
 import eu.luftiger.bits.shared.RoleChangeOutcome
 import eu.luftiger.bits.shared.ThreadCreationFailure
+import eu.luftiger.bits.shared.ThreadRenameFailure
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraGovernment
@@ -48,6 +53,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 @SpringBootTest(properties = ["bits.service-token=test-service-token-at-least-32-chars"])
@@ -396,7 +402,8 @@ class EmbassyTest {
         assertEquals(listOf("r-gov"), JsonPath.read<List<String>>(embassies, "$.settings.hostRoleIds"))
         assertEquals(
             listOf(
-                "Botschaften: Ämter: Präsident, Außenminister; Botschafter-Rolle: @Botschafter; Gastgeber-Rollen: @Regierung; Botschafts-Kanal: keiner",
+                "Botschaften: Ämter: Präsident, Außenminister; Botschafter-Rolle: @Botschafter; Gastgeber-Rollen: @Regierung; " +
+                    "Botschafts-Kanal: keiner; Thread-Name: Botschaft {land}",
             ),
             jdbc.queryForList("SELECT description FROM audit_entry", String::class.java),
         )
@@ -447,7 +454,7 @@ class EmbassyTest {
         assertEquals(listOf(true, false, true), JsonPath.read<List<Boolean>>(embassies, "$.channels[*].threadsCreatable"))
         assertEquals(
             "Botschaften: Ämter: Präsident, Vizepräsident, Außenminister; Botschafter-Rolle: @Botschafter; " +
-                "Gastgeber-Rollen: keine; Botschafts-Kanal: #c-open",
+                "Gastgeber-Rollen: keine; Botschafts-Kanal: #c-open; Thread-Name: Botschaft {land}",
             jdbc.queryForList("SELECT description FROM audit_entry", String::class.java).last(),
         )
     }
@@ -593,6 +600,101 @@ class EmbassyTest {
     }
 
     @Test
+    fun `the thread name template needs {land} exactly once and at most 100 characters`() {
+        assertEquals("Botschaft {land}", JsonPath.read<String>(embassies(), "$.settings.threadNameTemplate"))
+        listOf("Botschaft", "{land} {land}", "{Land}", " ", "{land}" + "x".repeat(95)).forEach {
+            setSettingsRequest(settings(channelId = null, template = it)).andExpect { status { isBadRequest() } }
+        }
+
+        setSettings(settings(channelId = null, template = " 🏛️ Botschaft {land} "))
+
+        assertEquals("🏛️ Botschaft {land}", JsonPath.read<String>(embassies(), "$.settings.threadNameTemplate"))
+        val audit = jdbc.queryForList("SELECT description FROM audit_entry", String::class.java)
+        assertTrue(audit.last()!!.endsWith("; Thread-Name: 🏛️ Botschaft {land}"))
+    }
+
+    @Test
+    fun `a thread created on its own is named after the template, with the country name as WarEra has it`() {
+        reportChannels(channel("c-1", creatable = true))
+        setSettings(settings(channelId = "c-1", template = "🏛️ Botschaft {land}"))
+        warera.governments["de"] = WareraGovernment("de", president = "w6")
+
+        creationService.createMissing(mapOf("w6" to "de"))
+
+        assertEquals("🏛️ Botschaft Germany", creationEvents().single().name)
+    }
+
+    @Test
+    fun `renaming renames threads that are not archived and named otherwise, and is recorded`() {
+        reportThreads(
+            """{"id":"t-fr","name":"botschaft-frankreich","parentChannelId":"c-1","parentChannelName":"diplomatie","archived":false,"manageable":true}""",
+            """{"id":"t-de","name":"botschaft-deutschland","parentChannelId":"c-1","parentChannelName":"diplomatie","archived":true,"manageable":true}""",
+            """{"id":"t-pl","name":"Botschaft Poland","parentChannelId":"c-1","parentChannelName":"diplomatie","archived":true,"manageable":true}""",
+        )
+        assign("t-fr", "fr").andExpect { status { isCreated() } }
+        assign("t-de", "de").andExpect { status { isCreated() } }
+        jdbc.update(
+            "INSERT INTO embassy_thread (thread_id, thread_name, parent_channel_id, country_id, country_name, created_at) " +
+                "VALUES ('t-pl', 'Botschaft Poland', 'c-1', 'pl', 'Poland', now())",
+        )
+        awaitBackgroundWork()
+        // Changing the template alone renames nothing.
+        setSettings(settings(channelId = null, template = "Botschaft {land}"))
+        awaitBackgroundWork()
+        assertEquals(emptyList(), renameEvents())
+        // Archived and named otherwise: skipped, which the page says; an archived thread with the name already is not.
+        assertEquals(
+            mapOf("France" to false, "Germany" to true, "Poland" to false),
+            JsonPath
+                .read<List<String>>(embassies(), "$.threads[*].countryName")
+                .zip(JsonPath.read<List<Boolean>>(embassies(), "$.threads[*].renameSkipped"))
+                .toMap(),
+        )
+
+        mockMvc.post("/web/admin/embassies/thread-renames") { cookie(admin) }.andExpect { status { isAccepted() } }
+
+        val event = renameEvents().single()
+        assertEquals(listOf(EmbassyThreadRename("t-fr", "c-1", "Botschaft France", "France")), event.threads)
+        assertEquals(
+            "Botschafts-Threads nach der Vorlage Botschaft {land} umbenennen lassen: 1 Threads",
+            jdbc.queryForObject(
+                "SELECT description FROM audit_entry WHERE action = 'EMBASSY_THREADS_RENAME_REQUESTED'",
+                String::class.java,
+            ),
+        )
+    }
+
+    @Test
+    fun `renames that failed land in the system log`() {
+        val report =
+            EmbassyThreadRenameReport(
+                listOf(
+                    FailedThreadRename("t-fr", "botschaft-frankreich", "France", ThreadRenameFailure.NO_PERMISSION),
+                    FailedThreadRename("t-de", null, "Germany", ThreadRenameFailure.MISSING),
+                ),
+            )
+
+        mockMvc
+            .post("/api/embassies/thread-renames") {
+                header("Authorization", BOT_TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = BitsJson.encodeToString(EmbassyThreadRenameReport.serializer(), report)
+            }.andExpect { status { isNoContent() } }
+
+        assertEquals(
+            listOf(
+                "Der Botschafts-Thread botschaft-frankreich (France) wurde nicht umbenannt: Dem Bot fehlt im Kanal das Recht " +
+                    "„Threads verwalten“.",
+                "Der Botschafts-Thread t-de (Germany) wurde nicht umbenannt: Er wurde gelöscht, oder der Bot sieht ihn nicht.",
+            ),
+            jdbc.queryForList(
+                "SELECT message FROM system_log_entry WHERE kind = 'EMBASSY_THREAD_RENAME_FAILED' ORDER BY id",
+                String::class.java,
+            ),
+        )
+    }
+
+    @Test
     fun `members are found by name or ID`() {
         reportMembers("3", "5")
 
@@ -605,9 +707,11 @@ class EmbassyTest {
 
     private fun embassies() = get("/web/admin/embassies")
 
-    private fun settings(channelId: String?) =
-        """{"offices":["PRESIDENT","VICE_PRESIDENT","MINISTER_OF_FOREIGN_AFFAIRS"],"ambassadorRoleId":"r-amb","hostRoleIds":[],""" +
-            """"channelId":${channelId?.let { "\"$it\"" } ?: "null"}}"""
+    private fun settings(
+        channelId: String?,
+        template: String = "Botschaft {land}",
+    ) = """{"offices":["PRESIDENT","VICE_PRESIDENT","MINISTER_OF_FOREIGN_AFFAIRS"],"ambassadorRoleId":"r-amb","hostRoleIds":[],""" +
+        """"channelId":${channelId?.let { "\"$it\"" } ?: "null"},"threadNameTemplate":"$template"}"""
 
     private fun channel(
         id: String,
@@ -789,6 +893,11 @@ class EmbassyTest {
     private fun creationEvents(): List<EmbassyThreadCreationEvent> {
         jdbc.awaitOutbox()
         return streamEvents().filterIsInstance<EmbassyThreadCreationEvent>()
+    }
+
+    private fun renameEvents(): List<EmbassyThreadRenameEvent> {
+        jdbc.awaitOutbox()
+        return streamEvents().filterIsInstance<EmbassyThreadRenameEvent>()
     }
 
     private fun lastSync(): EmbassySyncEvent = streamEvents().filterIsInstance<EmbassySyncEvent>().lastOrNull() ?: fail("no embassy sync")

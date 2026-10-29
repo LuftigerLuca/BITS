@@ -6,6 +6,7 @@ import {
   dismissEmbassyCreation,
   getEmbassies,
   removeEmbassyMember,
+  renameEmbassyThreads,
   searchEmbassyMembers,
   setEmbassySettings,
   unassignEmbassyThread,
@@ -81,6 +82,16 @@ export function useDismissCreation() {
     'Verworfen',
     undefined,
     undefined,
+  )
+}
+
+/** Fire-and-forget: the new names show once the bot reports the threads again. */
+export function useRenameThreads() {
+  return useEmbassyMutation(
+    () => renameEmbassyThreads(),
+    'Threads werden umbenannt',
+    undefined,
+    'Die neuen Namen erscheinen gleich, Fehler im System-Log.',
   )
 }
 

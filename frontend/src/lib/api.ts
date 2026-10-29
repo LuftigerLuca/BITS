@@ -390,6 +390,7 @@ export type AuditAction =
   | 'DSK_MILITARY_UNIT_ADDED'
   | 'DSK_MILITARY_UNIT_REMOVED'
   | 'STATUS_ROLES_CHANGED'
+  | 'EMBASSY_THREADS_RENAME_REQUESTED'
   | 'BOT_PRESENCE_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
@@ -459,6 +460,7 @@ export type LogEntryType =
   | 'VOTE_EVALUATION_DELAYED'
   | 'EMBASSY_THREAD_UNAVAILABLE'
   | 'EMBASSY_THREAD_CREATION_FAILED'
+  | 'EMBASSY_THREAD_RENAME_FAILED'
 
 export type SyncTrigger = 'HOURLY' | 'RULE_CHANGE' | 'ACCOUNT_CHANGE' | 'SETTING_CHANGE'
 
@@ -573,6 +575,8 @@ export interface EmbassySettings {
   hostRoleIds: string[]
   /** Where the bot creates embassy threads; `null` for none. */
   channelId: string | null
+  /** The name of embassy threads, with `{land}` exactly once for the English name of the country. */
+  threadNameTemplate: string
 }
 
 export interface EmbassyChannel {
@@ -608,6 +612,8 @@ export interface EmbassyThread {
   countryName: string
   /** Whether the bot no longer reports the thread, e.g. because it was deleted. */
   missing: boolean
+  /** Whether the thread is archived and named other than after the template, so renaming skips it. */
+  renameSkipped: boolean
   /** Who is in the thread and why, as of the last sync; empty until the bot reported one. */
   members: { discordUserId: string; name: string; reason: string }[]
   /** Added by an admin; they stay regardless of any office. */
@@ -664,6 +670,11 @@ export async function createEmbassyThread(countryId: string, threadName: string)
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ countryId, threadName }),
   })
+}
+
+/** The bot renames every assigned thread that is not archived after the template; failures go to the system log. */
+export async function renameEmbassyThreads(): Promise<void> {
+  await request(`${EMBASSIES}/thread-renames`, { method: 'POST' })
 }
 
 /** Only a creation that failed. */

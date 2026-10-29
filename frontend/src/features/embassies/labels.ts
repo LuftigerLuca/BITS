@@ -1,5 +1,26 @@
 import { ApiError } from '@/lib/api'
 
+/** Stands for the English name of the country in the thread name template. */
+export const PLACEHOLDER = '{land}'
+
+/** Discord's limit for thread names, and the template's. */
+export const MAX_THREAD_NAME_LENGTH = 100
+
+/** Why [template] cannot be saved, in German; `null` if it can. Checked by the backend the same way. */
+export function templateError(template: string): string | null {
+  const trimmed = template.trim()
+  if (trimmed.length === 0) return 'Der Thread-Name darf nicht leer sein.'
+  if (trimmed.length > MAX_THREAD_NAME_LENGTH) return `Der Thread-Name darf höchstens ${MAX_THREAD_NAME_LENGTH} Zeichen haben.`
+  const count = trimmed.split(PLACEHOLDER).length - 1
+  if (count !== 1) return `Der Thread-Name muss ${PLACEHOLDER} genau einmal enthalten.`
+  return null
+}
+
+/** The name of the thread of [countryName] after [template], cut to Discord's limit like the backend does. */
+export function threadName(template: string, countryName: string): string {
+  return template.replaceAll(PLACEHOLDER, countryName).slice(0, MAX_THREAD_NAME_LENGTH)
+}
+
 export const ERROR_MESSAGE = 'Die Botschaften konnten nicht geladen werden. Bitte versuche es später erneut.'
 
 /** Discord adds only members who may see the channel of a private thread. */

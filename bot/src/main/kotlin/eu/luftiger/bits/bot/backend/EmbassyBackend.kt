@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.backend
 import eu.luftiger.bits.shared.DiscordThreadDto
 import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.EmbassyThreadCreationReport
+import eu.luftiger.bits.shared.EmbassyThreadRenameReport
 
 /** The part of the backend's REST API for the embassies; [KtorBackendClient] implements it next to [BackendClient]. */
 interface EmbassyBackend {
@@ -20,4 +21,7 @@ interface EmbassyBackend {
         creationId: Long,
         report: EmbassyThreadCreationReport,
     )
+
+    /** Tells the backend which embassy threads the bot could not rename. */
+    suspend fun reportThreadRenames(report: EmbassyThreadRenameReport)
 }

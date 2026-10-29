@@ -400,12 +400,13 @@ export const MANUAL_PAGES: ManualPage[] = [
           'einem Land seinen Thread zu, und BITS hält die Mitglieder aktuell.',
         steps: [
           'Wähle unter „Botschaften“ die Ämter, die jemanden zum Botschafter machen (Standard: Präsident, ' +
-            'Vizepräsident, Außenminister), die Botschafter-Rolle, Gastgeber-Rollen wie die eigene Regierung und den ' +
-            'Botschafts-Kanal.',
+            'Vizepräsident, Außenminister), die Botschafter-Rolle, Gastgeber-Rollen wie die eigene Regierung, den ' +
+            'Botschafts-Kanal und den Thread-Namen, z. B. „🏛️ Botschaft {land}“. {land} steht dabei für den ' +
+            'englischen Ländernamen aus WarEra, z. B. „Germany“; Standard ist „Botschaft {land}“.',
           'Verknüpft sich jemand mit einem dieser Ämter in einem Land ohne Thread, legt der Bot im Botschafts-Kanal ' +
-            'den privaten Thread „Botschaft <Land>“ an und ordnet ihn zu.',
+            'einen privaten Thread mit diesem Namen an und ordnet ihn zu.',
           'Unter „Botschafts-Threads“ kannst du einem Land auch selbst einen bestehenden Thread zuordnen oder mit ' +
-            '„Automatisch anlegen“ einen Thread mit eigenem Namen anlegen lassen.',
+            '„Automatisch anlegen“ einen Thread anlegen lassen; der Name aus der Vorlage ist vorbelegt und änderbar.',
           'Füge bei Bedarf Mitglieder von Hand hinzu.',
         ],
         points: [
@@ -420,6 +421,10 @@ export const MANUAL_PAGES: ManualPage[] = [
             'Minute, zeigt die Seite den Grund. BITS versucht es dann nicht von selbst erneut: Lege ihn erneut an, ' +
             'ordne einen anderen Thread zu oder verwirf den Fehler.',
           'Hebst du eine Zuordnung auf, bleibt der Thread in Discord bestehen.',
+          'Ändern des Thread-Namens benennt keinen Thread um. Mit „Bestehende umbenennen“ benennt der Bot alle ' +
+            'zugeordneten Threads nach der Vorlage um. Archivierte überspringt er; sie sind auf der Seite mit ' +
+            '„Archiviert, beim Umbenennen übersprungen“ markiert. Die neuen Namen erscheinen kurz darauf, was nicht ' +
+            'klappt, steht im System-Log.',
         ],
         tips: [
           'Der Bot braucht im Botschafts-Kanal die Rechte „Private Threads erstellen“, „Threads verwalten“ und ' +

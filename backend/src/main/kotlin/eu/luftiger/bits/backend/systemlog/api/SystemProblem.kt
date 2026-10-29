@@ -60,6 +60,14 @@ sealed interface SystemProblem {
         val reason: String,
     ) : SystemProblem
 
+    /** The bot could not rename an embassy thread after the name template; the other threads were renamed. */
+    @NamedInterface("api")
+    data class EmbassyThreadRenameFailed(
+        val threadName: String,
+        val countryName: String,
+        val cause: EmbassyThreadCause,
+    ) : SystemProblem
+
     /** A role with rules was deleted in Discord or moved above the bot, so its rules no longer run. */
     @NamedInterface("api")
     data class RoleNotAssignable(

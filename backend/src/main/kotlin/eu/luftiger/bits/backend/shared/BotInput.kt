@@ -35,6 +35,9 @@ object BotInput {
     /** Far above any guild BITS serves; a list beyond is a bug. */
     private const val MAX_MEMBERS = 1_000_000
     private const val MAX_REASON_LENGTH = 1_000
+
+    /** As the backend sent it, so it fits the country name columns. */
+    private const val MAX_COUNTRY_NAME_LENGTH = 255
     private val STREAM_ID = Regex("[0-9]{1,20}-[0-9]{1,20}")
     private val EVENT_TYPE = Regex("[a-z_]{1,64}")
 
@@ -75,6 +78,8 @@ object BotInput {
     fun reportedChangeCount(count: Int) = check(count <= MAX_REPORTED_CHANGES, "number of changes")
 
     fun reason(value: String) = check(value.length <= MAX_REASON_LENGTH, "reason")
+
+    fun countryName(value: String) = check(value.isNotBlank() && value.length <= MAX_COUNTRY_NAME_LENGTH, "country name")
 
     fun streamId(value: String) = check(STREAM_ID.matches(value), "stream id")
 
