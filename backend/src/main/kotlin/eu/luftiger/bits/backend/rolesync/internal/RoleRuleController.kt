@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -42,34 +43,46 @@ class RoleRuleController(
     @PostMapping("/rules")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
-        @RequestBody request: CreateRuleRequest,
+        @RequestBody request: RuleRequest,
         @AuthenticationPrincipal session: Jwt,
     ): RuleResponse {
         val rule = ruleService.create(request, actor(session))
-        log.info("Rule {} ({}) for role {} created by {}", rule.id, rule.label, rule.roleId, session.subject)
+        log.info("Rule ({}) for role {} created by {}", rule.label, rule.roleId, session.subject)
         return rule
     }
 
-    /** What creating the rule would change, without creating it. */
+    /** Replaces the blocks of the rule of the role as a whole. */
+    @PutMapping("/rules/{roleId}")
+    fun update(
+        @PathVariable roleId: String,
+        @RequestBody request: UpdateRuleRequest,
+        @AuthenticationPrincipal session: Jwt,
+    ): RuleResponse {
+        val rule = ruleService.update(roleId, request, actor(session))
+        log.info("Rule ({}) for role {} updated by {}", rule.label, rule.roleId, session.subject)
+        return rule
+    }
+
+    /** What the rule would change as the rule of its role, in place of the one it has, without saving it. */
     @PostMapping("/rules/preview")
-    fun previewCreate(
-        @RequestBody request: CreateRuleRequest,
-    ): RulePreviewResponse = previewService.previewCreate(request)
+    fun preview(
+        @RequestBody request: RuleRequest,
+    ): RulePreviewResponse = previewService.preview(request)
 
-    /** What deleting the rule would change, without deleting it. */
-    @GetMapping("/rules/{id}/deletion-preview")
+    /** What deleting the rule of the role would change, without deleting it. */
+    @GetMapping("/rules/{roleId}/deletion-preview")
     fun previewDelete(
-        @PathVariable id: Long,
-    ): RulePreviewResponse = previewService.previewDelete(id)
+        @PathVariable roleId: String,
+    ): RulePreviewResponse = previewService.previewDelete(roleId)
 
-    @DeleteMapping("/rules/{id}")
+    @DeleteMapping("/rules/{roleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(
-        @PathVariable id: Long,
+        @PathVariable roleId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
-        val rule = ruleService.delete(id, actor(session))
-        log.info("Rule {} ({}) for role {} deleted by {}", id, rule.label, rule.roleId, session.subject)
+        val rule = ruleService.delete(roleId, actor(session))
+        log.info("Rule ({}) for role {} deleted by {}", rule.label, roleId, session.subject)
     }
 
     @GetMapping("/countries")
@@ -103,15 +116,41 @@ data class RoleResponse(
     val managed: Boolean,
 )
 
+/** The rule of a role, the only one it has. */
 @Serializable
 data class RuleResponse(
-    val id: Long,
     val roleId: String,
     /** `null` if the role was deleted in Discord. */
     val roleName: String?,
     val roleColor: Int?,
+    /** The blocks joined with "oder". */
     val label: String,
+    /** Of these, one is enough. */
+    val blocks: List<BlockResponse>,
     val status: RuleStatus,
+)
+
+/** All of the [conditions] must be met. */
+@Serializable
+data class BlockResponse(
+    /** The conditions joined with "und". */
+    val label: String,
+    val conditions: List<ConditionResponse>,
+)
+
+/** A condition with the fields of its [ConditionRequest], so the dashboard can edit it. */
+@Serializable
+data class ConditionResponse(
+    val type: RuleType,
+    val countryId: String?,
+    val offices: List<Office>,
+    val muId: String?,
+    val threshold: Int?,
+    val partyId: String?,
+    val muRole: MuRole?,
+    /** Name of the country, military unit or party at the time the condition was saved. */
+    val targetName: String?,
+    val label: String,
 )
 
 @Serializable
@@ -134,7 +173,7 @@ data class RulePreviewResponse(
     val roleId: String,
     /** `null` if the role was deleted in Discord. */
     val roleName: String?,
-    /** `false` if no active rule is left for the role: BITS no longer manages it, and nobody gets or loses it. */
+    /** `false` if the role has no active rule after the change: BITS no longer manages it, and nobody gets or loses it. */
     val managed: Boolean,
     /** `false` until the bot has reported the members with their roles since the backend started; there is no preview. */
     val membersReported: Boolean,
@@ -153,11 +192,20 @@ data class PreviewMember(
     val name: String?,
 )
 
-/** All of the [conditions] must be met, at least one and at most [RoleRuleService.MAX_CONDITIONS]. */
+/**
+ * One of the [blocks] must be met, and all conditions of a block; at least one and at most [RoleRuleService.MAX_BLOCKS]
+ * blocks, each with at least one and at most [RoleRuleService.MAX_CONDITIONS] conditions.
+ */
 @Serializable
-data class CreateRuleRequest(
+data class RuleRequest(
     val roleId: String,
-    val conditions: List<ConditionRequest>,
+    val blocks: List<List<ConditionRequest>>,
+)
+
+/** Like [RuleRequest], for the role the rule has already. */
+@Serializable
+data class UpdateRuleRequest(
+    val blocks: List<List<ConditionRequest>>,
 )
 
 /** Which of the optional fields are needed depends on [type]. */
@@ -204,6 +252,20 @@ val RuleType.condition: ConditionType
             RuleType.PARTY_LEADER -> ConditionType.PARTY_LEADER
         }
 
+val ConditionType.ruleType: RuleType
+    get() =
+        when (this) {
+            ConditionType.CITIZENSHIP -> RuleType.CITIZENSHIP
+            ConditionType.GOVERNMENT_OFFICE -> RuleType.GOVERNMENT_OFFICE
+            ConditionType.MILITARY_UNIT -> RuleType.MILITARY_UNIT
+            ConditionType.LEVEL -> RuleType.LEVEL
+            ConditionType.MILITARY_RANK -> RuleType.MILITARY_RANK
+            ConditionType.COMPANIES -> RuleType.COMPANIES
+            ConditionType.PARTY -> RuleType.PARTY
+            ConditionType.MU_LEADERSHIP -> RuleType.MU_LEADERSHIP
+            ConditionType.PARTY_LEADER -> RuleType.PARTY_LEADER
+        }
+
 /** Like [RuleType], the API's names for [GovernmentOffice]. */
 @Serializable
 enum class Office {
@@ -226,6 +288,17 @@ val Office.office: GovernmentOffice
             Office.CONGRESS -> GovernmentOffice.CONGRESS
         }
 
+val GovernmentOffice.apiOffice: Office
+    get() =
+        when (this) {
+            GovernmentOffice.PRESIDENT -> Office.PRESIDENT
+            GovernmentOffice.VICE_PRESIDENT -> Office.VICE_PRESIDENT
+            GovernmentOffice.MINISTER_OF_ECONOMY -> Office.MINISTER_OF_ECONOMY
+            GovernmentOffice.MINISTER_OF_DEFENSE -> Office.MINISTER_OF_DEFENSE
+            GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS -> Office.MINISTER_OF_FOREIGN_AFFAIRS
+            GovernmentOffice.CONGRESS -> Office.CONGRESS
+        }
+
 /** Like [RuleType], the API's names for [MilitaryUnitRole]. */
 @Serializable
 enum class MuRole {
@@ -240,6 +313,14 @@ val MuRole.role: MilitaryUnitRole
             MuRole.COMMANDER -> MilitaryUnitRole.COMMANDER
             MuRole.MANAGER -> MilitaryUnitRole.MANAGER
             MuRole.OWNER -> MilitaryUnitRole.OWNER
+        }
+
+val MilitaryUnitRole.apiRole: MuRole
+    get() =
+        when (this) {
+            MilitaryUnitRole.COMMANDER -> MuRole.COMMANDER
+            MilitaryUnitRole.MANAGER -> MuRole.MANAGER
+            MilitaryUnitRole.OWNER -> MuRole.OWNER
         }
 
 @Serializable

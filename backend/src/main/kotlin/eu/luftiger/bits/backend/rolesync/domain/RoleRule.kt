@@ -21,40 +21,73 @@ import jakarta.persistence.Table
 import java.time.Instant
 
 /**
- * Gives the Discord role [roleId] to every linked member whose WarEra account meets all of the [conditions]. Several
- * rules for the same role are combined with OR.
+ * Gives the Discord role [roleId] to every linked member whose WarEra account meets all conditions of at least one of
+ * the [blocks]: the conditions of a block are combined with AND, the blocks with OR. Each role has one rule at most.
  */
 @Entity
 @Table(name = "role_rule")
 class RoleRule(
     @Column(name = "role_id", nullable = false)
     val roleId: String,
-    /** At least one, in the order the admin entered them. */
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "role_rule_condition", joinColumns = [JoinColumn(name = "rule_id")])
-    @OrderColumn(name = "position")
-    val conditions: List<RuleCondition>,
+    blocks: List<RuleBlock>,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant,
 ) {
-    init {
-        require(conditions.isNotEmpty()) { "A rule needs at least one condition" }
-    }
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
 
-    /**
-     * The conditions regardless of their order, for the unique index that catches the same rule twice for a role.
-     * V16 computes it the same way for the rules from before.
-     */
-    @Column(name = "conditions_key", nullable = false, length = 2000)
-    val conditionsKey: String = conditions.map { it.key }.sorted().joinToString(";")
+    /** The conditions of all blocks, block by block; each knows its [RuleCondition.block]. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "role_rule_condition", joinColumns = [JoinColumn(name = "rule_id")])
+    @OrderColumn(name = "position")
+    private val storedConditions: MutableList<RuleCondition> = stored(blocks)
 
-    /** German description for the dashboard and Discord's audit log, e.g. "Staatsbürgerschaft Germany und Level ab 10". */
+    /** At least one, each with at least one condition, in the order the admin entered them. */
+    val blocks: List<RuleBlock>
+        get() =
+            storedConditions
+                .groupBy { it.block }
+                .toSortedMap()
+                .values
+                .map(::RuleBlock)
+
+    /** The conditions of all blocks. */
+    val conditions: List<RuleCondition>
+        get() = storedConditions
+
+    /** German description for the dashboard, e.g. "Staatsbürgerschaft Germany und Level ab 10 oder Mitglied der MU X". */
+    val label: String
+        get() = blocks.joinToString(" oder ") { it.label }
+
+    /** Replaces all blocks, when an admin edits the rule. */
+    fun replaceBlocks(blocks: List<RuleBlock>) {
+        val conditions = stored(blocks)
+        storedConditions.clear()
+        storedConditions.addAll(conditions)
+    }
+
+    private fun stored(blocks: List<RuleBlock>): MutableList<RuleCondition> {
+        require(blocks.isNotEmpty()) { "A rule needs at least one block" }
+        return blocks.flatMapIndexedTo(mutableListOf()) { index, block -> block.conditions.map { it.inBlock(index) } }
+    }
+}
+
+/** Conditions of a [RoleRule] that must all be met; not stored on its own, see [RuleCondition.block]. */
+class RuleBlock(
+    val conditions: List<RuleCondition>,
+) {
+    init {
+        require(conditions.isNotEmpty()) { "A block needs at least one condition" }
+    }
+
+    /** German description, e.g. "Staatsbürgerschaft Germany und Level ab 10"; the reason in Discord's audit log. */
     val label: String
         get() = conditions.joinToString(" und ") { it.label }
+
+    /** The conditions regardless of their order, to catch the same block twice in a rule. */
+    val key: String
+        get() = conditions.map { it.key }.sorted().joinToString(";")
 }
 
 /** One condition of a [RoleRule]. Which of the fields are set depends on [type]. */
@@ -98,7 +131,12 @@ class RuleCondition(
     @Enumerated(EnumType.STRING)
     @Column(name = "mu_role")
     val muRole: MilitaryUnitRole? = null,
+    /** Index of the [RuleBlock] in its rule; set by [RoleRule]. */
+    @Column(name = "block", nullable = false)
+    val block: Int = 0,
 ) {
+    fun inBlock(block: Int) = RuleCondition(type, countryId, offices, muId, threshold, targetName, partyId, muRole, block)
+
     /** German description, e.g. "Level ab 10". */
     val label: String
         get() =

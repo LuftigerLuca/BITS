@@ -316,7 +316,7 @@ class AuthTest {
                 cookie(session)
                 header(HttpHeaders.ORIGIN, "https://other.bits.test")
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"roleId":"1","conditions":[{"type":"CITIZEN","countryId":"de"}]}"""
+                content = """{"roleId":"1","blocks":[[{"type":"CITIZEN","countryId":"de"}]]}"""
             }.andExpect { status { isForbidden() } }
         mockMvc
             .post("/auth/logout") {

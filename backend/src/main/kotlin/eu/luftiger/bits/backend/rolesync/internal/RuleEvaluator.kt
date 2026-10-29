@@ -2,23 +2,23 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleBlock
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.warera.WareraUser
 
 /**
- * Decides which managed roles a member gets. A rule is met if all of its conditions are, and a role if any of its rules
- * is. A condition whose WarEra data is missing is neither met nor failed, and so is a rule that no other condition
- * fails: the member keeps the role as it is, so an unreachable WarEra API never takes roles away.
+ * Decides which managed roles a member gets. A block is met if all of its conditions are, and a role if any block of its
+ * rule is. A condition whose WarEra data is missing is neither met nor failed, and so is a block that no other condition
+ * fails: unless another block is met, the member keeps the role as it is, so an unreachable WarEra API never takes roles
+ * away.
  */
 class RuleEvaluator(
-    /** Rules of the roles BITS manages, i.e. only those whose role exists and is assignable. */
-    rules: List<RoleRule>,
+    /** Rules of the roles BITS manages, i.e. only those whose role exists and is assignable; one per role. */
+    private val rules: List<RoleRule>,
     private val data: RuleData,
 ) {
-    private val rulesByRole = rules.groupBy { it.roleId }
-
     /**
      * Target roles of a linked member, or `null` if the member gets and keeps nothing. [user] is `null` if it could not be
      * loaded, [companyCount] if the companies were not or could not be loaded.
@@ -39,15 +39,17 @@ class RuleEvaluator(
         return if (grants.isEmpty() && keep.isEmpty()) null else MemberRoles(grants, keep)
     }
 
-    /** How each rule of each managed role turns out for [user], in the order of the rules; [evaluate] decides on this. */
+    /** How each block of the rule of each managed role turns out for [user], in their order; [evaluate] decides on this. */
     fun check(
         user: WareraUser?,
         companyCount: Int? = null,
     ): List<RoleCheck> =
-        rulesByRole.map { (roleId, rules) ->
+        rules.map { rule ->
             RoleCheck(
-                roleId,
-                rules.map { rule -> RuleCheck(rule, rule.conditions.map { ConditionCheck(it, matches(it, user, companyCount)) }) },
+                rule.roleId,
+                rule.blocks.map { block ->
+                    BlockCheck(block, block.conditions.map { ConditionCheck(it, matches(it, user, companyCount)) })
+                },
             )
         }
 
@@ -87,8 +89,8 @@ class ConditionCheck(
     val met: Boolean?,
 )
 
-class RuleCheck(
-    val rule: RoleRule,
+class BlockCheck(
+    val block: RuleBlock,
     val conditions: List<ConditionCheck>,
 ) {
     /** `false` if any condition fails, else `null` if the data for any is missing. */
@@ -102,15 +104,15 @@ class RuleCheck(
 
 class RoleCheck(
     val roleId: String,
-    val rules: List<RuleCheck>,
+    val blocks: List<BlockCheck>,
 ) {
-    /** The first rule that is met; the sync names it as the reason. */
-    val metBy: RoleRule? = rules.firstOrNull { it.met == true }?.rule
+    /** The first block that is met; the sync names it as the reason. */
+    val metBy: RuleBlock? = blocks.firstOrNull { it.met == true }?.block
 
     val outcome: RoleOutcome =
         when {
             metBy != null -> RoleOutcome.MET
-            rules.any { it.met == null } -> RoleOutcome.UNDECIDED
+            blocks.any { it.met == null } -> RoleOutcome.UNDECIDED
             else -> RoleOutcome.NOT_MET
         }
 }
@@ -119,6 +121,6 @@ enum class RoleOutcome {
     MET,
     NOT_MET,
 
-    /** No rule is met and the data for at least one is missing; the member keeps the role as it is. */
+    /** No block is met and the data for at least one is missing; the member keeps the role as it is. */
     UNDECIDED,
 }

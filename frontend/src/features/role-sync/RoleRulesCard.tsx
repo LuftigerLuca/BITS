@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Trash2Icon } from 'lucide-react'
+import { Fragment, useState } from 'react'
+import { PencilIcon, Trash2Icon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
 import {
@@ -22,7 +22,7 @@ import { RulePreview } from './RulePreview'
 import { useDeleteRoleRule, useDeletionPreview, useRoleRules } from './queries'
 
 /** Rules that tie Discord roles to WarEra data; BITS gives and takes these roles on its own. */
-export function RoleRulesCard() {
+export function RoleRulesCard({ onEdit = () => {} }: { onEdit?: (rule: RoleRule) => void }) {
   const rules = useRoleRules()
   const deleteRule = useDeleteRoleRule()
   const [ruleToDelete, setRuleToDelete] = useState<RoleRule | null>(null)
@@ -33,7 +33,8 @@ export function RoleRulesCard() {
         <CardTitle>Automatische Rollen</CardTitle>
         <CardDescription>
           BITS vergibt diese Rollen anhand der WarEra-Daten verknüpfter Accounts und entzieht sie allen, die keine
-          ihrer Regeln erfüllen. Mehrere Regeln für dieselbe Rolle reichen einzeln aus, die Bedingungen einer Regel müssen alle erfüllt sein.
+          ihrer Regel erfüllen. Von den Blöcken einer Regel genügt einer, die Bedingungen eines Blocks müssen alle erfüllt
+          sein.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -55,7 +56,7 @@ export function RoleRulesCard() {
             </TableHeader>
             <TableBody>
               {rules.data.map((rule) => (
-                <TableRow key={rule.id}>
+                <TableRow key={rule.roleId}>
                   <TableCell>
                     {rule.roleName !== null ? (
                       <RoleName name={rule.roleName} color={rule.roleColor} />
@@ -63,20 +64,35 @@ export function RoleRulesCard() {
                       <span className="text-muted-foreground">Gelöschte Rolle</span>
                     )}
                   </TableCell>
-                  <TableCell>{rule.label}</TableCell>
+                  <TableCell className="whitespace-normal">
+                    <Blocks rule={rule} />
+                  </TableCell>
                   <TableCell>
                     <Badge variant={STATUS[rule.status].variant}>{STATUS[rule.status].label}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Regel „${rule.label}“ löschen`}
-                      disabled={deleteRule.isPending && deleteRule.variables === rule.id}
-                      onClick={() => setRuleToDelete(rule)}
-                    >
-                      <Trash2Icon />
-                    </Button>
+                    <div className="flex">
+                      {/* Orphaned and unassignable roles cannot get a new rule, only lose theirs. */}
+                      {rule.status === 'ACTIVE' && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Regel „${rule.label}“ bearbeiten`}
+                          onClick={() => onEdit(rule)}
+                        >
+                          <PencilIcon />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Regel „${rule.label}“ löschen`}
+                        disabled={deleteRule.isPending && deleteRule.variables === rule.roleId}
+                        onClick={() => setRuleToDelete(rule)}
+                      >
+                        <Trash2Icon />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -87,7 +103,7 @@ export function RoleRulesCard() {
           rule={ruleToDelete}
           onConfirm={(rule) => {
             setRuleToDelete(null)
-            deleteRule.mutate(rule.id)
+            deleteRule.mutate(rule.roleId)
           }}
           onCancel={() => setRuleToDelete(null)}
         />
@@ -96,9 +112,23 @@ export function RoleRulesCard() {
   )
 }
 
+/** The blocks of a rule, with „oder“ between them, so the grouping of the conditions shows. */
+function Blocks({ rule }: { rule: RoleRule }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {rule.blocks.map((block, index) => (
+        <Fragment key={index}>
+          {index > 0 && <span className="text-xs font-medium text-muted-foreground">oder</span>}
+          <span>{block.label}</span>
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
 /**
- * Deleting a rule syncs everybody right away, so a slip in the table would take the role from members at once; the
- * dialog shows from whom. The last rule of a role ends its management instead, which takes the role from nobody.
+ * Deleting a rule ends the management of its role, which takes the role from nobody; the dialog says so, and the sync
+ * that follows runs right away.
  */
 function DeleteRuleDialog({
   rule,
@@ -109,7 +139,7 @@ function DeleteRuleDialog({
   onConfirm: (rule: RoleRule) => void
   onCancel: () => void
 }) {
-  const preview = useDeletionPreview(rule?.id ?? null)
+  const preview = useDeletionPreview(rule?.roleId ?? null)
   const role = rule?.roleName ?? 'gelöschte Rolle'
   return (
     <AlertDialog open={rule !== null} onOpenChange={(open) => !open && onCancel()}>

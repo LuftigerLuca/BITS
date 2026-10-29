@@ -8,12 +8,14 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 
 /**
  * Shows an admin whom a rule change gives the role and from whom it takes it, before it is saved. It judges like the
  * sync that follows the change: with the [RuleEvaluator], the WarEra data of the last sync and fresh governments,
- * parties and military units, against the roles the members hold now as the bot reported them. A rule change only changes its own role, and the bot
- * takes it from as many members as it takes, so that is all the sync would change for it.
+ * parties and military units, against the roles the members hold now as the bot reported them. A rule change only
+ * changes its own role, and the bot takes it from as many members as it takes, so that is all the sync would change for
+ * it.
  *
  * It saves, records and publishes nothing.
  */
@@ -27,21 +29,24 @@ class RulePreviewService(
     private val accountLinks: AccountLinks,
     private val guildMembers: GuildMembers,
 ) {
-    /** @throws ResponseStatusException 400 like [RoleRuleService.create] */
-    fun previewCreate(request: CreateRuleRequest): RulePreviewResponse {
-        val (role, rule) = ruleService.newRule(request)
-        return preview(role.id, rulesOf(role.id) + rule)
+    /**
+     * What [request] would change as the rule of its role, in place of the one the role has, for a new rule and for an
+     * edited one alike.
+     *
+     * @throws ResponseStatusException 400 like [RoleRuleService.create]
+     */
+    fun preview(request: RuleRequest): RulePreviewResponse {
+        val (role, blocks) = ruleService.newBlocks(request)
+        return preview(role.id, listOf(RoleRule(role.id, blocks, Instant.EPOCH)))
     }
 
-    /** @throws ResponseStatusException 404 if the rule does not exist */
-    fun previewDelete(id: Long): RulePreviewResponse {
-        val rule = ruleRepository.findByIdOrNull(id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        return preview(rule.roleId, rulesOf(rule.roleId).filter { it.id != id })
+    /** @throws ResponseStatusException 404 if the role has no rule */
+    fun previewDelete(roleId: String): RulePreviewResponse {
+        ruleRepository.findByRoleId(roleId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return preview(roleId, emptyList())
     }
 
-    private fun rulesOf(roleId: String) = ruleInputs.activeRules().filter { it.roleId == roleId }
-
-    /** [rules] are the active rules of [roleId] after the change. */
+    /** [rules] are the active rule of [roleId] after the change, if any. */
     private fun preview(
         roleId: String,
         rules: List<RoleRule>,

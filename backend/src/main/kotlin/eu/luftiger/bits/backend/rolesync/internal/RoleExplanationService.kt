@@ -34,10 +34,7 @@ class RoleExplanationService(
         if (rules.isEmpty()) return RoleExplanationResponse.Explained(link.wareraUsername, emptyList())
         val user = wareraClient.getUser(link.wareraUserId)
         val companyCount =
-            if (rules.any { rule ->
-                    rule.conditions.any { it.type == ConditionType.COMPANIES }
-                }
-            ) {
+            if (rules.any { rule -> rule.conditions.any { it.type == ConditionType.COMPANIES } }) {
                 companyCount(user.id)
             } else {
                 null
@@ -56,18 +53,18 @@ class RoleExplanationService(
                                 RoleOutcome.NOT_MET -> ManagedRoleOutcome.NOT_MET
                                 RoleOutcome.UNDECIDED -> ManagedRoleOutcome.UNDECIDED
                             },
-                        rules = role.rules.map { RuleExplanation(it.rule.label, it.met, detail(it, user, companyCount)) },
+                        rules = role.blocks.map { RuleExplanation(it.block.label, it.met, detail(it, user, companyCount)) },
                     )
                 }
         return RoleExplanationResponse.Explained(user.username, roles)
     }
 
     /**
-     * What the user lacks, in German: the conditions that fail, or if none fails, those that cannot be checked; `null`
-     * if the rule is met.
+     * What the user lacks for a block, in German: the conditions that fail, or if none fails, those that cannot be
+     * checked; `null` if the block is met.
      */
     private fun detail(
-        check: RuleCheck,
+        check: BlockCheck,
         user: WareraUser,
         companyCount: Int?,
     ): String? {

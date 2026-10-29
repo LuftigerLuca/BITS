@@ -91,24 +91,54 @@ export type MuRole = 'COMMANDER' | 'MANAGER' | 'OWNER'
 
 export type RuleStatus = 'ACTIVE' | 'ORPHANED' | 'NOT_ASSIGNABLE'
 
+/** The rule of a role, the only one it has. */
 export interface RoleRule {
-  id: number
   roleId: string
   /** `null` if the role was deleted in Discord. */
   roleName: string | null
   roleColor: number | null
+  /** The blocks joined with „oder“. */
   label: string
+  /** Of these, one is enough. */
+  blocks: RuleBlock[]
   status: RuleStatus
 }
 
-/** All of the conditions must be met; between one and `MAX_CONDITIONS`. */
-export interface CreateRoleRule {
-  roleId: string
-  conditions: CreateCondition[]
+/** All of the conditions must be met. */
+export interface RuleBlock {
+  /** The conditions joined with „und“. */
+  label: string
+  conditions: RuleCondition[]
 }
 
-/** The backend takes at most this many conditions per rule. */
+/** A saved condition, with the fields to edit it. */
+export interface RuleCondition {
+  type: ConditionType
+  countryId: string | null
+  offices: GovernmentOffice[]
+  muId: string | null
+  threshold: number | null
+  partyId: string | null
+  muRole: MuRole | null
+  /** Name of the country, military unit or party when the condition was saved. */
+  targetName: string | null
+  label: string
+}
+
+/**
+ * One of the blocks must be met, and all conditions of a block; between one and `MAX_BLOCKS` blocks of between one and
+ * `MAX_CONDITIONS` conditions.
+ */
+export interface CreateRoleRule {
+  roleId: string
+  blocks: CreateCondition[][]
+}
+
+/** The backend takes at most this many conditions per block. */
 export const MAX_CONDITIONS = 10
+
+/** The backend takes at most this many blocks per rule. */
+export const MAX_BLOCKS = 10
 
 /** Which of the optional fields are needed depends on `type`. */
 export interface CreateCondition {
@@ -137,7 +167,7 @@ export interface PreviewMember {
 export interface RulePreview {
   roleId: string
   roleName: string | null
-  /** `false` if no rule is left for the role: BITS no longer manages it, and nobody gets or loses it. */
+  /** `false` if the role has no rule after the change: BITS no longer manages it, and nobody gets or loses it. */
   managed: boolean
   /** `false` until the bot has reported the members with their roles since the backend started; there is no preview. */
   membersReported: boolean
@@ -168,7 +198,18 @@ export async function createRoleRule(rule: CreateRoleRule): Promise<RoleRule> {
   return response.json()
 }
 
-export async function previewCreateRoleRule(rule: CreateRoleRule): Promise<RulePreview> {
+/** Replaces the blocks of the rule of the role as a whole. */
+export async function updateRoleRule(rule: CreateRoleRule): Promise<RoleRule> {
+  const response = await request(`${ROLE_SYNC}/rules/${rule.roleId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blocks: rule.blocks }),
+  })
+  return response.json()
+}
+
+/** What `rule` would change as the rule of its role, in place of the one it has. */
+export async function previewRoleRule(rule: CreateRoleRule): Promise<RulePreview> {
   const response = await request(`${ROLE_SYNC}/rules/preview`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -177,12 +218,12 @@ export async function previewCreateRoleRule(rule: CreateRoleRule): Promise<RuleP
   return response.json()
 }
 
-export async function previewDeleteRoleRule(id: number): Promise<RulePreview> {
-  return (await request(`${ROLE_SYNC}/rules/${id}/deletion-preview`)).json()
+export async function previewDeleteRoleRule(roleId: string): Promise<RulePreview> {
+  return (await request(`${ROLE_SYNC}/rules/${roleId}/deletion-preview`)).json()
 }
 
-export async function deleteRoleRule(id: number): Promise<void> {
-  await request(`${ROLE_SYNC}/rules/${id}`, { method: 'DELETE' })
+export async function deleteRoleRule(roleId: string): Promise<void> {
+  await request(`${ROLE_SYNC}/rules/${roleId}`, { method: 'DELETE' })
 }
 
 export async function getCountries(): Promise<Option[]> {
@@ -202,6 +243,7 @@ const AUDIT_LOG = '/web/admin/audit-log'
 export type AuditAction =
   | 'ROLE_RULE_CREATED'
   | 'ROLE_RULE_DELETED'
+  | 'ROLE_RULE_UPDATED'
   | 'OVERVIEW_COUNTRY_SET'
   | 'NICKNAME_SETTING_CHANGED'
   | 'VOTE_STARTED'
@@ -428,7 +470,13 @@ export interface Embassies {
   /** By country name. */
   threads: EmbassyThread[]
   /** Private threads without a country yet. */
-  availableThreads: { id: string; name: string; channelName: string; archived: boolean; manageable: boolean }[]
+  availableThreads: {
+    id: string
+    name: string
+    channelName: string
+    archived: boolean
+    manageable: boolean
+  }[]
 }
 
 export async function getEmbassies(): Promise<Embassies> {
@@ -465,7 +513,9 @@ export async function addEmbassyMember(threadId: string, discordUserId: string):
 }
 
 export async function removeEmbassyMember(threadId: string, discordUserId: string): Promise<void> {
-  await request(`${EMBASSIES}/threads/${threadId}/members/${discordUserId}`, { method: 'DELETE' })
+  await request(`${EMBASSIES}/threads/${threadId}/members/${discordUserId}`, {
+    method: 'DELETE',
+  })
 }
 
 /** Members of the Discord by name or ID, at most 20. */
@@ -512,7 +562,10 @@ export interface BotPresence {
 export async function getBotPresence(): Promise<BotPresence> {
   const presence = await (await request(BOT_PRESENCE)).json()
   // The backend leaves out fields with their default, i.e. online without activity.
-  return { status: presence.status ?? 'ONLINE', activity: presence.activity ?? null }
+  return {
+    status: presence.status ?? 'ONLINE',
+    activity: presence.activity ?? null,
+  }
 }
 
 export async function setBotPresence(presence: BotPresence): Promise<void> {
@@ -649,7 +702,9 @@ export async function createVote(vote: CreateVote): Promise<Vote> {
 
 /** Ends the vote early, which starts the evaluation; `cancel` ends it without one. */
 export async function closeVote(id: number, cancel: boolean): Promise<void> {
-  await request(`${VOTES}/${id}/${cancel ? 'cancel' : 'end'}`, { method: 'POST' })
+  await request(`${VOTES}/${id}/${cancel ? 'cancel' : 'end'}`, {
+    method: 'POST',
+  })
 }
 
 export function voteResultImageUrl(id: number): string {
@@ -742,7 +797,7 @@ export interface AccountRole {
   name: string
   color: number | null
   outcome: AccountRoleOutcome
-  /** Any one of the rules is enough. */
+  /** The blocks of the rule of the role, any one of which is enough. */
   rules: { label: string; met: boolean | null; detail: string | null }[]
 }
 

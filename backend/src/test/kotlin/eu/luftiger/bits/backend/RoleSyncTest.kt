@@ -133,12 +133,13 @@ class RoleSyncTest {
         val user = session(SessionUser.discord("42", "Luca", "https://avatar", Role.USER))
 
         mockMvc.get("/web/admin/role-sync/rules") { cookie(user) }.andExpect { status { isForbidden() } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""", user).andExpect { status { isForbidden() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""", user).andExpect { status { isForbidden() } }
         previewRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""",
             user,
         ).andExpect { status { isForbidden() } }
-        mockMvc.get("/web/admin/role-sync/rules/1/deletion-preview") { cookie(user) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/web/admin/role-sync/rules/r-veteran/deletion-preview") { cookie(user) }.andExpect { status { isForbidden() } }
+        updateRule("r-veteran", """{"blocks":[[{"type":"LEVEL","threshold":10}]]}""", user).andExpect { status { isForbidden() } }
     }
 
     @Test
@@ -164,7 +165,7 @@ class RoleSyncTest {
             )
         reportMembers(holders)
 
-        val preview = preview("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        val preview = preview("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
 
         assertEquals(true, preview.managed)
         assertEquals(true, preview.membersReported)
@@ -173,7 +174,7 @@ class RoleSyncTest {
         assertEquals(listOf("2", "3"), preview.losses.map { it.discordUserId })
         assertEquals(listOf("4", "5"), preview.unknown.map { it.discordUserId })
 
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         val event = awaitEvents(1).single() as RoleSyncEvent
         val (gains, losses) = changesOf(event, holders, "r-veteran")
         assertEquals(preview.gains.map { it.discordUserId }.toSet(), gains)
@@ -181,26 +182,25 @@ class RoleSyncTest {
     }
 
     @Test
-    fun `preview of a deletion counts the members of the rules that are left`() {
+    fun `preview of an edit counts the members of the blocks that are left, a deletion nobody`() {
         link("1", "w1")
         link("2", "w2")
-        val citizen = ruleId(createRule("""{"roleId":"r-veteran","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}"""))
-        val level = ruleId(createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":2}]}"""))
-        awaitEvents(2)
+        createRule(
+            """{"roleId":"r-veteran","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}],[{"type":"LEVEL","threshold":2}]]}""",
+        )
+        awaitEvents(1)
         reportMembers(mapOf("1" to listOf("r-veteran"), "2" to listOf("r-veteran")))
 
-        val withoutLevel = deletionPreview(level)
+        val withoutLevel = preview("""{"roleId":"r-veteran","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         assertEquals(true, withoutLevel.managed)
         assertEquals(listOf("2"), withoutLevel.losses.map { it.discordUserId })
         assertEquals(emptyList(), withoutLevel.gains)
 
-        mockMvc.delete("/web/admin/role-sync/rules/$citizen") { cookie(admin) }
-        awaitEvents(3)
-        // The last rule: BITS no longer manages the role, so nobody loses it.
-        val withoutAny = deletionPreview(level)
-        assertEquals(false, withoutAny.managed)
-        assertEquals(emptyList(), withoutAny.losses)
-        mockMvc.get("/web/admin/role-sync/rules/999999/deletion-preview") { cookie(admin) }.andExpect { status { isNotFound() } }
+        // BITS no longer manages the role, so nobody loses it.
+        val deletion = deletionPreview("r-veteran")
+        assertEquals(false, deletion.managed)
+        assertEquals(emptyList(), deletion.losses)
+        mockMvc.get("/web/admin/role-sync/rules/r-citizen/deletion-preview") { cookie(admin) }.andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -209,8 +209,8 @@ class RoleSyncTest {
         reportMembers(mapOf("1" to emptyList()))
         val audits = jdbc.queryForObject("SELECT COUNT(*) FROM audit_entry", Int::class.java)
 
-        preview("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
-        previewRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":0}]}""").andExpect { status { isBadRequest() } }
+        preview("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
+        previewRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":0}]]}""").andExpect { status { isBadRequest() } }
 
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
         assertEquals(audits, jdbc.queryForObject("SELECT COUNT(*) FROM audit_entry", Int::class.java))
@@ -222,7 +222,7 @@ class RoleSyncTest {
         link("1", "w1")
         reportMembers(mapOf("1" to listOf("r-veteran")))
 
-        previewRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""").andExpect {
+        previewRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect {
             jsonPath("$.gains") { isArray() }
             jsonPath("$.losses") { isArray() }
             jsonPath("$.unknown") { isArray() }
@@ -230,7 +230,7 @@ class RoleSyncTest {
         // Without the members of the bot, the lists are empty as well.
         memberService.forget()
         previewRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""",
         ).andExpect { jsonPath("$.gains") { isArray() } }
     }
 
@@ -238,7 +238,7 @@ class RoleSyncTest {
     fun `preview without the members of the bot says so`() {
         link("1", "w1")
 
-        val preview = preview("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        val preview = preview("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
 
         assertEquals(false, preview.membersReported)
         assertEquals(emptyList(), preview.gains + preview.losses + preview.unknown)
@@ -246,67 +246,103 @@ class RoleSyncTest {
 
     @Test
     fun `only assignable roles can be picked`() {
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
 
         val roles = mockMvc.get("/web/admin/role-sync/roles") { cookie(admin) }
         assertEquals(listOf("Bürger Deutschland", "Minister", "Veteran"), roles.read("$[*].name"))
         assertEquals(listOf(false, false, true), roles.read("$[*].managed"))
-        createRule("""{"roleId":"r-mod","conditions":[{"type":"LEVEL","threshold":10}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-mod","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isBadRequest() } }
     }
 
     @Test
     fun `admin creates a rule of each type and deletes it`() {
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""").andExpect {
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""").andExpect {
             status { isCreated() }
             jsonPath("$.label") { value("Staatsbürgerschaft Germany") }
             jsonPath("$.status") { value("ACTIVE") }
         }
         createRule(
-            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["MINISTER_OF_DEFENSE"]}]}""",
+            """{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["MINISTER_OF_DEFENSE"]}]]}""",
         ).andExpect { jsonPath("$.label") { value("Verteidigungsminister in Germany") } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_UNIT","muId":"m1"}]}""")
-            .andExpect { jsonPath("$.label") { value("Mitglied der MU Deutsche Marine") } }
-        val id =
-            ruleId(createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_RANK","threshold":40}]}"""))
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MILITARY_UNIT","muId":"m1"}],[{"type":"MILITARY_RANK","threshold":40}]]}""")
+            .andExpect { jsonPath("$.label") { value("Mitglied der MU Deutsche Marine oder Militärrang ab 40") } }
 
+        val rules = mockMvc.get("/web/admin/role-sync/rules") { cookie(admin) }
         assertEquals(
             listOf(
                 "Staatsbürgerschaft Germany",
                 "Verteidigungsminister in Germany",
-                "Mitglied der MU Deutsche Marine",
-                "Militärrang ab 40",
+                "Mitglied der MU Deutsche Marine oder Militärrang ab 40",
             ),
-            mockMvc.get("/web/admin/role-sync/rules") { cookie(admin) }.read("$[*].label"),
+            rules.read("$[*].label"),
         )
-        mockMvc.delete("/web/admin/role-sync/rules/$id") { cookie(admin) }.andExpect { status { isNoContent() } }
-        mockMvc.delete("/web/admin/role-sync/rules/$id") { cookie(admin) }.andExpect { status { isNotFound() } }
-        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
+        assertEquals(listOf("Mitglied der MU Deutsche Marine", "Militärrang ab 40"), rules.read("$[2].blocks[*].label"))
+        assertEquals(
+            listOf("MILITARY_UNIT", "m1", "Deutsche Marine"),
+            listOf(
+                rules.read<String>("$[2].blocks[0].conditions[0].type"),
+                rules.read<String>("$[2].blocks[0].conditions[0].muId"),
+                rules.read<String>("$[2].blocks[0].conditions[0].targetName"),
+            ),
+        )
+        assertEquals(listOf("MINISTER_OF_DEFENSE"), rules.read("$[1].blocks[0].conditions[0].offices"))
+        mockMvc.delete("/web/admin/role-sync/rules/r-veteran") { cookie(admin) }.andExpect { status { isNoContent() } }
+        mockMvc.delete("/web/admin/role-sync/rules/r-veteran") { cookie(admin) }.andExpect { status { isNotFound() } }
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
     }
 
     @Test
     fun `incomplete or unknown conditions are rejected`() {
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP"}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP"}]]}""").andExpect { status { isBadRequest() } }
         createRule(
-            """{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"xx"}]}""",
+            """{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"xx"}]]}""",
         ).andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de"}]}""").andExpect {
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de"}]]}""").andExpect {
             status { isBadRequest() }
         }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_UNIT","muId":"m9"}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MILITARY_UNIT","muId":"m9"}]]}""").andExpect { status { isBadRequest() } }
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"MILITARY_UNIT","muId":"not an id"}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"MILITARY_UNIT","muId":"not an id"}]]}""",
         ).andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":0}]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-gone","conditions":[{"type":"LEVEL","threshold":5}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":0}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-gone","blocks":[[{"type":"LEVEL","threshold":5}]]}""").andExpect { status { isBadRequest() } }
     }
 
     @Test
-    fun `the same rule twice for a role is a conflict`() {
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""").andExpect { status { isCreated() } }
+    fun `a role has one rule at most`() {
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isCreated() } }
 
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""").andExpect { status { isConflict() } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":20}]}""").andExpect { status { isCreated() } }
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"LEVEL","threshold":10}]}""").andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isConflict() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":20}]]}""").andExpect { status { isConflict() } }
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isCreated() } }
+    }
+
+    @Test
+    fun `admin edits a rule as a whole, which syncs all members`() {
+        link("1", "w1")
+        link("2", "w2")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":99}]]}""")
+        awaitEvents(1)
+
+        updateRule(
+            "r-veteran",
+            """{"blocks":[[{"type":"CITIZENSHIP","countryId":"de"},{"type":"LEVEL","threshold":10}],[{"type":"MILITARY_UNIT","muId":"m1"}]]}""",
+        ).andExpect {
+            status { isOk() }
+            jsonPath("$.label") { value("Staatsbürgerschaft Germany und Level ab 10 oder Mitglied der MU Deutsche Marine") }
+        }
+
+        val event = awaitEvents(2).last() as RoleSyncEvent
+        assertEquals(listOf("r-veteran"), event.confirmedRoleIds)
+        assertEquals(setOf("1"), event.members.filterValues { roles -> roles.grants.any { it.roleId == "r-veteran" } }.keys)
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
+        assertEquals(
+            listOf(0, 0, 1),
+            jdbc.queryForList("SELECT block FROM role_rule_condition ORDER BY position", Int::class.java),
+        )
+        updateRule("r-citizen", """{"blocks":[[{"type":"LEVEL","threshold":10}]]}""").andExpect { status { isNotFound() } }
+        updateRule("r-veteran", """{"blocks":[]}""").andExpect { status { isBadRequest() } }
+        updateRule("r-veteran", """{"blocks":[[]]}""").andExpect { status { isBadRequest() } }
     }
 
     @Test
@@ -316,7 +352,7 @@ class RoleSyncTest {
         link("2", "w2")
 
         createRule(
-            """{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"},{"type":"LEVEL","threshold":10}]}""",
+            """{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"},{"type":"LEVEL","threshold":10}]]}""",
         ).andExpect { jsonPath("$.label") { value("Staatsbürgerschaft Germany und Level ab 10") } }
 
         assertEquals(
@@ -326,27 +362,32 @@ class RoleSyncTest {
     }
 
     @Test
-    fun `the same conditions in another order are a conflict`() {
+    fun `the same block twice in a rule is rejected, in any order`() {
         val citizen = """{"type":"CITIZENSHIP","countryId":"de"}"""
         val level = """{"type":"LEVEL","threshold":10}"""
-        createRule("""{"roleId":"r-citizen","conditions":[$citizen,$level]}""").andExpect { status { isCreated() } }
 
-        createRule("""{"roleId":"r-citizen","conditions":[$level,$citizen]}""").andExpect { status { isConflict() } }
-        createRule("""{"roleId":"r-citizen","conditions":[$citizen]}""").andExpect { status { isCreated() } }
-        createRule("""{"roleId":"r-veteran","conditions":[$level,$citizen]}""").andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-citizen","blocks":[[$citizen,$level],[$level,$citizen]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-citizen","blocks":[[$citizen],[$citizen]]}""").andExpect { status { isBadRequest() } }
+        // The same condition in two blocks is fine.
+        createRule("""{"roleId":"r-citizen","blocks":[[$citizen,$level],[$citizen]]}""").andExpect { status { isCreated() } }
     }
 
     @Test
-    fun `a rule needs between one and ten different conditions`() {
+    fun `a rule needs between one and ten blocks of between one and ten different conditions`() {
         fun levels(count: Int) = (1..count).joinToString(",") { """{"type":"LEVEL","threshold":$it}""" }
+
+        fun blocks(count: Int) = (1..count).joinToString(",") { """[{"type":"LEVEL","threshold":$it}]""" }
         val level = """{"type":"LEVEL","threshold":10}"""
 
-        createRule("""{"roleId":"r-veteran","conditions":[]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","conditions":[$level,$level]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","conditions":[$level,{"type":"CITIZENSHIP"}]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","conditions":[${levels(11)}]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[$level,$level]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[$level,{"type":"CITIZENSHIP"}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[${levels(11)}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[${blocks(11)}]}""").andExpect { status { isBadRequest() } }
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM role_rule", Int::class.java))
-        createRule("""{"roleId":"r-veteran","conditions":[${levels(10)}]}""").andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[${levels(10)}]]}""").andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-citizen","blocks":[${blocks(10)}]}""").andExpect { status { isCreated() } }
     }
 
     @Test
@@ -354,7 +395,7 @@ class RoleSyncTest {
         val ruleId =
             requireNotNull(
                 jdbc.queryForObject(
-                    "INSERT INTO role_rule (role_id, conditions_key, created_at) VALUES ('r', 'key', now()) RETURNING id",
+                    "INSERT INTO role_rule (role_id, created_at) VALUES ('r', now()) RETURNING id",
                     Long::class.java,
                 ),
             )
@@ -371,8 +412,8 @@ class RoleSyncTest {
             muRole: String? = null,
         ) = jdbc.update(
             "INSERT INTO role_rule_condition " +
-                "(rule_id, position, type, country_id, offices, threshold, target_name, party_id, mu_id, mu_role) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(rule_id, position, block, type, country_id, offices, threshold, target_name, party_id, mu_id, mu_role) " +
+                "VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
             ruleId,
             position++,
             type,
@@ -426,7 +467,7 @@ class RoleSyncTest {
         link("1", "w1")
         link("2", "w2")
 
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
 
         assertEquals(
             RoleSyncEvent(
@@ -445,11 +486,11 @@ class RoleSyncTest {
     @Test
     fun `rule change reuses the WarEra data of the last sync, the hourly sync loads it again`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         awaitEvents(1)
 
         warera.users["w1"] = warera.users.getValue("w1").copy(leveling = WareraUser.Leveling(5))
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         assertEquals(setOf("r-citizen", "r-veteran"), grantedRoles(awaitEvents(2).last(), "1"))
 
         syncTrigger.hourly()
@@ -462,7 +503,7 @@ class RoleSyncTest {
     @Test
     fun `linking syncs the member and takes the roles of the previous account`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         awaitEvents(1)
 
         verify("2", "Luftiger")
@@ -475,7 +516,7 @@ class RoleSyncTest {
     @Test
     fun `unlinking syncs the member, who then gets none of the managed roles`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         assertEquals(setOf("r-citizen"), grantedRoles(awaitEvents(1).single(), "1"))
 
         mockMvc
@@ -539,7 +580,7 @@ class RoleSyncTest {
         assertEquals(mapOf("1" to "Umbenannt"), (awaitEvents(2).last() as RoleSyncEvent).nicknames)
 
         optIn("1", false).andExpect { jsonPath("$.enabled") { value(false) } }
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         assertEquals(emptyMap(), (awaitEvents(3).last() as RoleSyncEvent).nicknames)
     }
 
@@ -559,7 +600,7 @@ class RoleSyncTest {
     @Test
     fun `while the role sync is off, syncs set nicknames only, and switching it on syncs everybody`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         awaitEvents(1)
 
         setFeature("ROLE_SYNC", false)
@@ -580,7 +621,7 @@ class RoleSyncTest {
         link("1", "w1")
         optIn("1", true)
         awaitEvents(1)
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         awaitEvents(2)
 
         setFeature("NICKNAMES", false)
@@ -597,7 +638,7 @@ class RoleSyncTest {
         setFeature("ROLE_SYNC", false)
         setFeature("NICKNAMES", false)
 
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         unlink("1")
         syncTrigger.hourly()
 
@@ -627,10 +668,9 @@ class RoleSyncTest {
         link("3", "w3")
         warera.hold("w3")
 
-        repeat(10) {
-            createRule(
-                """{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":${it + 1}}]}""",
-            ).andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":1}]]}""").andExpect { status { isCreated() } }
+        repeat(9) {
+            updateRule("r-veteran", """{"blocks":[[{"type":"LEVEL","threshold":${it + 2}}]]}""").andExpect { status { isOk() } }
         }
         warera.release()
 
@@ -640,7 +680,7 @@ class RoleSyncTest {
     @Test
     fun `a new link is synced while the hourly refresh runs, and the next refresh is skipped`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
         awaitEvents(1)
         warera.lookups.clear()
         warera.hold("w1")
@@ -661,22 +701,20 @@ class RoleSyncTest {
     fun `admin creates company and party rules`() {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei"), WareraParty("p2", "Andere"))
 
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":1}]}""")
-            .andExpect { jsonPath("$.label") { value("Besitz von mindestens 1 Firma") } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":3}]}""")
-            .andExpect { jsonPath("$.label") { value("Besitz von mindestens 3 Firmen") } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p1"}]}""")
-            .andExpect { jsonPath("$.label") { value("Mitglied der Partei Partei") } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p2"}]}""")
-            .andExpect { status { isCreated() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"COMPANIES","threshold":1}],[{"type":"COMPANIES","threshold":3}]]}""")
+            .andExpect { jsonPath("$.label") { value("Besitz von mindestens 1 Firma oder Besitz von mindestens 3 Firmen") } }
+        createRule(
+            """{"roleId":"r-minister","blocks":[[{"type":"PARTY","countryId":"de","partyId":"p1"}],""" +
+                """[{"type":"PARTY","countryId":"de","partyId":"p2"}]]}""",
+        ).andExpect { jsonPath("$.label") { value("Mitglied der Partei Partei oder Mitglied der Partei Andere") } }
 
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":0}]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de"}]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p9"}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"COMPANIES","threshold":0}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY","countryId":"de"}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY","countryId":"de","partyId":"p9"}]]}""")
             .andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"xx","partyId":"p1"}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY","countryId":"xx","partyId":"p1"}]]}""")
             .andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p1"}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY","countryId":"de","partyId":"p1"}]]}""")
             .andExpect { status { isConflict() } }
     }
 
@@ -697,19 +735,19 @@ class RoleSyncTest {
         link("2", "w2")
         // Verification looks at the companies too.
         warera.companyLookups.clear()
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         awaitEvents(1)
         syncTrigger.hourly()
         awaitEvents(2)
         assertEquals(emptyList(), warera.companyLookups)
 
         warera.companyCounts["w2"] = 2
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"COMPANIES","threshold":2}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"COMPANIES","threshold":2}]]}""")
         assertEquals(setOf("r-citizen"), grantedRoles(awaitEvents(3).last(), "2"))
         assertEquals(setOf("r-veteran"), grantedRoles(awaitEvents(3).last(), "1"))
         assertEquals(listOf("w1", "w2"), warera.companyLookups.sorted())
 
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"COMPANIES","threshold":1}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"COMPANIES","threshold":1}]]}""")
         awaitEvents(4)
         assertEquals(2, warera.companyLookups.size)
 
@@ -724,7 +762,7 @@ class RoleSyncTest {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w2")))
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY","countryId":"de","partyId":"p1"}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY","countryId":"de","partyId":"p1"}]]}""")
         awaitBackgroundWork()
 
         val first = roleSyncEvents().size
@@ -749,8 +787,8 @@ class RoleSyncTest {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei"))
         link("2", "w2")
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"COMPANIES","threshold":3},""" +
-                """{"type":"PARTY","countryId":"de","partyId":"p1"}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"COMPANIES","threshold":3},""" +
+                """{"type":"PARTY","countryId":"de","partyId":"p1"}]]}""",
         )
         awaitBackgroundWork()
 
@@ -781,26 +819,26 @@ class RoleSyncTest {
     fun `admin creates MU leadership and party leader rules`() {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei"))
 
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"COMMANDER"}]}""")
-            .andExpect { jsonPath("$.label") { value("Kommandeur der MU Deutsche Marine") } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muRole":"MANAGER"}]}""")
-            .andExpect { jsonPath("$.label") { value("Manager einer MU") } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de"}]}""")
-            .andExpect { jsonPath("$.label") { value("Parteivorsitz in Germany") } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de","partyId":"p1"}]}""")
-            .andExpect { jsonPath("$.label") { value("Vorsitz der Partei Partei") } }
+        createRule(
+            """{"roleId":"r-veteran","blocks":[[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"COMMANDER"}],""" +
+                """[{"type":"MU_LEADERSHIP","muRole":"MANAGER"}]]}""",
+        ).andExpect { jsonPath("$.label") { value("Kommandeur der MU Deutsche Marine oder Manager einer MU") } }
+        createRule(
+            """{"roleId":"r-minister","blocks":[[{"type":"PARTY_LEADER","countryId":"de"}],""" +
+                """[{"type":"PARTY_LEADER","countryId":"de","partyId":"p1"}]]}""",
+        ).andExpect { jsonPath("$.label") { value("Parteivorsitz in Germany oder Vorsitz der Partei Partei") } }
 
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1"}]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m9","muRole":"OWNER"}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MU_LEADERSHIP","muId":"m1"}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MU_LEADERSHIP","muId":"m9","muRole":"OWNER"}]]}""")
             .andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER"}]}""").andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de","partyId":"p9"}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY_LEADER"}]]}""").andExpect { status { isBadRequest() } }
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY_LEADER","countryId":"de","partyId":"p9"}]]}""")
             .andExpect { status { isBadRequest() } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muRole":"MANAGER"}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MU_LEADERSHIP","muRole":"MANAGER"}]]}""")
             .andExpect { status { isConflict() } }
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"PARTY_LEADER","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"PARTY_LEADER","countryId":"de"}]]}""")
             .andExpect { status { isConflict() } }
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"MANAGER"}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"MANAGER"}]]}""")
             .andExpect { status { isCreated() } }
     }
 
@@ -813,9 +851,9 @@ class RoleSyncTest {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w1"), leader = "w1"))
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"COMMANDER"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"MU_LEADERSHIP","muRole":"OWNER"}]}""")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"PARTY_LEADER","countryId":"de"}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MU_LEADERSHIP","muId":"m1","muRole":"COMMANDER"}]]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"MU_LEADERSHIP","muRole":"OWNER"}]]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"PARTY_LEADER","countryId":"de"}]]}""")
         awaitBackgroundWork()
 
         warera.militaryUnitLookups.clear()
@@ -850,8 +888,8 @@ class RoleSyncTest {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei", members = listOf("w1")))
         link("1", "w1")
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"MU_LEADERSHIP","muRole":"COMMANDER"},""" +
-                """{"type":"PARTY_LEADER","countryId":"de"}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"MU_LEADERSHIP","muRole":"COMMANDER"},""" +
+                """{"type":"PARTY_LEADER","countryId":"de"}]]}""",
         )
         awaitBackgroundWork()
 
@@ -873,7 +911,7 @@ class RoleSyncTest {
     fun `office rules check the government of the country`() {
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""")
 
         assertEquals(setOf("2"), (awaitEvents(1).single() as RoleSyncEvent).members.keys)
     }
@@ -888,37 +926,37 @@ class RoleSyncTest {
         awaitBackgroundWork()
         reportMembers(mapOf("1" to emptyList(), "2" to listOf("r-minister")))
         val heads =
-            """{"roleId":"r-minister","conditions":[""" +
-                """{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["VICE_PRESIDENT","PRESIDENT"]}]}"""
+            """{"roleId":"r-minister","blocks":[[""" +
+                """{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["VICE_PRESIDENT","PRESIDENT"]}]]}"""
 
         assertEquals(listOf("1"), preview(heads).gains.map { it.discordUserId })
-        val id =
-            ruleId(
-                createRule(heads).andExpect { jsonPath("$.label") { value("Präsident oder Vizepräsident in Germany") } },
-            )
+        createRule(heads).andExpect { jsonPath("$.label") { value("Präsident oder Vizepräsident in Germany") } }
         assertEquals(setOf("1", "2"), (awaitEvents(1).single() as RoleSyncEvent).members.keys)
         assertEquals("PRESIDENT,VICE_PRESIDENT", jdbc.queryForObject("SELECT offices FROM role_rule_condition", String::class.java))
 
-        createRule(
-            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT","VICE_PRESIDENT"]}]}""",
-        ).andExpect { status { isConflict() } }
-        createRule(
-            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":[]}]}""",
+        updateRule(
+            "r-minister",
+            """{"blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":[]}]]}""",
         ).andExpect { status { isBadRequest() } }
-        createRule(
-            """{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""",
-        ).andExpect { status { isCreated() } }
+        // The same offices in another order are the same block.
+        updateRule(
+            "r-minister",
+            """{"blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT","VICE_PRESIDENT"]}],""" +
+                """[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["VICE_PRESIDENT","PRESIDENT"]}]]}""",
+        ).andExpect { status { isBadRequest() } }
         reportMembers(mapOf("1" to listOf("r-minister"), "2" to listOf("r-minister")))
-        // The president keeps the role through the rule with the president alone.
-        assertEquals(listOf("1"), deletionPreview(id).losses.map { it.discordUserId })
+        // The president keeps the role with the president alone.
+        val presidentOnly =
+            preview("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""")
+        assertEquals(listOf("1"), presidentOnly.losses.map { it.discordUserId })
     }
 
     @Test
     fun `failed lookups keep the roles of the affected members`() {
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""")
         awaitEvents(2)
 
         warera.failingUsers += "w1"
@@ -933,8 +971,8 @@ class RoleSyncTest {
     @Test
     fun `rules of a deleted role are orphaned and not run`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         awaitEvents(2)
 
         reportRoles("""{"id":"r-veteran","name":"Veteran","color":null,"position":1,"assignable":true}""")
@@ -947,13 +985,12 @@ class RoleSyncTest {
     }
 
     @Test
-    fun `role explanation names the rule that is met and what is missing`() {
+    fun `role explanation names the block that is met and what each block misses`() {
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_RANK","threshold":50}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}],[{"type":"MILITARY_RANK","threshold":50}]]}""")
         awaitBackgroundWork()
 
         assertEquals(
@@ -989,8 +1026,8 @@ class RoleSyncTest {
     fun `role explanation of a rule with several conditions names the ones that fail`() {
         link("2", "w2")
         createRule(
-            """{"roleId":"r-veteran","conditions":[{"type":"CITIZENSHIP","countryId":"de"},{"type":"LEVEL","threshold":10},""" +
-                """{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""",
+            """{"roleId":"r-veteran","blocks":[[{"type":"CITIZENSHIP","countryId":"de"},{"type":"LEVEL","threshold":10},""" +
+                """{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""",
         )
         awaitBackgroundWork()
 
@@ -1014,9 +1051,9 @@ class RoleSyncTest {
     fun `role explanation agrees with the sync, also when a government is missing`() {
         link("1", "w1")
         link("2", "w2")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-minister","conditions":[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]}""")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"MILITARY_RANK","threshold":40}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
+        createRule("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"MILITARY_RANK","threshold":40}]]}""")
         // Rule changes right after one another may be merged into one sync, so only the syncs after them are counted.
         awaitBackgroundWork()
 
@@ -1048,8 +1085,8 @@ class RoleSyncTest {
     @Test
     fun `role explanation leaves out orphaned rules, changes nothing and points unlinked members to verify`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-citizen","conditions":[{"type":"CITIZENSHIP","countryId":"de"}]}""")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-citizen","blocks":[[{"type":"CITIZENSHIP","countryId":"de"}]]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         reportRoles("""{"id":"r-veteran","name":"Veteran","color":null,"position":1,"assignable":true}""")
         awaitBackgroundWork()
         val before = roleSyncEvents().size
@@ -1062,7 +1099,7 @@ class RoleSyncTest {
     @Test
     fun `role explanation is a 503 if the user cannot be loaded`() {
         link("1", "w1")
-        createRule("""{"roleId":"r-veteran","conditions":[{"type":"LEVEL","threshold":10}]}""")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
         warera.failingUsers += "w1"
 
         explainRequest("1").andExpect { status { isServiceUnavailable() } }
@@ -1133,10 +1170,10 @@ class RoleSyncTest {
                 .response.contentAsString,
         )
 
-    private fun deletionPreview(id: Long): RulePreviewResponse =
+    private fun deletionPreview(roleId: String): RulePreviewResponse =
         BitsJson.decodeFromString(
             mockMvc
-                .get("/web/admin/role-sync/rules/$id/deletion-preview") { cookie(admin) }
+                .get("/web/admin/role-sync/rules/$roleId/deletion-preview") { cookie(admin) }
                 .andExpect { status { isOk() } }
                 .andReturn()
                 .response.contentAsString,
@@ -1182,6 +1219,17 @@ class RoleSyncTest {
             content = body
         }
 
+    private fun updateRule(
+        roleId: String,
+        body: String,
+        session: Cookie = admin,
+    ): ResultActionsDsl =
+        mockMvc.put("/web/admin/role-sync/rules/$roleId") {
+            cookie(session)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }
+
     private fun setFeature(
         feature: String,
         enabled: Boolean,
@@ -1208,8 +1256,6 @@ class RoleSyncTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"discordUserId":"$discordUserId"}"""
             }.andExpect { status { isOk() } }
-
-    private fun ruleId(result: ResultActionsDsl): Long = result.read<Number>("$.id").toLong()
 
     private fun <T> ResultActionsDsl.read(path: String): T = JsonPath.read(andReturn().response.contentAsString, path)
 

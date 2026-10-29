@@ -6,6 +6,7 @@ import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.DiscordRole
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.rolesync.domain.RuleBlock
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
@@ -59,54 +60,93 @@ class RoleRuleService(
                         !role.assignable -> RuleStatus.NOT_ASSIGNABLE
                         else -> RuleStatus.ACTIVE
                     }
-                RuleResponse(requireNotNull(rule.id), rule.roleId, role?.name, role?.color, rule.label, status)
+                response(rule, role, status)
             }
     }
 
     /**
-     * @throws ResponseStatusException 400 if the role cannot be given or a condition is incomplete or unknown, 409 if
-     * the role has a rule with the same conditions already
+     * @throws ResponseStatusException 400 if the role cannot be given or a block or condition is invalid, see
+     * [newBlocks]; 409 if the role has a rule already, which is to be edited instead
      */
     fun create(
-        request: CreateRuleRequest,
+        request: RuleRequest,
         actor: AuditActor,
     ): RuleResponse {
-        val (role, rule) = newRule(request)
+        val (role, blocks) = newBlocks(request)
         val saved =
             requireNotNull(
                 transactionTemplate.execute {
+                    if (ruleRepository.findByRoleId(role.id) != null) throw conflict(role.id)
                     val created =
                         try {
-                            ruleRepository.saveAndFlush(rule)
+                            ruleRepository.saveAndFlush(RoleRule(role.id, blocks, createdAt = now()))
                         } catch (_: DataIntegrityViolationException) {
-                            // The unique index on role and conditions; the CHECK constraints and the index on the
-                            // conditions of a rule cannot fail after the checks of newRule.
-                            throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} has this rule already")
+                            // The unique index on the role, if another admin was faster; the CHECK constraints and the
+                            // index on the conditions of a block cannot fail after the checks of newBlocks.
+                            throw conflict(role.id)
                         }
-                    auditLog.record(actor, AuditAction.ROLE_RULE_CREATED, describe(role.id, role.name, created))
+                    auditLog.record(actor, AuditAction.ROLE_RULE_CREATED, describe(role.id, role.name, created.label))
                     created
                 },
             )
         syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
-        return RuleResponse(requireNotNull(saved.id), role.id, role.name, role.color, saved.label, RuleStatus.ACTIVE)
+        return response(saved, role, RuleStatus.ACTIVE)
     }
 
     /**
-     * The rule [request] asks for, not saved yet, with its role.
+     * Replaces the blocks of the rule of [roleId] as a whole.
      *
-     * @throws ResponseStatusException 400 if the role cannot be given, there are no or too many conditions, one is
-     * incomplete or unknown, or the same condition is given twice
+     * @throws ResponseStatusException 404 if the role has no rule, 400 like [create]
      */
-    fun newRule(request: CreateRuleRequest): Pair<DiscordRole, RoleRule> {
+    fun update(
+        roleId: String,
+        request: UpdateRuleRequest,
+        actor: AuditActor,
+    ): RuleResponse {
+        val (role, blocks) = newBlocks(RuleRequest(roleId, request.blocks))
+        val saved =
+            requireNotNull(
+                transactionTemplate.execute {
+                    val rule = ruleRepository.findByRoleId(roleId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                    val before = rule.label
+                    rule.replaceBlocks(blocks)
+                    val updated = ruleRepository.saveAndFlush(rule)
+                    auditLog.record(
+                        actor,
+                        AuditAction.ROLE_RULE_UPDATED,
+                        "${describe(role.id, role.name, updated.label)} (vorher: $before)",
+                    )
+                    updated
+                },
+            )
+        syncTrigger.syncAllWithCachedData(confirmedRoleIds = listOf(role.id))
+        return response(saved, role, RuleStatus.ACTIVE)
+    }
+
+    /**
+     * The blocks [request] asks for, not saved yet, with their role.
+     *
+     * @throws ResponseStatusException 400 if the role cannot be given; there are no or too many blocks, or a block has
+     * no or too many conditions; a condition is incomplete or unknown; or the same condition stands twice in a block, or
+     * the same block twice in the rule
+     */
+    fun newBlocks(request: RuleRequest): Pair<DiscordRole, List<RuleBlock>> {
         val role = roleRepository.findByIdOrNull(request.roleId)
         if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
-        if (request.conditions.isEmpty()) throw badRequest("Conditions missing")
-        if (request.conditions.size > MAX_CONDITIONS) throw badRequest("At most $MAX_CONDITIONS conditions")
+        if (request.blocks.isEmpty()) throw badRequest("Blocks missing")
+        if (request.blocks.size > MAX_BLOCKS) throw badRequest("At most $MAX_BLOCKS blocks")
         // The countries for every condition at once, and only if needed.
         val countries by lazy { wareraClient.getAllCountries().associate { it.id to it.name } }
-        val conditions = request.conditions.map { condition(it) { countryId -> countries[countryId] } }
-        if (conditions.distinctBy { it.key }.size < conditions.size) throw badRequest("The same condition twice")
-        return role to RoleRule(role.id, conditions, createdAt = now())
+        val blocks =
+            request.blocks.map { conditions ->
+                if (conditions.isEmpty()) throw badRequest("Conditions missing")
+                if (conditions.size > MAX_CONDITIONS) throw badRequest("At most $MAX_CONDITIONS conditions per block")
+                val block = RuleBlock(conditions.map { condition(it) { countryId -> countries[countryId] } })
+                if (block.conditions.distinctBy { it.key }.size < block.conditions.size) throw badRequest("The same condition twice")
+                block
+            }
+        if (blocks.distinctBy { it.key }.size < blocks.size) throw badRequest("The same block twice")
+        return role to blocks
     }
 
     private fun condition(
@@ -164,18 +204,23 @@ class RoleRuleService(
         }
     }
 
-    /** @return the deleted rule, for the log */
+    /**
+     * Deletes the rule of [roleId]; BITS no longer manages the role.
+     *
+     * @return the deleted rule, for the log
+     * @throws ResponseStatusException 404 if the role has no rule
+     */
     fun delete(
-        id: Long,
+        roleId: String,
         actor: AuditActor,
     ): RoleRule {
         val rule =
             requireNotNull(
                 transactionTemplate.execute {
-                    val found = ruleRepository.findByIdOrNull(id) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                    val found = ruleRepository.findByRoleId(roleId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
                     ruleRepository.delete(found)
                     val roleName = roleRepository.findByIdOrNull(found.roleId)?.name
-                    auditLog.record(actor, AuditAction.ROLE_RULE_DELETED, describe(found.roleId, roleName, found))
+                    auditLog.record(actor, AuditAction.ROLE_RULE_DELETED, describe(found.roleId, roleName, found.label))
                     found
                 },
             )
@@ -228,20 +273,51 @@ class RoleRuleService(
     private fun describe(
         roleId: String,
         roleName: String?,
-        rule: RoleRule,
+        label: String,
     ): String {
-        // The rules of a role deleted in Discord stay, so its name may be unknown by the time a rule is deleted.
+        // The rule of a role deleted in Discord stays, so its name may be unknown by the time the rule is deleted.
         val role = roleName?.let { "@$it" } ?: "$roleId (in Discord gelöscht)"
-        return "Rolle $role: ${rule.label}"
+        return "Rolle $role: $label"
     }
+
+    private fun response(
+        rule: RoleRule,
+        role: DiscordRole?,
+        status: RuleStatus,
+    ) = RuleResponse(
+        roleId = rule.roleId,
+        roleName = role?.name,
+        roleColor = role?.color,
+        label = rule.label,
+        blocks = rule.blocks.map { block -> BlockResponse(block.label, block.conditions.map(::conditionResponse)) },
+        status = status,
+    )
+
+    private fun conditionResponse(condition: RuleCondition) =
+        ConditionResponse(
+            type = condition.type.ruleType,
+            countryId = condition.countryId,
+            offices = condition.offices.sorted().map { it.apiOffice },
+            muId = condition.muId,
+            threshold = condition.threshold,
+            partyId = condition.partyId,
+            muRole = condition.muRole?.apiRole,
+            targetName = condition.targetName,
+            label = condition.label,
+        )
+
+    private fun conflict(roleId: String) = ResponseStatusException(HttpStatus.CONFLICT, "Role $roleId has a rule already")
 
     private fun now() = clock.instant()
 
     private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 
     companion object {
-        /** More would hardly be met by anybody, and keeps the key of the conditions short enough for its index. */
+        /** Conditions per block; more would hardly be met by anybody. */
         const val MAX_CONDITIONS = 10
+
+        /** Blocks per rule; like conditions, more would hardly be needed. */
+        const val MAX_BLOCKS = 10
 
         private const val MAX_SEARCH_RESULTS = 5
     }
