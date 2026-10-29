@@ -9,7 +9,6 @@ import { expectToast } from '@/test/toast'
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
 const militaryUnits: MilitaryUnits = {
-  country: { id: 'de', name: 'Germany' },
   roles: [
     { id: 'r-dsk1', name: 'DSK1', color: 0x0000ff, hasRule: false, dskId: 1 },
     { id: 'r-dsk2', name: 'DSK2', color: null, hasRule: false, dskId: null },
@@ -72,13 +71,14 @@ describe('military units', () => {
     await expectToast('success', 'DSK angelegt')
   })
 
-  it('assigns a military unit found by name, but not one of another DSK', async () => {
+  it('assigns a military unit of any country found by name, but not one of another DSK', async () => {
     const added: unknown[] = []
     stub({
       'GET /web/admin/military-units/search': () =>
         json([
-          { id: 'm2', name: 'Deutsche Luftwaffe', dskName: null },
-          { id: 'm3', name: 'Deutsches Heer', dskName: 'DSK2' },
+          { id: 'm2', name: 'Deutsche Luftwaffe', countryName: 'Germany', dskName: null },
+          { id: 'm3', name: 'Deutsches Heer', countryName: 'Germany', dskName: 'DSK2' },
+          { id: 'm4', name: 'Deutsche Fremdenlegion', countryName: 'France', dskName: null },
         ]),
       'POST /web/admin/military-units/dsks/1/military-units': bodies(added),
     })
@@ -86,9 +86,10 @@ describe('military units', () => {
 
     await userEvent.type(await screen.findByLabelText('MU hinzufügen'), 'Deutsch{Enter}')
     expect(await screen.findByRole('button', { name: 'Deutsches Heer zu DSK1 hinzufügen' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Deutsche Luftwaffe zu DSK1 hinzufügen' }))
+    expect(screen.getByText(/France/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Deutsche Fremdenlegion zu DSK1 hinzufügen' }))
 
-    await expect.poll(() => added).toEqual([{ muId: 'm2' }])
+    await expect.poll(() => added).toEqual([{ muId: 'm4' }])
     await expectToast('success', 'MU zugeordnet')
   })
 
@@ -127,14 +128,6 @@ describe('military units', () => {
     await userEvent.click(within(section).getByRole('button', { name: 'Speichern' }))
 
     await expect.poll(() => updated).toEqual([{ name: 'DSK 1', roleId: null }])
-  })
-
-  it('says that no country is selected and offers no search then', async () => {
-    stub({}, { ...militaryUnits, country: null })
-    renderApp('/admin/military-units')
-
-    expect(await screen.findByText('Kein Land ausgewählt')).toBeInTheDocument()
-    expect(screen.queryByLabelText('MU hinzufügen')).not.toBeInTheDocument()
   })
 
   it('says why a change failed', async () => {

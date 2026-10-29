@@ -65,7 +65,7 @@ class DskController(
         log.info("DSK {} deleted by {}", dskId, session.subject)
     }
 
-    /** Military units of the country under "Verwaltung", by name. */
+    /** Military units of all countries, by name. */
     @GetMapping("/search")
     fun search(
         @RequestParam query: String,
@@ -105,18 +105,10 @@ class DskController(
 
 @Serializable
 data class MilitaryUnitsResponse(
-    /** The country under "Verwaltung", whose military units can be assigned; `null` while none is set. */
-    val country: CountryOption?,
     /** The roles the bot can give, highest first. */
     val roles: List<DskRoleOption>,
     /** By name. */
     val dsks: List<DskResponse>,
-)
-
-@Serializable
-data class CountryOption(
-    val id: String,
-    val name: String,
 )
 
 /** A role for a DSK; only free if it has no rule and belongs to no other DSK. */
@@ -166,6 +158,8 @@ data class MilitaryUnitResponse(
 data class MilitaryUnitOption(
     val id: String,
     val name: String,
+    /** Name of the country the unit is based in, its ID if WarEra does not list it, `null` if WarEra names none. */
+    val countryName: String?,
     /** The DSK the unit belongs to already, `null` if none; it cannot be assigned to another. */
     val dskName: String?,
 )

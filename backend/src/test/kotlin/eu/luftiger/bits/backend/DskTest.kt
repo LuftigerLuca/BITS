@@ -75,7 +75,7 @@ class DskTest {
         redisTemplate.delete(EventStream.KEY)
         syncService.forget()
         warera.reset()
-        // A second German unit, and one of France with a similar name.
+        // A second German unit, and one based in France with a similar name.
         warera.militaryUnits["m2"] = WareraMilitaryUnit("m2", "Deutsche Luftwaffe", country = "de")
         warera.militaryUnits["m3"] = WareraMilitaryUnit("m3", "Deutsche Fremdenlegion", country = "fr")
         warera.users["w3"] = WareraUser("w3", "Flieger", country = "de", mu = "m2")
@@ -127,7 +127,6 @@ class DskTest {
 
         updateDsk(id, """{"name":"DSK 1"}""").andExpect { status { isNoContent() } }
         overview().andExpect {
-            jsonPath("$.country.name") { value("Germany") }
             jsonPath("$.dsks[0].name") { value("DSK 1") }
             jsonPath("$.dsks[0].roleId") { value(null) }
         }
@@ -148,24 +147,40 @@ class DskTest {
     }
 
     @Test
-    fun `the search shows only military units of the selected country, and only those can be assigned`() {
+    fun `the search shows military units of all countries with their country, and all of them can be assigned`() {
+        // Without a country under "Verwaltung", which DSKs do not need.
+        jdbc.execute("TRUNCATE overview_setting")
         createDsk("""{"name":"DSK1"}""")
         val id = dskId("DSK1")
         addUnit(id, "m1")
 
         val found = search("Deutsche").andExpect { status { isOk() } }
-        assertEquals(listOf("m1", "m2"), found.read<List<String>>("$[*].id"))
-        assertEquals(listOf("DSK1", null), found.read<List<String?>>("$[*].dskName"))
-        addUnit(id, "m3").andExpect { status { isBadRequest() } }
+        assertEquals(listOf("m1", "m2", "m3"), found.read<List<String>>("$[*].id"))
+        assertEquals(listOf("Germany", "Germany", "France"), found.read<List<String?>>("$[*].countryName"))
+        assertEquals(listOf("DSK1", null, null), found.read<List<String?>>("$[*].dskName"))
+        addUnit(id, "m3").andExpect { status { isCreated() } }
         addUnit(id, "unknown").andExpect { status { isBadRequest() } }
-
-        jdbc.execute("TRUNCATE overview_setting")
-        search("Deutsche").andExpect { status { isBadRequest() } }
-        addUnit(id, "m2").andExpect { status { isBadRequest() } }
+        assertEquals(
+            listOf("Deutsche Fremdenlegion", "Deutsche Marine"),
+            overview().read<List<String>>("$.dsks[0].militaryUnits[*].name"),
+        )
 
         warera.down = true
-        jdbc.update("INSERT INTO overview_setting (id, country_id, country_name, updated_at) VALUES (1, 'de', 'Germany', now())")
         search("Deutsche").andExpect { status { isServiceUnavailable() } }
+    }
+
+    @Test
+    fun `members of a unit based abroad get the role of its DSK`() {
+        warera.users["w4"] = WareraUser("w4", "Legionär", country = "de", mu = "m3")
+        link("4", "w4")
+        createDsk("""{"name":"DSK1","roleId":"r-dsk1"}""")
+        addUnit(dskId("DSK1"), "m3").andExpect { status { isCreated() } }
+
+        val synced = awaitEvents(2).last()
+        assertEquals(
+            listOf(RoleGrant("r-dsk1", "BITS: Mitglied der MU Deutsche Fremdenlegion (DSK1)")),
+            synced.members["4"]?.grants,
+        )
     }
 
     @Test

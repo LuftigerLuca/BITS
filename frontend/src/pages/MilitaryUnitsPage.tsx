@@ -1,6 +1,4 @@
-import { TriangleAlertIcon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
 import { DsksCard } from '@/features/military-units/DsksCard'
 import { ERROR_MESSAGE } from '@/features/military-units/labels'
@@ -20,18 +18,7 @@ export function MilitaryUnitsPage() {
       ) : militaryUnits.isError ? (
         <ErrorState message={ERROR_MESSAGE} onRetry={() => militaryUnits.refetch()} />
       ) : (
-        <>
-          {militaryUnits.data.country === null && (
-            <Alert>
-              <TriangleAlertIcon />
-              <AlertTitle>Kein Land ausgewählt</AlertTitle>
-              <AlertDescription>
-                Wähle unter „Verwaltung“ das Land aus. Erst dann kannst du den DSKs MUs dieses Landes zuordnen.
-              </AlertDescription>
-            </Alert>
-          )}
-          <DsksCard data={militaryUnits.data} />
-        </>
+        <DsksCard data={militaryUnits.data} />
       )}
     </div>
   )

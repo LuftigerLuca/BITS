@@ -10,7 +10,7 @@ export function errorMessage(error: unknown): string {
     }
     if (error.status === 404) return 'Die DSK oder die MU gibt es nicht mehr. Bitte lade die Seite neu.'
     if (error.status === 400) {
-      return 'Die Angaben passen nicht, z. B. weil der Name fehlt, die Rolle nicht vergeben werden kann oder die MU nicht zum ausgewählten Land gehört.'
+      return 'Die Angaben passen nicht, z. B. weil der Name fehlt, die Rolle nicht vergeben werden kann oder WarEra die MU nicht kennt.'
     }
   }
   return 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'
