@@ -1,9 +1,10 @@
 import { AuditLogCard } from '@/features/audit-log/AuditLogCard'
+import { PageHeader } from '@/components/PageHeader'
 
 export function AuditLogPage() {
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl font-semibold">Audit-Log</h1>
+      <PageHeader title="Audit-Log" />
       <AuditLogCard />
     </div>
   )

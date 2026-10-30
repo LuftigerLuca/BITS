@@ -32,9 +32,17 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * A heading of the second level by default, so that screen readers can jump from card to card below the page's `h1`.
+ * Cards that stand for a page of their own use `h1`; a title that is no heading, such as a figure, uses `p`.
+ */
+function CardTitle({
+  className,
+  as: Component = "h2",
+  ...props
+}: React.ComponentProps<"h2"> & { as?: "h1" | "h2" | "h3" | "p" }) {
   return (
-    <div
+    <Component
       data-slot="card-title"
       className={cn(
         "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
