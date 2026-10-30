@@ -4,6 +4,7 @@ import {
   BookOpenIcon,
   ChevronsUpDownIcon,
   CircleUserIcon,
+  GaugeIcon,
   HistoryIcon,
   HouseIcon,
   LandmarkIcon,
@@ -128,6 +129,9 @@ export function Layout() {
                       </NavItem>
                       <NavItem to="/admin/system-log" icon={<ActivityIcon />}>
                         System-Log
+                      </NavItem>
+                      <NavItem to="/admin/system-status" icon={<GaugeIcon />}>
+                        System-Status
                       </NavItem>
                     </SidebarMenu>
                   </SidebarGroupContent>

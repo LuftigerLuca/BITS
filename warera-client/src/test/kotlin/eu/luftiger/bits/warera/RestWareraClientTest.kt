@@ -369,4 +369,55 @@ class RestWareraClientTest {
         assertTrue(maxInMinute <= RestWareraClient.WARERA_LIMIT_PER_MINUTE, "$maxInMinute calls in one sliding minute")
         assertTrue(maxInMinute >= 80, "only $maxInMinute calls in one sliding minute, the limiter is too strict")
     }
+
+    @Test
+    fun `tells the listener about every request, retries included, and about throttled calls`() {
+        val requests = mutableListOf<Pair<String, Int?>>()
+        val throttled = mutableListOf<String>()
+        val retried = mutableListOf<String>()
+        val listener =
+            object : WareraCallListener {
+                override fun requestSent(
+                    procedure: String,
+                    status: Int?,
+                    permitWait: Duration,
+                    duration: Duration,
+                ) {
+                    requests += procedure to status
+                }
+
+                override fun throttled(procedure: String) {
+                    throttled += procedure
+                }
+
+                override fun retried(procedure: String) {
+                    retried += procedure
+                }
+            }
+        val builder = RestClient.builder().baseUrl("https://warera.test/trpc")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val limiter = RestWareraClient.defaultRateLimiter(period = Duration.ofHours(1), timeout = Duration.ZERO)
+        val client = RestWareraClient(builder.build(), limiter, RestWareraClient.defaultRetry(Duration.ofMillis(1)), listener)
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond { throw java.io.IOException("connection reset") }
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(withSuccess("""{"result":{"data":[]}}""", MediaType.APPLICATION_JSON))
+
+        client.getAllCountries()
+        // The limiter allows three calls per period, all of which went to the retries above.
+        assertFailsWith<WareraApiException> { client.getAllCountries() }
+
+        assertEquals(
+            listOf("country.getAllCountries" to 429, "country.getAllCountries" to null, "country.getAllCountries" to 200),
+            requests,
+        )
+        assertEquals(listOf("country.getAllCountries"), throttled)
+        assertEquals(listOf("country.getAllCountries", "country.getAllCountries"), retried)
+        server.verify()
+    }
 }

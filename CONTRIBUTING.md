@@ -163,6 +163,8 @@ What these flows show:
 - **WarEra calls run outside of transactions**, since the rate limiter can make them wait for seconds. Writes go
   into short `TransactionTemplate` blocks before or after them. Work that may take longer than the bot waits runs
   in the background and reports its result as event (`VerificationCheckedEvent`).
+- **Background work runs through `BackgroundWork`** from `systemstatus.api` (`RoleSyncTrigger`,
+  `VerificationService`), so the page "System-Status" shows its last run and counts its WarEra calls for it.
 - **Other modules hear about changes through application events** from their `api/` (`AccountLinked`,
   `AccountUnlinked`), published inside the transaction and received with `@ApplicationModuleListener` after the
   commit. Events for the bot go through `EventPublisher` inside the same transaction, so they reach the bot only if

@@ -1,10 +1,14 @@
 package eu.luftiger.bits.bot.backend
 
+import eu.luftiger.bits.bot.status.BackendCallCounter
+import eu.luftiger.bits.shared.BackendCallCount
 import eu.luftiger.bits.shared.BotActivity
 import eu.luftiger.bits.shared.BotActivityType
+import eu.luftiger.bits.shared.BotHeartbeat
 import eu.luftiger.bits.shared.BotPresence
 import eu.luftiger.bits.shared.BotStatus
 import eu.luftiger.bits.shared.CastVoteResponse
+import eu.luftiger.bits.shared.DiscordRequestCount
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.FeatureStates
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
@@ -280,5 +284,42 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", engine, requestTimeout = Duration.ofMillis(100))
 
             assertFailsWith<BackendTimeoutException> { client.startVerification("42", "Luftiger") }
+        }
+
+    @Test
+    fun `every request is counted by endpoint with how it ended`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    when (request.url.encodedPath) {
+                        "/api/votes/7/result/posted" -> respond("")
+                        "/api/votes/8/result/posted" -> respond("", HttpStatusCode.InternalServerError)
+                        "/api/features" -> throw java.io.IOException("connection refused")
+                        else -> {
+                            delay(5_000)
+                            respond("")
+                        }
+                    }
+                }
+            val calls = BackendCallCounter()
+            val client = KtorBackendClient("http://backend:8080", "secret", engine, requestTimeout = Duration.ofMillis(100), calls = calls)
+
+            client.markVoteResultPosted(7)
+            assertFails { client.markVoteResultPosted(8) }
+            assertFails { client.features() }
+            assertFails {
+                client.heartbeat(
+                    BotHeartbeat("dev", 0, "CONNECTED", 0, null, 0, 0, 0, emptyList(), DiscordRequestCount(0, 0, 0, 0)),
+                )
+            }
+
+            assertEquals(
+                setOf(
+                    BackendCallCount("POST /api/votes/{id}/result/posted", succeeded = 1, failed = 1, timedOut = 0, unreachable = 0),
+                    BackendCallCount("GET /api/features", succeeded = 0, failed = 0, timedOut = 0, unreachable = 1),
+                    BackendCallCount("POST /api/bot-heartbeat", succeeded = 0, failed = 0, timedOut = 1, unreachable = 0),
+                ),
+                calls.snapshot().toSet(),
+            )
         }
 }

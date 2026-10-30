@@ -30,6 +30,8 @@ spring:
 
 bits:
   service-token: ${BITS_SERVICE_TOKEN:}
+  # The commit the image was built from, shown on the page "System-Status"; set by the Dockerfile.
+  version: ${BITS_VERSION:dev}
   warera:
     base-url: ${WARERA_BASE_URL:https://api2.warera.io/trpc}
   role-sync:

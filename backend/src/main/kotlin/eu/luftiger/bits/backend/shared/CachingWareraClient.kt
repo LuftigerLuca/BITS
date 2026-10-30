@@ -1,10 +1,12 @@
 package eu.luftiger.bits.backend.shared
 
+import eu.luftiger.bits.warera.WareraCallListener
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraParty
+import eu.luftiger.bits.warera.WareraProcedure
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -15,7 +17,7 @@ import java.time.Instant
  * military units, loaded for each search in the MU picker and each MU leadership rule, and the parties and the
  * government of each country, loaded for each `/profil`. Role sync, `/rollen` and the evaluation of votes therefore see
  * parties and governments up to [countryDetailsTtl] old, and military units up to [militaryUnitTtl]. Errors are not
- * kept.
+ * kept. [listener] learns about every lookup in the cache.
  */
 class CachingWareraClient(
     private val delegate: WareraClient,
@@ -23,6 +25,7 @@ class CachingWareraClient(
     private val countriesTtl: Duration = Duration.ofHours(1),
     private val militaryUnitTtl: Duration = Duration.ofMinutes(10),
     private val countryDetailsTtl: Duration = Duration.ofMinutes(10),
+    private val listener: WareraCallListener = WareraCallListener.NONE,
 ) : WareraClient by delegate {
     private var countries: Cached<List<WareraCountry>>? = null
     private val militaryUnits = HashMap<String, Cached<WareraMilitaryUnit>>()
@@ -31,26 +34,37 @@ class CachingWareraClient(
 
     @Synchronized
     override fun getAllCountries(): List<WareraCountry> {
-        countries?.takeIf { it.isFresh() }?.let { return it.value }
+        countries?.takeIf { it.isFresh() }?.let {
+            listener.cacheLookup(WareraProcedure.ALL_COUNTRIES, hit = true)
+            return it.value
+        }
+        listener.cacheLookup(WareraProcedure.ALL_COUNTRIES, hit = false)
         return delegate.getAllCountries().also { countries = Cached(it, clock.instant().plus(countriesTtl)) }
     }
 
     @Synchronized
-    override fun getMilitaryUnit(muId: String): WareraMilitaryUnit = militaryUnits.load(muId, militaryUnitTtl, delegate::getMilitaryUnit)
+    override fun getMilitaryUnit(muId: String): WareraMilitaryUnit =
+        militaryUnits.load(WareraProcedure.MILITARY_UNIT, muId, militaryUnitTtl, delegate::getMilitaryUnit)
 
     @Synchronized
-    override fun getParties(countryId: String): List<WareraParty> = parties.load(countryId, countryDetailsTtl, delegate::getParties)
+    override fun getParties(countryId: String): List<WareraParty> =
+        parties.load(WareraProcedure.PARTIES, countryId, countryDetailsTtl, delegate::getParties)
 
     @Synchronized
     override fun getGovernment(countryId: String): WareraGovernment =
-        governments.load(countryId, countryDetailsTtl, delegate::getGovernment)
+        governments.load(WareraProcedure.GOVERNMENT, countryId, countryDetailsTtl, delegate::getGovernment)
 
     private fun <T> HashMap<String, Cached<T>>.load(
+        procedure: String,
         key: String,
         ttl: Duration,
         loader: (String) -> T,
     ): T {
-        get(key)?.takeIf { it.isFresh() }?.let { return it.value }
+        get(key)?.takeIf { it.isFresh() }?.let {
+            listener.cacheLookup(procedure, hit = true)
+            return it.value
+        }
+        listener.cacheLookup(procedure, hit = false)
         values.removeIf { !it.isFresh() }
         return loader(key).also { put(key, Cached(it, clock.instant().plus(ttl))) }
     }

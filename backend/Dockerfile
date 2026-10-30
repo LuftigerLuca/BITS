@@ -7,6 +7,9 @@ RUN ./gradlew :backend:bootJar --no-daemon
 FROM eclipse-temurin:21-jre@sha256:227118764cccd3c3294617061aaa93a08309c63a395eefa83e6b35032992ea99
 WORKDIR /app
 COPY --from=build /workspace/backend/build/libs/*.jar app.jar
+# The commit it was built from, shown on the page "System-Status"; the CD passes it.
+ARG BITS_VERSION=dev
+ENV BITS_VERSION=$BITS_VERSION
 EXPOSE 8080
 # nobody: the app writes nowhere but /tmp, so it needs no user of its own, and never runs as root, also locally.
 USER 65534:65534

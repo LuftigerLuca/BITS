@@ -10,6 +10,8 @@ data class BotConfig(
     val serviceToken: String,
     val redisUrl: String,
     val removalLimit: RemovalLimit = RemovalLimit(),
+    /** The commit the image was built from, set by the Dockerfile. */
+    val version: String = "dev",
 ) {
     companion object {
         fun fromEnv(env: Map<String, String> = System.getenv()): BotConfig {
@@ -26,6 +28,7 @@ data class BotConfig(
                         minRemovals = env["ROLE_SYNC_MIN_REMOVALS"]?.toInt() ?: RemovalLimit().minRemovals,
                         maxShare = env["ROLE_SYNC_MAX_REMOVAL_SHARE"]?.toDouble() ?: RemovalLimit().maxShare,
                     ),
+                version = env["BITS_VERSION"]?.takeIf { it.isNotBlank() } ?: "dev",
             )
         }
     }

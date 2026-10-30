@@ -7,6 +7,8 @@ import eu.luftiger.bits.backend.account.domain.AccountVerification
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundJob
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundWork
 import eu.luftiger.bits.shared.AccountLinkedEvent
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -50,6 +52,7 @@ class VerificationService(
     private val applicationEvents: ApplicationEventPublisher,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
+    private val work: BackgroundWork,
     @param:Qualifier("applicationTaskExecutor") private val executor: TaskExecutor,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -110,7 +113,7 @@ class VerificationService(
         }
 
         executor.execute {
-            val result = lookForCode(verification, discordName) ?: return@execute
+            val result = work.run(BackgroundJob.VERIFICATION_CHECK) { lookForCode(verification, discordName) } ?: return@execute
             eventPublisher.publish(VerificationCheckedEvent(discordUserId, verification.code, result, clock.millis()))
         }
         return CheckVerificationResponse.Checking

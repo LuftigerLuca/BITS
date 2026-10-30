@@ -13,30 +13,35 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import org.springframework.web.client.RestClientResponseException
 import java.time.Duration
+import java.util.concurrent.Callable
 
 /**
  * [WareraClient] for the tRPC API of WarEra (`https://api2.warera.io/trpc`).
  *
  * The API allows 100 requests per minute and IP, so calls are throttled by [rateLimiter]. Rate-limit
- * responses, server errors and network errors are retried by [retry]. Timeouts come from the [RestClient].
+ * responses, server errors and network errors are retried by [retry]. Timeouts come from the [RestClient]. [listener]
+ * learns about every request.
  */
 class RestWareraClient(
     private val restClient: RestClient,
     private val rateLimiter: RateLimiter = defaultRateLimiter(),
     private val retry: Retry = defaultRetry(),
+    private val listener: WareraCallListener = WareraCallListener.NONE,
 ) : WareraClient {
-    override fun getAllCountries(): List<WareraCountry> = query("country.getAllCountries", ListSerializer(WareraCountry.serializer()))
+    override fun getAllCountries(): List<WareraCountry> = query(WareraProcedure.ALL_COUNTRIES, ListSerializer(WareraCountry.serializer()))
 
     override fun searchUserIds(text: String): List<String> = search(text).userIds
 
     override fun getUser(userId: String): WareraUser =
-        query("user.getUserLite", WareraUser.serializer(), buildJsonObject { put("userId", userId) })
+        query(WareraProcedure.USER, WareraUser.serializer(), buildJsonObject { put("userId", userId) })
 
     override fun getCompanyIds(userId: String): List<String> {
         val ids = mutableListOf<String>()
@@ -48,7 +53,7 @@ class RestWareraClient(
                     put("perPage", COMPANY_PAGE_SIZE)
                     cursor?.let { put("cursor", it) }
                 }
-            val page = query("company.getCompanies", CompanyPage.serializer(), input)
+            val page = query(WareraProcedure.COMPANIES, CompanyPage.serializer(), input)
             ids += page.items
             cursor = page.nextCursor
         } while (cursor != null)
@@ -56,15 +61,15 @@ class RestWareraClient(
     }
 
     override fun getCompany(companyId: String): WareraCompany =
-        query("company.getById", WareraCompany.serializer(), buildJsonObject { put("companyId", companyId) })
+        query(WareraProcedure.COMPANY, WareraCompany.serializer(), buildJsonObject { put("companyId", companyId) })
 
     override fun getGovernment(countryId: String): WareraGovernment =
-        query("government.getByCountryId", WareraGovernment.serializer(), buildJsonObject { put("countryId", countryId) })
+        query(WareraProcedure.GOVERNMENT, WareraGovernment.serializer(), buildJsonObject { put("countryId", countryId) })
 
     override fun searchMilitaryUnitIds(text: String): List<String> = search(text).muIds
 
     override fun getMilitaryUnit(muId: String): WareraMilitaryUnit =
-        query("mu.getById", WareraMilitaryUnit.serializer(), buildJsonObject { put("muId", muId) })
+        query(WareraProcedure.MILITARY_UNIT, WareraMilitaryUnit.serializer(), buildJsonObject { put("muId", muId) })
 
     override fun getParties(countryId: String): List<WareraParty> {
         val parties = mutableListOf<WareraParty>()
@@ -76,7 +81,7 @@ class RestWareraClient(
                     put("limit", PARTY_PAGE_SIZE)
                     cursor?.let { put("cursor", it) }
                 }
-            val page = query("party.getManyPaginated", PartyPage.serializer(), input)
+            val page = query(WareraProcedure.PARTIES, PartyPage.serializer(), input)
             parties += page.items
             cursor = page.nextCursor
         } while (cursor != null)
@@ -84,25 +89,25 @@ class RestWareraClient(
     }
 
     private fun search(text: String): SearchResult =
-        query("search.searchAnything", SearchResult.serializer(), buildJsonObject { put("searchText", text) })
+        query(WareraProcedure.SEARCH, SearchResult.serializer(), buildJsonObject { put("searchText", text) })
 
     private fun <T> query(
         procedure: String,
         serializer: KSerializer<T>,
         input: JsonObject? = null,
     ): T {
+        // Every attempt of the retry waits for a permit of its own, since every one counts against the limit.
+        var attempts = 0
         val call =
-            RateLimiter.decorateCallable(rateLimiter) {
-                restClient
-                    .get()
-                    .uri { builder ->
-                        builder.path("/{procedure}")
-                        // tRPC takes the input of a query as JSON in the query string.
-                        if (input != null) builder.queryParam("input", "{input}")
-                        builder.build(mapOf("procedure" to procedure, "input" to input?.toString().orEmpty()))
-                    }.retrieve()
-                    .body(String::class.java)
-                    ?: throw WareraApiException("Empty response from $procedure")
+            Callable {
+                if (++attempts > 1) listener.retried(procedure)
+                val waitStart = System.nanoTime()
+                try {
+                    RateLimiter.decorateCallable(rateLimiter) { send(procedure, input, waitStart) }.call()
+                } catch (e: RequestNotPermitted) {
+                    listener.throttled(procedure)
+                    throw e
+                }
             }
         val body =
             try {
@@ -123,6 +128,37 @@ class RestWareraClient(
             // the first line goes along, and no cause.
             throw WareraSchemaException("WarEra API call $procedure returned an unexpected response: ${e.message?.lineSequence()?.first()}")
         }
+    }
+
+    private fun send(
+        procedure: String,
+        input: JsonObject?,
+        waitStart: Long,
+    ): String {
+        val start = System.nanoTime()
+
+        fun report(status: Int?) =
+            listener.requestSent(procedure, status, Duration.ofNanos(start - waitStart), Duration.ofNanos(System.nanoTime() - start))
+        val body =
+            try {
+                restClient
+                    .get()
+                    .uri { builder ->
+                        builder.path("/{procedure}")
+                        // tRPC takes the input of a query as JSON in the query string.
+                        if (input != null) builder.queryParam("input", "{input}")
+                        builder.build(mapOf("procedure" to procedure, "input" to input?.toString().orEmpty()))
+                    }.retrieve()
+                    .body(String::class.java)
+            } catch (e: RestClientResponseException) {
+                report(e.statusCode.value())
+                throw e
+            } catch (e: RestClientException) {
+                report(null)
+                throw e
+            }
+        report(HttpStatus.OK.value())
+        return body ?: throw WareraApiException("Empty response from $procedure")
     }
 
     @Serializable
@@ -168,6 +204,9 @@ class RestWareraClient(
         const val WARERA_LIMIT_PER_MINUTE = 100
 
         const val CALLS_PER_PERIOD = 3
+
+        /** What [defaultRateLimiter] allows per minute with its default period. */
+        const val DEFAULT_CALLS_PER_MINUTE = 90
 
         /** Longest `Retry-After` that is waited for; a longer one would outlast any request. */
         private val MAX_RETRY_AFTER: Duration = Duration.ofSeconds(10)
