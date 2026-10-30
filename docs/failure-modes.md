@@ -26,6 +26,10 @@ down, it ends only with the next report or at its end date. If the
 vote's channel was deleted, the result is only in the dashboard. Without WarEra, admins cannot list the parties to pick their
 colours; result images are still drawn with the colours saved, and the preview uses invented parties.
 
+Whether a member may manage votes in the dashboard follows the roles in the bot's last member list, so losing or gaining
+a manager role counts within seconds. Only until the bot has sent its list since the backend started, e.g. while the bot
+is down, does the dashboard use the roles the member had at login.
+
 A field WarEra stops sending or renames looks like a real change, not like an outage. A sync of all members that would
 take a role from at least 10 members and more than a quarter of its holders is held back by the bot, unless an admin
 just changed the role's rule or switched the limit off under "Rollen". While it is off, such a change takes the role
