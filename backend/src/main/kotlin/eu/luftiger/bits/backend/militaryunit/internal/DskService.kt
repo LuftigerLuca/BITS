@@ -97,8 +97,8 @@ class DskService(
         val name = validName(request.name)
         val roleId = request.roleId?.let(::validRole)
         transactionTemplate.executeWithoutResult {
-            if (dskRepository.existsByNameIgnoreCase(name)) throw conflict("DSK $name exists already")
-            if (roleId != null && dskRepository.findByRoleId(roleId) != null) throw conflict("Role $roleId belongs to another DSK")
+            if (dskRepository.existsByNameIgnoreCase(name)) throw ConflictException("DSK $name exists already")
+            if (roleId != null && dskRepository.findByRoleId(roleId) != null) throw ConflictException("Role $roleId belongs to another DSK")
             saveAndFlush(Dsk(name, roleId, clock.instant()))
             auditLog.record(actor, AuditAction.DSK_CREATED, "$name, ${roleLabel(roleId)}")
         }
@@ -123,10 +123,10 @@ class DskService(
             transactionTemplate.execute {
                 val dsk = dskRepository.findByIdOrNull(dskId) ?: throw NotFoundException()
                 if (!name.equals(dsk.name, ignoreCase = true) && dskRepository.existsByNameIgnoreCase(name)) {
-                    throw conflict("DSK $name exists already")
+                    throw ConflictException("DSK $name exists already")
                 }
                 if (roleId != null && dskRepository.findByRoleId(roleId).let { it != null && it.id != dskId }) {
-                    throw conflict("Role $roleId belongs to another DSK")
+                    throw ConflictException("Role $roleId belongs to another DSK")
                 }
                 val before = "${dsk.name}, ${roleLabel(dsk.roleId)}"
                 val formerRoleId = dsk.roleId
@@ -196,12 +196,12 @@ class DskService(
         val roleId =
             transactionTemplate.execute {
                 val dsk = dskRepository.findByIdOrNull(dskId) ?: throw NotFoundException()
-                if (militaryUnitRepository.existsById(mu.id)) throw conflict("Military unit ${mu.id} belongs to a DSK already")
+                if (militaryUnitRepository.existsById(mu.id)) throw ConflictException("Military unit ${mu.id} belongs to a DSK already")
                 try {
                     militaryUnitRepository.saveAndFlush(DskMilitaryUnit(mu.id, dskId, mu.name, clock.instant()))
                 } catch (_: DataIntegrityViolationException) {
                     // If another admin was faster.
-                    throw conflict("Military unit ${mu.id} belongs to a DSK already")
+                    throw ConflictException("Military unit ${mu.id} belongs to a DSK already")
                 }
                 auditLog.record(actor, AuditAction.DSK_MILITARY_UNIT_ADDED, "MU ${mu.name} zu ${dsk.name}")
                 dsk.roleId
@@ -233,7 +233,7 @@ class DskService(
             dskRepository.saveAndFlush(dsk)
         } catch (_: DataIntegrityViolationException) {
             // The unique indexes on the name and the role, if another admin was faster.
-            throw conflict("Name or role of the DSK taken")
+            throw ConflictException("Name or role of the DSK taken")
         }
     }
 
@@ -253,8 +253,8 @@ class DskService(
      */
     private fun validRole(roleId: String): String {
         if (guildRoles.assignable().none { it.id == roleId }) throw InvalidInputException("Role $roleId cannot be assigned")
-        if (roleId in guildRoles.withRuleIds()) throw conflict("Role $roleId has a rule")
-        if (roleId in guildRoles.statusIds()) throw conflict("Role $roleId is a status role")
+        if (roleId in guildRoles.withRuleIds()) throw ConflictException("Role $roleId has a rule")
+        if (roleId in guildRoles.statusIds()) throw ConflictException("Role $roleId is a status role")
         return roleId
     }
 
@@ -276,9 +276,7 @@ class DskService(
         return "Rolle ${name?.let { "@$it" } ?: "$roleId (in Discord gelöscht)"}"
     }
 
-    private fun conflict(reason: String) = ConflictException(reason)
-
-    private companion object {
+    companion object {
         const val MAX_NAME_LENGTH = 100
 
         /** More than for the rules, since those of other countries are left out. */

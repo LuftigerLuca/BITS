@@ -1,6 +1,9 @@
 package eu.luftiger.bits.backend.auth.internal
 
+import eu.luftiger.bits.backend.shared.WebInput
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -31,7 +34,7 @@ class AuthController(
 
     @PostMapping("/login")
     fun login(
-        @RequestBody body: AdminLoginRequest,
+        @Valid @RequestBody body: AdminLoginRequest,
         request: HttpServletRequest,
     ): ResponseEntity<Unit> =
         when (val result = adminLoginService.login(body.username, body.password, request.remoteAddr)) {
@@ -69,6 +72,8 @@ data class AuthOptionsResponse(
 
 @Serializable
 data class AdminLoginRequest(
+    @field:Size(max = WebInput.MAX_USERNAME_LENGTH)
     val username: String,
+    @field:Size(max = WebInput.MAX_PASSWORD_LENGTH)
     val password: String,
 )

@@ -163,6 +163,7 @@ class VoteBotController(
     private fun check(actor: VoteActor) {
         BotInput.discordUserId(actor.discordUserId)
         BotInput.memberName(actor.name)
+        actor.avatarUrl?.let(BotInput::avatarUrl)
         BotInput.roleCount(actor.roleIds.size)
         actor.roleIds.forEach(BotInput::roleId)
     }

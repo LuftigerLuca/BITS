@@ -2,7 +2,10 @@ package eu.luftiger.bits.backend.vote.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.shared.WebInput
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.CacheControl
@@ -76,7 +79,7 @@ class VoteResultSettingsController(
     @PutMapping("/party-colors")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setPartyColors(
-        @RequestBody request: SetPartyColorsRequest,
+        @Valid @RequestBody request: SetPartyColorsRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         settingsService.setPartyColors(request.colors.mapValues { parse(it.value) }, request.noPartyColor?.let(::parse), actor(session))
@@ -139,6 +142,13 @@ data class PartyColorResponse(
 @Serializable
 data class SetPartyColorsRequest(
     /** `#RRGGBB` by WarEra party ID; parties left out get the palette's again. */
-    val colors: Map<String, String>,
+    @field:Size(max = WebInput.MAX_PARTIES)
+    val colors: Map<
+        @Size(max = WebInput.MAX_WARERA_ID_LENGTH)
+        String,
+        @Size(max = WebInput.MAX_COLOR_LENGTH)
+        String,
+    >,
+    @field:Size(max = WebInput.MAX_COLOR_LENGTH)
     val noPartyColor: String?,
 )

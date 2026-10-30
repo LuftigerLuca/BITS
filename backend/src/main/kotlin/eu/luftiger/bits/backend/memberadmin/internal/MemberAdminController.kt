@@ -2,6 +2,8 @@ package eu.luftiger.bits.backend.memberadmin.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -28,26 +30,26 @@ class MemberAdminController(
 
     @GetMapping
     fun search(
-        @RequestParam query: String,
+        @RequestParam @Size(max = WebInput.MAX_QUERY_LENGTH) query: String,
     ): List<MemberSummary> = service.search(query)
 
     /** 404 for a member who is neither on the guild nor linked. */
     @GetMapping("/{discordUserId}")
     fun member(
-        @PathVariable discordUserId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,
     ): MemberDetailResponse = service.member(discordUserId)
 
     /** Judged with fresh WarEra data like `/rollen`, so it can take a while; 503 if WarEra cannot be reached. */
     @GetMapping("/{discordUserId}/roles")
     fun roles(
-        @PathVariable discordUserId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,
     ): MemberRolesResponse = service.roles(discordUserId)
 
     /** 404 for an unknown member, 409 while nothing is synced, since the role sync and all it sets is switched off. */
     @PostMapping("/{discordUserId}/sync")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun sync(
-        @PathVariable discordUserId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
         service.sync(discordUserId, actor(session))
@@ -58,7 +60,7 @@ class MemberAdminController(
     @DeleteMapping("/{discordUserId}/link")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unlink(
-        @PathVariable discordUserId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
         service.unlink(discordUserId, actor(session))

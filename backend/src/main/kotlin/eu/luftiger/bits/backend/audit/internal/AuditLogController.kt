@@ -1,6 +1,8 @@
 package eu.luftiger.bits.backend.audit.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditAction
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -21,7 +23,7 @@ class AuditLogController(
     /** Newest first, [AuditLogService.PAGE_SIZE] at a time; the next page starts [before] the last entry of this one. */
     @GetMapping
     fun entries(
-        @RequestParam(required = false) actor: String?,
+        @RequestParam(required = false) @Size(max = WebInput.MAX_QUERY_LENGTH) actor: String?,
         @RequestParam(required = false) action: AuditAction?,
         @RequestParam(required = false) before: Long?,
     ): AuditLogPage = service.page(actor, action, before)

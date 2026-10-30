@@ -136,6 +136,11 @@ backend/src/main/kotlin/eu/luftiger/bits/backend/
   the status and a problem detail (RFC 9457), as it does for `WareraApiException` (503) and for what Spring rejects
   itself, such as failed validation. Controllers neither catch these nor have their own `@ExceptionHandler`.
   `ServiceLayerTest` checks that no service uses `ResponseStatusException` or `HttpStatus`.
+- **Input limits:** every string and list a controller takes has an upper limit, so overlong input ends in a 400
+  before it reaches WarEra or the database. Under `/web`, request bodies get `@Valid` and `@field:Size`, list
+  elements `List<@Size(max = …) String>`, parameters `@Size`; the limits are in `WebInput` or, if they belong to a
+  feature, in its service (e.g. `VoteService.MAX_QUESTION_LENGTH`). Under `/api`, the controller checks the bot's
+  input with `BotInput`, since its DTOs live in the Gradle module `shared`. `InputLimitTest` shows both.
 - REST DTOs that the bot uses live in the Gradle module `shared` (package `eu.luftiger.bits.shared`), not in
   `api/dto`. `api/dto` is only for types that backend modules exchange with each other. Do not confuse the Gradle
   module `shared` with the backend package `eu.luftiger.bits.backend.shared`.

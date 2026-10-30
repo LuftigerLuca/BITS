@@ -2,6 +2,9 @@ package eu.luftiger.bits.backend.overview.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -45,7 +48,7 @@ class OverviewController(
 
     @PutMapping("/country")
     fun setCountry(
-        @RequestBody request: SetCountryRequest,
+        @Valid @RequestBody request: SetCountryRequest,
         @AuthenticationPrincipal session: Jwt,
     ): CountryResponse {
         val actor = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
@@ -100,6 +103,7 @@ data class OverviewHistoryDay(
 
 @Serializable
 data class SetCountryRequest(
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val countryId: String,
 )
 

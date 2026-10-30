@@ -2,6 +2,9 @@ package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -30,7 +33,7 @@ class StatusRoleController(
     @PutMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun set(
-        @RequestBody request: StatusRolesRequest,
+        @Valid @RequestBody request: StatusRolesRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         val actor = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
@@ -42,8 +45,10 @@ class StatusRoleController(
 @Serializable
 data class StatusRolesRequest(
     /** `null` for none. */
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val verifiedRoleId: String? = null,
     /** `null` for none. */
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val unverifiedRoleId: String? = null,
 )
 

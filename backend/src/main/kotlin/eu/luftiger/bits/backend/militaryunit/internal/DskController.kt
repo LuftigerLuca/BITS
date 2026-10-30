@@ -2,6 +2,9 @@ package eu.luftiger.bits.backend.militaryunit.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -34,7 +37,7 @@ class DskController(
     @PostMapping("/dsks")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
-        @RequestBody request: DskRequest,
+        @Valid @RequestBody request: DskRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         dskService.create(request, actor(session))
@@ -46,7 +49,7 @@ class DskController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun update(
         @PathVariable dskId: Long,
-        @RequestBody request: DskRequest,
+        @Valid @RequestBody request: DskRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         dskService.update(dskId, request, actor(session))
@@ -66,14 +69,14 @@ class DskController(
     /** Military units of all countries, by name. */
     @GetMapping("/search")
     fun search(
-        @RequestParam query: String,
+        @RequestParam @Size(max = WebInput.MAX_QUERY_LENGTH) query: String,
     ): List<MilitaryUnitOption> = dskService.searchMilitaryUnits(query)
 
     @PostMapping("/dsks/{dskId}/military-units")
     @ResponseStatus(HttpStatus.CREATED)
     fun addMilitaryUnit(
         @PathVariable dskId: Long,
-        @RequestBody request: AddMilitaryUnitRequest,
+        @Valid @RequestBody request: AddMilitaryUnitRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         dskService.addMilitaryUnit(dskId, request.muId, actor(session))
@@ -84,7 +87,7 @@ class DskController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun removeMilitaryUnit(
         @PathVariable dskId: Long,
-        @PathVariable muId: String,
+        @PathVariable @Size(max = WebInput.MAX_WARERA_ID_LENGTH) muId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
         dskService.removeMilitaryUnit(dskId, muId, actor(session))
@@ -160,12 +163,15 @@ data class MilitaryUnitOption(
 
 @Serializable
 data class DskRequest(
+    @field:Size(max = DskService.MAX_NAME_LENGTH)
     val name: String,
     /** `null` for none. */
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val roleId: String? = null,
 )
 
 @Serializable
 data class AddMilitaryUnitRequest(
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val muId: String,
 )

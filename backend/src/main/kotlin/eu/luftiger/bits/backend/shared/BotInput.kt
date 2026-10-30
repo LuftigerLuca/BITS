@@ -38,6 +38,9 @@ object BotInput {
     private val STREAM_ID = Regex("[0-9]{1,20}-[0-9]{1,20}")
     private val EVENT_TYPE = Regex("[a-z_]{1,64}")
 
+    /** Discord's CDN URLs are far shorter; checked against the column of the audit log, which leaves room. */
+    private const val MAX_AVATAR_URL_LENGTH = 512
+
     /** Role IDs are snowflakes as well; checked against the column only, so tests can use readable IDs. */
     private const val MAX_ROLE_ID_LENGTH = 32
 
@@ -81,6 +84,8 @@ object BotInput {
     fun streamId(value: String) = check(STREAM_ID.matches(value), "stream id")
 
     fun eventType(value: String) = check(EVENT_TYPE.matches(value), "event type")
+
+    fun avatarUrl(value: String) = check(value.length <= MAX_AVATAR_URL_LENGTH, "avatar url")
 
     /** Optional, so an older bot can leave it out. */
     fun discordName(value: String?) = value?.let(::memberName)
