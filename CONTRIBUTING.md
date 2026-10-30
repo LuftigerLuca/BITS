@@ -213,7 +213,9 @@ What these flows show:
   `Subsection`, never a box built from `border` and `rounded-*`. Actions of a row are an `IconAction` (ghost icon
   button with tooltip), actions of a section or subsection outline text buttons of size `sm`. Whatever takes roles
   from members asks first with `ConfirmDialog`. An empty list shows `EmptyState` from `components/QueryState.tsx`,
-  naming the action that adds something if there is one; short hints inside a row or a subsection stay text.
+  naming the action that adds something if there is one; short hints inside a row or a subsection stay text. Colours
+  come from the tokens in `index.css`; text reaches 4.5:1 and icons 3:1 in both themes, which `contrast.test.ts`
+  checks for every pair the dashboard shows. `primary` is no text colour, only for icons and as background.
 - `.editorconfig` defines indentation and line endings.
 - **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (Discord messages,
   dashboard) is in German.
