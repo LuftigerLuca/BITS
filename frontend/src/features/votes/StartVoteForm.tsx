@@ -4,7 +4,8 @@ import { RoleName } from '@/components/RoleName'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ThresholdChoice } from '@/lib/api'
@@ -36,7 +37,11 @@ export function StartVoteForm() {
     thresholdPercent === null || (Number.isInteger(thresholdPercent) && thresholdPercent >= 1 && thresholdPercent <= 99)
   const threshold = thresholdPercent === null ? null : { percent: thresholdPercent, choice: thresholdChoice }
   const valid =
-    question.trim() !== '' && roleId !== null && channelId !== null && (end === null || !Number.isNaN(end)) && percentValid
+    question.trim() !== '' &&
+    roleId !== null &&
+    channelId !== null &&
+    (end === null || !Number.isNaN(end)) &&
+    percentValid
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -60,8 +65,8 @@ export function StartVoteForm() {
         <CardTitle>Neue Abstimmung</CardTitle>
         <CardDescription>
           Der Bot postet die Frage mit den Buttons Ja, Nein und Enthaltung im Kanal und pingt die Rolle. Abstimmen
-          dürfen alle mit der Rolle und einem verknüpften WarEra-Account; das Ergebnis erscheint nach Partei
-          ausgewertet im selben Kanal.
+          dürfen alle mit der Rolle und einem verknüpften WarEra-Account; das Ergebnis erscheint nach Partei ausgewertet
+          im selben Kanal.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -71,18 +76,18 @@ export function StartVoteForm() {
           <ErrorState message={errorMessage(options.error)} onRetry={() => options.refetch()} />
         ) : (
           <form className="flex flex-col gap-4" onSubmit={submit}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vote-question">Frage</Label>
+            <Field>
+              <FieldLabel htmlFor="vote-question">Frage</FieldLabel>
               <Input
                 id="vote-question"
                 value={question}
                 maxLength={MAX_QUESTION_LENGTH}
                 onChange={(event) => setQuestion(event.target.value)}
               />
-            </div>
+            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="vote-role">Stimmberechtigte Rolle</Label>
+              <Field>
+                <FieldLabel htmlFor="vote-role">Stimmberechtigte Rolle</FieldLabel>
                 <SearchableSelect
                   id="vote-role"
                   className="w-full"
@@ -92,9 +97,9 @@ export function StartVoteForm() {
                   placeholder="Rolle wählen"
                   renderItem={(item) => <RoleName name={item.label} color={colors.get(item.value) ?? null} />}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="vote-channel">Kanal</Label>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vote-channel">Kanal</FieldLabel>
                 <SearchableSelect
                   id="vote-channel"
                   className="w-full"
@@ -102,11 +107,12 @@ export function StartVoteForm() {
                   value={channelId}
                   onValueChange={setChannelId}
                   placeholder="Kanal wählen"
+                  aria-describedby="vote-channel-hint"
                 />
-                <p className="text-xs text-muted-foreground">Nur Kanäle, in denen der Bot posten darf.</p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="vote-end">Ende</Label>
+                <FieldDescription id="vote-channel-hint">Nur Kanäle, in denen der Bot posten darf.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="vote-end">Ende</FieldLabel>
                 <Input
                   id="vote-end"
                   type="datetime-local"
@@ -114,20 +120,17 @@ export function StartVoteForm() {
                   disabled={openEnd}
                   onChange={(event) => setEndsAt(event.target.value)}
                 />
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    checked={openEnd}
-                    onChange={(event) => setOpenEnd(event.target.checked)}
-                  />
-                  Ohne Enddatum, bis jemand sie beendet
-                </label>
-              </div>
-              <div className="flex flex-col gap-1.5">
+                <Field orientation="horizontal">
+                  <Checkbox id="vote-open-end" checked={openEnd} onCheckedChange={(checked) => setOpenEnd(checked)} />
+                  <FieldLabel htmlFor="vote-open-end" className="font-normal">
+                    Ohne Enddatum, bis jemand sie beendet
+                  </FieldLabel>
+                </Field>
+              </Field>
+              <Field>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="vote-threshold">Automatisch beenden bei mehr als (%)</Label>
+                  <Field>
+                    <FieldLabel htmlFor="vote-threshold">Automatisch beenden bei mehr als (%)</FieldLabel>
                     <Input
                       id="vote-threshold"
                       type="number"
@@ -139,9 +142,9 @@ export function StartVoteForm() {
                       aria-describedby="vote-threshold-hint"
                       onChange={(event) => setPercent(event.target.value)}
                     />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="vote-threshold-choice">mit der Stimme</Label>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="vote-threshold-choice">mit der Stimme</FieldLabel>
                     <Select
                       items={THRESHOLD_ITEMS}
                       value={thresholdChoice}
@@ -159,14 +162,14 @@ export function StartVoteForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </Field>
                 </div>
-                <p id="vote-threshold-hint" className="text-xs text-muted-foreground">
+                <FieldDescription id="vote-threshold-hint">
                   Optional, 1 bis 99. Sie endet, sobald mehr als so viel Prozent aller Stimmberechtigten mit dieser
                   Stimme gestimmt haben oder das Ende erreicht ist, je nachdem, was zuerst eintritt; 50 heißt mehr als
                   die Hälfte.
-                </p>
-              </div>
+                </FieldDescription>
+              </Field>
             </div>
             <Button type="submit" className="self-start" disabled={createVote.isPending || !valid}>
               Abstimmung starten

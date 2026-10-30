@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import type { Dsk, MilitaryUnits } from '@/lib/api'
 import { errorMessage } from './labels'
@@ -228,8 +228,8 @@ function DskFields({
 }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
-      <div className="flex flex-1 flex-col gap-1.5">
-        <Label htmlFor={`${idPrefix}-name`}>Name</Label>
+      <Field className="flex-1">
+        <FieldLabel htmlFor={`${idPrefix}-name`}>Name</FieldLabel>
         <Input
           id={`${idPrefix}-name`}
           value={name}
@@ -237,11 +237,11 @@ function DskFields({
           placeholder="z. B. DSK1"
           onChange={(e) => onNameChange(e.target.value)}
         />
-      </div>
-      <div className="flex flex-1 flex-col gap-1.5">
-        <Label htmlFor={`${idPrefix}-role`}>Rolle</Label>
+      </Field>
+      <Field className="flex-1">
+        <FieldLabel htmlFor={`${idPrefix}-role`}>Rolle</FieldLabel>
         <RoleSelect id={`${idPrefix}-role`} data={data} dskId={dskId} value={roleId} onValueChange={onRoleChange} />
-      </div>
+      </Field>
     </div>
   )
 }
@@ -259,8 +259,8 @@ function MilitaryUnitSearch({ dsk }: { dsk: Dsk }) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5 sm:max-w-sm">
-      <Label htmlFor={inputId}>MU hinzufügen</Label>
+    <Field className="sm:max-w-sm">
+      <FieldLabel htmlFor={inputId}>MU hinzufügen</FieldLabel>
       <div className="flex gap-2">
         <Input
           id={inputId}
@@ -318,7 +318,7 @@ function MilitaryUnitSearch({ dsk }: { dsk: Dsk }) {
           ))}
         </ul>
       )}
-    </div>
+    </Field>
   )
 }
 

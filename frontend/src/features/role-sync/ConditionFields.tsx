@@ -3,7 +3,7 @@ import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { searchMilitaryUnits, type ConditionType, type GovernmentOffice, type MuRole, type Option } from '@/lib/api'
@@ -112,8 +112,8 @@ export function ConditionFields({
         </Button>
       )}
       <div className="clear-left grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={id('type')}>Art</Label>
+        <Field>
+          <FieldLabel htmlFor={id('type')}>Art</FieldLabel>
           <Select
             items={typeItems}
             value={type}
@@ -130,10 +130,10 @@ export function ConditionFields({
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </Field>
         {needsCountry(type) && (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={id('country')}>Land</Label>
+          <Field>
+            <FieldLabel htmlFor={id('country')}>Land</FieldLabel>
             <SearchableSelect
               id={id('country')}
               className="w-full"
@@ -143,15 +143,16 @@ export function ConditionFields({
               disabled={countriesPending}
               placeholder={countriesPending ? 'Länder werden geladen …' : 'Land wählen'}
             />
-          </div>
+          </Field>
         )}
         {type === 'GOVERNMENT_OFFICE' && (
-          <fieldset className="flex flex-col gap-2 sm:col-span-2">
-            <legend className="mb-1.5 text-sm leading-none font-medium">Ämter</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
+          <FieldSet className="sm:col-span-2">
+            <FieldLegend variant="label">Ämter</FieldLegend>
+            <FieldGroup data-slot="checkbox-group" className="grid gap-2 sm:grid-cols-2">
               {officeItems.map((item) => (
-                <label key={item.value} className="flex items-center gap-2 text-sm">
+                <Field key={item.value} orientation="horizontal">
                   <Checkbox
+                    id={id(`office-${item.value}`)}
                     checked={draft.offices.includes(item.value)}
                     onCheckedChange={(checked) =>
                       update({
@@ -161,16 +162,18 @@ export function ConditionFields({
                       })
                     }
                   />
-                  {item.label}
-                </label>
+                  <FieldLabel htmlFor={id(`office-${item.value}`)} className="font-normal">
+                    {item.label}
+                  </FieldLabel>
+                </Field>
               ))}
-            </div>
-            <p className="text-sm text-muted-foreground">Eines der gewählten Ämter genügt.</p>
-          </fieldset>
+            </FieldGroup>
+            <FieldDescription>Eines der gewählten Ämter genügt.</FieldDescription>
+          </FieldSet>
         )}
         {leadership && (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={id('mu-role')}>Stufe</Label>
+          <Field>
+            <FieldLabel htmlFor={id('mu-role')}>Stufe</FieldLabel>
             <Select
               items={muRoleItems}
               value={draft.muRole}
@@ -187,15 +190,13 @@ export function ConditionFields({
                 ))}
               </SelectContent>
             </Select>
-            <p id={id('mu-role-hint')} className="text-sm text-muted-foreground">
-              Höhere Stufen zählen mit.
-            </p>
-          </div>
+            <FieldDescription id={id('mu-role-hint')}>Höhere Stufen zählen mit.</FieldDescription>
+          </Field>
         )}
         {(type === 'MILITARY_UNIT' || leadership) && (
           <>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={id('mu-query')}>Military Unit suchen</Label>
+            <Field>
+              <FieldLabel htmlFor={id('mu-query')}>Military Unit suchen</FieldLabel>
               <div className="flex gap-2">
                 <Input
                   id={id('mu-query')}
@@ -212,9 +213,9 @@ export function ConditionFields({
                   Suchen
                 </Button>
               </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={id('mu')}>Military Unit</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={id('mu')}>Military Unit</FieldLabel>
               <Select
                 items={muItems}
                 value={leadership ? (draft.muId ?? ANY) : draft.muId}
@@ -232,12 +233,12 @@ export function ConditionFields({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </>
         )}
         {(type === 'PARTY' || partyLeader) && (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={id('party')}>Partei</Label>
+          <Field>
+            <FieldLabel htmlFor={id('party')}>Partei</FieldLabel>
             <SearchableSelect
               id={id('party')}
               className="w-full"
@@ -247,11 +248,11 @@ export function ConditionFields({
               disabled={partyItems.length === 0}
               placeholder={partyPlaceholder}
             />
-          </div>
+          </Field>
         )}
         {(type === 'LEVEL' || type === 'MILITARY_RANK' || type === 'COMPANIES') && (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={id('threshold')}>{THRESHOLD_LABELS[type]}</Label>
+          <Field>
+            <FieldLabel htmlFor={id('threshold')}>{THRESHOLD_LABELS[type]}</FieldLabel>
             <Input
               id={id('threshold')}
               type="number"
@@ -259,7 +260,7 @@ export function ConditionFields({
               value={draft.threshold}
               onChange={(event) => update({ threshold: event.target.value })}
             />
-          </div>
+          </Field>
         )}
       </div>
     </fieldset>

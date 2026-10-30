@@ -3,7 +3,7 @@ import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MAX_ACTIVITY_TEXT_LENGTH, type BotActivityType, type BotPresence, type BotStatus } from '@/lib/api'
 import { ACTIVITY, LOAD_ERROR, STATUS } from './labels'
@@ -58,8 +58,8 @@ function BotPresenceForm({ saved }: { saved: BotPresence }) {
   ]
   return (
     <form className="flex flex-col gap-4" onSubmit={submit}>
-      <div className="flex flex-col gap-1.5 sm:max-w-sm">
-        <Label htmlFor="bot-status">Status</Label>
+      <Field className="sm:max-w-sm">
+        <FieldLabel htmlFor="bot-status">Status</FieldLabel>
         <Select items={statusItems} value={status} onValueChange={(value) => setStatus(value as BotStatus)}>
           <SelectTrigger id="bot-status" className="w-full">
             <SelectValue />
@@ -72,9 +72,9 @@ function BotPresenceForm({ saved }: { saved: BotPresence }) {
             ))}
           </SelectContent>
         </Select>
-      </div>
-      <div className="flex flex-col gap-1.5 sm:max-w-sm">
-        <Label htmlFor="bot-activity">Aktivität</Label>
+      </Field>
+      <Field className="sm:max-w-sm">
+        <FieldLabel htmlFor="bot-activity">Aktivität</FieldLabel>
         <Select
           items={activityItems}
           value={type}
@@ -91,10 +91,12 @@ function BotPresenceForm({ saved }: { saved: BotPresence }) {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
       {type !== NO_ACTIVITY && (
-        <div className="flex flex-col gap-1.5 sm:max-w-sm">
-          <Label htmlFor="bot-activity-text">{type === 'CUSTOM' ? 'Status-Text' : 'Text der Aktivität'}</Label>
+        <Field className="sm:max-w-sm">
+          <FieldLabel htmlFor="bot-activity-text">
+            {type === 'CUSTOM' ? 'Status-Text' : 'Text der Aktivität'}
+          </FieldLabel>
           <Input
             id="bot-activity-text"
             value={text}
@@ -102,7 +104,7 @@ function BotPresenceForm({ saved }: { saved: BotPresence }) {
             placeholder={type === 'CUSTOM' ? 'z. B. Wartung bis 18 Uhr' : 'z. B. WarEra'}
             onChange={(event) => setText(event.target.value)}
           />
-        </div>
+        </Field>
       )}
       <Button type="submit" className="self-start" disabled={setPresence.isPending || !changed || !valid}>
         Speichern

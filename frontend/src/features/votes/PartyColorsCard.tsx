@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { PartyColors } from '@/lib/api'
 import { partyColorsErrorMessage } from './labels'
@@ -89,15 +91,16 @@ function PartyColorsForm({ saved }: { saved: PartyColors }) {
           return (
             <li key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2 text-sm">
               <span className="min-w-0 flex-1 truncate font-medium">{row.name}</span>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
+              <Field orientation="horizontal" className="w-auto">
+                <Checkbox
+                  id={`party-color-${row.id}`}
                   checked={color !== null}
-                  onChange={(event) => set(row.id, event.target.checked ? row.fallback : null)}
+                  onCheckedChange={(checked) => set(row.id, checked ? row.fallback : null)}
                 />
-                Eigene Farbe
-              </label>
+                <FieldLabel htmlFor={`party-color-${row.id}`} className="font-normal">
+                  Eigene Farbe
+                </FieldLabel>
+              </Field>
               <span className="flex w-36 items-center gap-2">
                 {color === null ? (
                   <span className="text-muted-foreground">Farbe aus der Palette</span>

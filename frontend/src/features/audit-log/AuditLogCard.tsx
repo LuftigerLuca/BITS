@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -46,8 +46,8 @@ export function AuditLogCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-actor">Admin</Label>
+          <Field>
+            <FieldLabel htmlFor="audit-actor">Admin</FieldLabel>
             <SearchableSelect
               id="audit-actor"
               className="w-full"
@@ -55,9 +55,9 @@ export function AuditLogCard() {
               value={actor}
               onValueChange={(value) => setActor(value ?? ALL)}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-action">Aktion</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="audit-action">Aktion</FieldLabel>
             <Select items={actionItems} value={action} onValueChange={(value) => setAction(value ?? ALL)}>
               <SelectTrigger id="audit-action" className="w-full">
                 <SelectValue />
@@ -70,7 +70,7 @@ export function AuditLogCard() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         </div>
         {log.isPending ? (
           <LoadingState label="Audit-Log wird geladen …" />

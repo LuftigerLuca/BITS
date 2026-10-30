@@ -7,16 +7,9 @@ import { useAuth } from '@/auth/context'
 import { DiscordIcon } from '@/components/DiscordIcon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { ApiError, DISCORD_LOGIN_URL, adminLogin, getAuthOptions } from '@/lib/api'
 
@@ -44,9 +37,7 @@ export function LoginPage() {
   if (user) return <Navigate to="/" replace />
 
   const errorCode = searchParams.get('error')
-  const discordError = errorCode
-    ? (DISCORD_ERRORS[errorCode] ?? 'Die Anmeldung mit Discord ist fehlgeschlagen.')
-    : null
+  const discordError = errorCode ? (DISCORD_ERRORS[errorCode] ?? 'Die Anmeldung mit Discord ist fehlgeschlagen.') : null
 
   // Phones load only the small image. On wide landscape screens the card moves to the right, and the image
   // shifts left so the eagle in its centre stays clear of the card, down to 1024 × 768; from 1280 px the card
@@ -64,9 +55,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle as="h1">BITS Dashboard</CardTitle>
-          <CardDescription>
-            Verwaltung des BITS-Bots für den deutschen WarEra-Discord.
-          </CardDescription>
+          <CardDescription>Verwaltung des BITS-Bots für den deutschen WarEra-Discord.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {sessionExpired && !discordError && (
@@ -79,11 +68,7 @@ export function LoginPage() {
               <AlertDescription>{discordError}</AlertDescription>
             </Alert>
           )}
-          <Button
-            variant="discord"
-            className="w-full"
-            onClick={() => window.location.assign(DISCORD_LOGIN_URL)}
-          >
+          <Button variant="discord" className="w-full" onClick={() => window.location.assign(DISCORD_LOGIN_URL)}>
             <DiscordIcon data-icon="inline-start" />
             Mit Discord anmelden
           </Button>
@@ -136,8 +121,8 @@ function AdminLoginForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="username">Benutzername</Label>
+      <Field>
+        <FieldLabel htmlFor="username">Benutzername</FieldLabel>
         <Input
           id="username"
           autoComplete="username"
@@ -145,9 +130,9 @@ function AdminLoginForm() {
           onChange={(event) => setUsername(event.target.value)}
           required
         />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="password">Passwort</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="password">Passwort</FieldLabel>
         <Input
           id="password"
           type="password"
@@ -156,7 +141,7 @@ function AdminLoginForm() {
           onChange={(event) => setPassword(event.target.value)}
           required
         />
-      </div>
+      </Field>
       <Button type="submit" variant="outline" disabled={submitting}>
         Anmelden
       </Button>
@@ -168,7 +153,8 @@ function adminLoginError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'Benutzername oder Passwort falsch.'
     // The lockout ends a fixed time after the first attempt, or later if the whole login is locked; the page cannot tell.
-    if (error.status === 429) return 'Zu viele Anmeldeversuche. Die Admin-Anmeldung ist vorübergehend gesperrt, versuche es später erneut.'
+    if (error.status === 429)
+      return 'Zu viele Anmeldeversuche. Die Admin-Anmeldung ist vorübergehend gesperrt, versuche es später erneut.'
   }
   return 'Die Anmeldung ist fehlgeschlagen. Bitte versuche es später erneut.'
 }

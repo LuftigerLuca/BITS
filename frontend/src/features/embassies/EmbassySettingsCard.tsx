@@ -3,7 +3,16 @@ import { RoleName } from '@/components/RoleName'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { OFFICES } from '@/features/role-sync/labels'
 import type { Embassies, EmbassySettings, GovernmentOffice } from '@/lib/api'
@@ -109,22 +118,25 @@ function SettingsForm({
         setSettings.mutate(settings)
       }}
     >
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">Ämter</legend>
-        {ALL_OFFICES.map((office) => (
-          <label key={office} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={offices.has(office)}
-              onChange={(event) => setOffices(toggle(offices, office, event.target.checked))}
-            />
-            {OFFICES[office]}
-          </label>
-        ))}
-      </fieldset>
-      <div className="flex flex-col gap-1.5 sm:max-w-sm">
-        <Label htmlFor="embassy-ambassador-role">Botschafter-Rolle</Label>
+      <FieldSet>
+        <FieldLegend variant="label">Ämter</FieldLegend>
+        <FieldGroup data-slot="checkbox-group" className="gap-2">
+          {ALL_OFFICES.map((office) => (
+            <Field key={office} orientation="horizontal">
+              <Checkbox
+                id={`embassy-office-${office}`}
+                checked={offices.has(office)}
+                onCheckedChange={(checked) => setOffices(toggle(offices, office, checked))}
+              />
+              <FieldLabel htmlFor={`embassy-office-${office}`} className="font-normal">
+                {OFFICES[office]}
+              </FieldLabel>
+            </Field>
+          ))}
+        </FieldGroup>
+      </FieldSet>
+      <Field className="sm:max-w-sm">
+        <FieldLabel htmlFor="embassy-ambassador-role">Botschafter-Rolle</FieldLabel>
         <SearchableSelect
           id="embassy-ambassador-role"
           className="w-full"
@@ -132,9 +144,9 @@ function SettingsForm({
           value={ambassadorRoleId ?? NONE}
           onValueChange={(value) => setAmbassadorRoleId(value === NONE ? null : value)}
         />
-      </div>
-      <div className="flex flex-col gap-1.5 sm:max-w-sm">
-        <Label htmlFor="embassy-channel">Botschafts-Kanal</Label>
+      </Field>
+      <Field className="sm:max-w-sm">
+        <FieldLabel htmlFor="embassy-channel">Botschafts-Kanal</FieldLabel>
         <SearchableSelect
           id="embassy-channel"
           className="w-full"
@@ -142,13 +154,13 @@ function SettingsForm({
           value={channelId ?? NONE}
           onValueChange={(value) => setChannelId(value === NONE ? null : value)}
         />
-        <p className="text-sm text-muted-foreground">
+        <FieldDescription>
           Hier legt der Bot neue Botschafts-Threads an. Er braucht dort „Private Threads erstellen“, „Threads verwalten“
           und „Nachrichten in Threads senden“.
-        </p>
-      </div>
-      <div className="flex flex-col gap-1.5 sm:max-w-sm">
-        <Label htmlFor="embassy-thread-name">Thread-Name</Label>
+        </FieldDescription>
+      </Field>
+      <Field className="sm:max-w-sm">
+        <FieldLabel htmlFor="embassy-thread-name">Thread-Name</FieldLabel>
         <Input
           id="embassy-thread-name"
           value={template}
@@ -157,29 +169,37 @@ function SettingsForm({
           aria-describedby="embassy-thread-name-hint"
           onChange={(event) => setTemplate(event.target.value)}
         />
-        <p
-          id="embassy-thread-name-hint"
-          className={invalidTemplate ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}
-        >
-          {invalidTemplate ??
-            `So benennt der Bot neue Threads. ${PLACEHOLDER} steht für den englischen Ländernamen aus WarEra, z. B. „Germany“. Bestehende Threads benennst du unter „Botschafts-Threads“ um.`}
-        </p>
-      </div>
-      <fieldset className="flex max-h-72 flex-col gap-2 overflow-y-auto">
-        <legend className="mb-2 text-sm font-medium">Gastgeber-Rollen</legend>
-        {roles.map((role) => (
-          <label key={role.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={hostRoleIds.has(role.id)}
-              onChange={(event) => setHostRoleIds(toggle(hostRoleIds, role.id, event.target.checked))}
-            />
-            <RoleName name={role.name} color={role.color} />
-          </label>
-        ))}
-      </fieldset>
-      <Button type="submit" className="self-start" disabled={!changed || invalidTemplate !== null || setSettings.isPending}>
+        {invalidTemplate ? (
+          <FieldError id="embassy-thread-name-hint">{invalidTemplate}</FieldError>
+        ) : (
+          <FieldDescription id="embassy-thread-name-hint">
+            So benennt der Bot neue Threads. {PLACEHOLDER} steht für den englischen Ländernamen aus WarEra, z. B.
+            „Germany“. Bestehende Threads benennst du unter „Botschafts-Threads“ um.
+          </FieldDescription>
+        )}
+      </Field>
+      <FieldSet>
+        <FieldLegend variant="label">Gastgeber-Rollen</FieldLegend>
+        <FieldGroup data-slot="checkbox-group" className="max-h-72 gap-2 overflow-y-auto">
+          {roles.map((role) => (
+            <Field key={role.id} orientation="horizontal">
+              <Checkbox
+                id={`embassy-host-${role.id}`}
+                checked={hostRoleIds.has(role.id)}
+                onCheckedChange={(checked) => setHostRoleIds(toggle(hostRoleIds, role.id, checked))}
+              />
+              <FieldLabel htmlFor={`embassy-host-${role.id}`} className="font-normal">
+                <RoleName name={role.name} color={role.color} />
+              </FieldLabel>
+            </Field>
+          ))}
+        </FieldGroup>
+      </FieldSet>
+      <Button
+        type="submit"
+        className="self-start"
+        disabled={!changed || invalidTemplate !== null || setSettings.isPending}
+      >
         Speichern
       </Button>
     </form>

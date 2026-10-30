@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { FieldGroup, FieldLabel, FieldLegend, FieldSet, Field } from '@/components/ui/field'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { VoteOptions } from '@/lib/api'
 import { errorMessage } from './labels'
@@ -57,20 +59,23 @@ function ManagerRolesForm({ roles, saved }: { roles: VoteOptions['roles']; saved
         setManagerRoles.mutate([...selected])
       }}
     >
-      <fieldset className="flex max-h-72 flex-col gap-2 overflow-y-auto">
-        <legend className="sr-only">Rollen</legend>
-        {roles.map((role) => (
-          <label key={role.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={selected.has(role.id)}
-              onChange={(event) => toggle(role.id, event.target.checked)}
-            />
-            <RoleName name={role.name} color={role.color} />
-          </label>
-        ))}
-      </fieldset>
+      <FieldSet>
+        <FieldLegend className="sr-only">Rollen</FieldLegend>
+        <FieldGroup data-slot="checkbox-group" className="max-h-72 gap-2 overflow-y-auto">
+          {roles.map((role) => (
+            <Field key={role.id} orientation="horizontal">
+              <Checkbox
+                id={`vote-manager-${role.id}`}
+                checked={selected.has(role.id)}
+                onCheckedChange={(checked) => toggle(role.id, checked)}
+              />
+              <FieldLabel htmlFor={`vote-manager-${role.id}`} className="font-normal">
+                <RoleName name={role.name} color={role.color} />
+              </FieldLabel>
+            </Field>
+          ))}
+        </FieldGroup>
+      </FieldSet>
       <Button type="submit" className="self-start" disabled={!changed || setManagerRoles.isPending}>
         Speichern
       </Button>
