@@ -162,12 +162,24 @@ class KtorBackendClientTest {
             val engine =
                 MockEngine { request ->
                     assertEquals("http://backend:8080/api/profiles", request.url.toString())
-                    assertEquals("""{"discordUserId":"42"}""", request.body.toByteArray().decodeToString())
+                    assertEquals("""{"discordUserId":"42","requestedBy":"7"}""", request.body.toByteArray().decodeToString())
                     respond("""{"type":"not_linked"}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
                 }
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
-            assertEquals(ProfileResponse.NotLinked, client.profile("42"))
+            assertEquals(ProfileResponse.NotLinked, client.profile("42", "7"))
+        }
+
+    @Test
+    fun `a member who reached the rate limit gets how long to wait`() =
+        runTest {
+            val engine =
+                MockEngine {
+                    respond("", HttpStatusCode.TooManyRequests, headersOf(HttpHeaders.RetryAfter, "45"))
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(45, assertFailsWith<TooManyRequestsException> { client.explainRoles("42") }.retryAfterSeconds)
         }
 
     @Test

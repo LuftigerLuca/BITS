@@ -255,7 +255,10 @@ class MemberReporterTest {
             enabled: Boolean,
         ): NicknamePreferenceResponse = TODO()
 
-        override suspend fun profile(discordUserId: String): ProfileResponse = TODO()
+        override suspend fun profile(
+            discordUserId: String,
+            requestedBy: String,
+        ): ProfileResponse = TODO()
 
         override suspend fun explainRoles(discordUserId: String): RoleExplanationResponse = TODO()
 

@@ -26,6 +26,9 @@ bits:
     snapshot-cron: "-"
   vote:
     cron: "-"
+  # Tests call the same members' commands far more often; MemberRateLimitTest sets its own limit.
+  member-rate-limit:
+    per-minute: 1000000
   auth:
     public-url: https://bits.test
     jwt-secret: test-signing-key-that-is-at-least-32-bytes-long

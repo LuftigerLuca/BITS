@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.shared.BotInput
+import eu.luftiger.bits.backend.shared.MemberRateLimit
 import eu.luftiger.bits.shared.RoleExplanationRequest
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.warera.WareraApiException
@@ -13,11 +14,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
-/** A missing link is part of the answer; a user WarEra cannot deliver is a 503. */
+/** A missing link is part of the answer; a user WarEra cannot deliver is a 503, a member asking too often a 429. */
 @RestController
 @RequestMapping("/api/role-explanations")
 class RoleExplanationController(
     private val explanationService: RoleExplanationService,
+    private val rateLimit: MemberRateLimit,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -26,6 +28,7 @@ class RoleExplanationController(
         @RequestBody request: RoleExplanationRequest,
     ): RoleExplanationResponse {
         BotInput.discordUserId(request.discordUserId)
+        rateLimit.check(request.discordUserId)
         return explanationService.explain(request.discordUserId)
     }
 

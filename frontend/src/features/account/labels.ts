@@ -20,5 +20,8 @@ export function rolesErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) {
     return 'WarEra ist gerade nicht erreichbar, deine Rollen können nicht geprüft werden. Bitte versuche es später erneut.'
   }
+  if (error instanceof ApiError && error.status === 429) {
+    return 'Du hast deine Rollen gerade zu oft geprüft. Bitte warte eine Minute und versuche es dann erneut.'
+  }
   return 'Deine Rollen konnten nicht geladen werden. Bitte versuche es später erneut.'
 }

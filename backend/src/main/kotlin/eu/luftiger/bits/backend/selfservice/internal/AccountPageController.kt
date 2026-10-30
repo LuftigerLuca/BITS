@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.selfservice.internal
 
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
+import eu.luftiger.bits.backend.shared.MemberRateLimit
 import eu.luftiger.bits.warera.WareraApiException
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
@@ -28,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException
 @RequestMapping("/web/account")
 class AccountPageController(
     private val service: AccountPageService,
+    private val rateLimit: MemberRateLimit,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -36,11 +38,18 @@ class AccountPageController(
         @AuthenticationPrincipal jwt: Jwt,
     ): AccountResponse = service.account(discordUserId(jwt))
 
-    /** Judged with fresh WarEra data like `/rollen`, so it can take a while; 503 if WarEra cannot be reached. */
+    /**
+     * Judged with fresh WarEra data like `/rollen`, so it can take a while; 503 if WarEra cannot be reached, 429 if the
+     * member asked too often, see [MemberRateLimit].
+     */
     @GetMapping("/roles")
     fun roles(
         @AuthenticationPrincipal jwt: Jwt,
-    ): AccountRolesResponse = service.roles(discordUserId(jwt))
+    ): AccountRolesResponse {
+        val discordUserId = discordUserId(jwt)
+        rateLimit.check(discordUserId)
+        return service.roles(discordUserId)
+    }
 
     /** Works like `/unverify`; 404 if there is no link. */
     @DeleteMapping("/link")

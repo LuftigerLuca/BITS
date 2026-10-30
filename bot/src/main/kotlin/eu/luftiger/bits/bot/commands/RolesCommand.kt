@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.BackendTimeoutException
+import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
 import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
@@ -38,6 +39,8 @@ class RolesCommand(
                     throw e
                 } catch (e: WareraUnavailableException) {
                     WARERA_UNAVAILABLE_MESSAGE
+                } catch (e: TooManyRequestsException) {
+                    tooManyRequestsMessage(e)
                 } catch (e: BackendTimeoutException) {
                     "Das dauert gerade länger als erwartet. Versuche es gleich noch einmal."
                 } catch (e: Exception) {

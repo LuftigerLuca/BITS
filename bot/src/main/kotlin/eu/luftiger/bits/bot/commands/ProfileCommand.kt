@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.BackendTimeoutException
+import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
 import eu.luftiger.bits.shared.ProfileDetail
 import eu.luftiger.bits.shared.ProfileResponse
@@ -44,7 +45,7 @@ class ProfileCommand(
         scope.launch {
             val answer =
                 try {
-                    answer(backend.profile(target.id), own, target.asMention, roleIds)
+                    answer(backend.profile(target.id, event.user.id), own, target.asMention, roleIds)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -75,6 +76,7 @@ class ProfileCommand(
     private fun failureMessage(e: Exception): String =
         when (e) {
             is WareraUnavailableException -> WARERA_UNAVAILABLE_MESSAGE
+            is TooManyRequestsException -> tooManyRequestsMessage(e)
             is BackendTimeoutException -> "Das dauert gerade länger als erwartet. Versuche es gleich noch einmal."
             else -> {
                 log.error("Profile call to backend failed", e)

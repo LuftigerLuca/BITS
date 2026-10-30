@@ -161,6 +161,18 @@ describe('account page', () => {
     expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument()
   })
 
+  it('asks to wait when the roles were checked too often', async () => {
+    stubFetch({
+      'GET /web/me': () => json(member),
+      'GET /web/account': () => json(account),
+      'GET /web/account/roles': () => status(429),
+    })
+
+    renderApp('/account')
+
+    expect(await screen.findByText(/Du hast deine Rollen gerade zu oft geprüft/)).toBeInTheDocument()
+  })
+
   it('keeps the admin account without Discord out', async () => {
     stubFetch({
       'GET /web/me': () => json({ ...member, role: 'ADMIN', wareraUsername: null, discordUser: false }),

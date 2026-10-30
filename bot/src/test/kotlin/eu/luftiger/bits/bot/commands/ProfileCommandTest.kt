@@ -106,7 +106,7 @@ class ProfileCommandTest {
     fun `command shows the profile of the given member in public`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.profile("7") } returns found
+            coEvery { backend.profile("7", any()) } returns found
             val replies = Replies()
 
             ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(
@@ -125,7 +125,7 @@ class ProfileCommandTest {
     fun `command without a member asks for the own profile and answers hints privately`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.profile("42") } returns ProfileResponse.NotLinked
+            coEvery { backend.profile("42", any()) } returns ProfileResponse.NotLinked
             val replies = Replies()
 
             ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies))
@@ -141,7 +141,7 @@ class ProfileCommandTest {
     fun `command says when WarEra cannot be reached`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.profile(any()) } throws WareraUnavailableException(RuntimeException("503"))
+            coEvery { backend.profile(any(), any()) } throws WareraUnavailableException(RuntimeException("503"))
             val replies = Replies()
 
             ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies))
@@ -154,7 +154,7 @@ class ProfileCommandTest {
     fun `command says BITS is not reachable when the backend fails`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.profile(any()) } throws IllegalStateException("connection refused")
+            coEvery { backend.profile(any(), any()) } throws IllegalStateException("connection refused")
             val replies = Replies()
 
             ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies))
@@ -167,7 +167,7 @@ class ProfileCommandTest {
     fun `command shows the own roles without a member`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.profile("42") } returns found
+            coEvery { backend.profile("42", any()) } returns found
             val replies = Replies()
 
             ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies, ownRoleIds = listOf("r-low")))
@@ -187,7 +187,7 @@ class ProfileCommandTest {
     fun `command leaves out the roles of a member who left the server`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.profile("7") } returns found
+            coEvery { backend.profile("7", any()) } returns found
             val replies = Replies()
 
             ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies, target = member("7")))
