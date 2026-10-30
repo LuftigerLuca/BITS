@@ -13,7 +13,8 @@ export function useAccount() {
 
 /** Judged with fresh WarEra data on every visit, like `/rollen`. */
 export function useAccountRoles() {
-  return useQuery({ queryKey: [...ACCOUNT, 'roles'], queryFn: getAccountRoles, staleTime: 0 })
+  // Each check costs WarEra calls and counts against the member's rate limit, so not on every return to the tab.
+  return useQuery({ queryKey: [...ACCOUNT, 'roles'], queryFn: getAccountRoles, staleTime: 0, refetchOnWindowFocus: false })
 }
 
 /** The session knows the WarEra name as well, e.g. for the start page, so it is checked again. */

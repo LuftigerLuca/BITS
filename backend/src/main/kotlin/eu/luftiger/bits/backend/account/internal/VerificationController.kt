@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.account.internal
 
 import eu.luftiger.bits.backend.shared.BotInput
+import eu.luftiger.bits.backend.shared.MemberRateLimit
 import eu.luftiger.bits.shared.CheckVerificationRequest
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationRequest
@@ -18,13 +19,14 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * Expected outcomes are part of the response body; only an unreachable WarEra API (503) and malformed input (400) are
- * errors.
+ * Expected outcomes are part of the response body; only an unreachable WarEra API (503), malformed input (400) and a
+ * member starting or checking too often (429, see [MemberRateLimit]) are errors.
  */
 @RestController
 @RequestMapping("/api/verifications")
 class VerificationController(
     private val verificationService: VerificationService,
+    private val rateLimit: MemberRateLimit,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -34,6 +36,7 @@ class VerificationController(
     ): StartVerificationResponse {
         BotInput.discordUserId(request.discordUserId)
         BotInput.wareraUsername(request.wareraUsername)
+        rateLimit.check(request.discordUserId)
         return verificationService.start(request.discordUserId, request.wareraUsername)
     }
 
@@ -44,6 +47,7 @@ class VerificationController(
         BotInput.discordUserId(request.discordUserId)
         BotInput.code(request.code)
         BotInput.discordName(request.discordName)
+        rateLimit.check(request.discordUserId)
         return verificationService.check(request.discordUserId, request.code, request.discordName)
     }
 

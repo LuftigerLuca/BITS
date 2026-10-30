@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
+import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
 import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
@@ -105,5 +106,21 @@ class RolesCommandTest {
             runCurrent()
 
             assertEquals(listOf(RolesCommand.WARERA_UNAVAILABLE_MESSAGE, BITS_UNAVAILABLE_MESSAGE), replies.messages)
+        }
+
+    @Test
+    fun `command says how long to wait after asking too often`() =
+        runTest {
+            val backend = mockk<BackendClient>()
+            coEvery { backend.explainRoles("42") } throws TooManyRequestsException(30, RuntimeException("429"))
+            val replies = Replies()
+
+            RolesCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
+            runCurrent()
+
+            assertEquals(
+                listOf("Du hast das gerade zu oft versucht. Warte bitte 30 Sekunden und versuche es dann noch einmal."),
+                replies.messages,
+            )
         }
 }

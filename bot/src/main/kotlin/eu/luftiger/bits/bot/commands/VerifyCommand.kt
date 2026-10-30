@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.BackendTimeoutException
+import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
@@ -111,6 +112,7 @@ class VerifyCommand(
                 onFailure()
                 when (e) {
                     is WareraUnavailableException -> hook.sendMessage(WARERA_UNAVAILABLE_MESSAGE).queue()
+                    is TooManyRequestsException -> hook.sendMessage(tooManyRequestsMessage(e)).queue()
                     is BackendTimeoutException ->
                         hook.sendMessage("Das dauert gerade länger als erwartet. Versuche es gleich noch einmal.").queue()
                     else -> {

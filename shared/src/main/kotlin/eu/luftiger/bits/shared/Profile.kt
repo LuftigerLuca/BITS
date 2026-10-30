@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ProfileRequest(
     val discordUserId: String,
+    /** The member who asked, who may look up others too; the backend's rate limit counts for them. */
+    val requestedBy: String? = null,
 )
 
 /** Outcome of looking up the WarEra profile of a Discord account. Each subtype is identified by its `type` field. */

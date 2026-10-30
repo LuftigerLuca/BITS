@@ -113,6 +113,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'BITS prüft dafür deine aktuellen WarEra-Daten, ändert aber keine Rollen.',
           'Auf dem Server gleicht der nächste Abgleich deine Rollen an, spätestens nach einer Stunde.',
           'Rollen von Hand zu vergeben hilft nicht: Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie.',
+          '/verify, /profil, /rollen und die Rollen unter „Mein Account“ fragen jedes Mal WarEra. Zusammen geht das ' +
+            'sechsmal pro Minute; danach sagt BITS dir, wie lange du warten musst. So bleibt WarEra für alle erreichbar.',
         ],
       },
       {

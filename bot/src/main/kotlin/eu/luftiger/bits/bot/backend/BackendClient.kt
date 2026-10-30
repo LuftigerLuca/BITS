@@ -40,7 +40,10 @@ interface BackendClient {
     ): NicknamePreferenceResponse
 
     /** @throws WareraUnavailableException if the backend cannot reach the WarEra API */
-    suspend fun profile(discordUserId: String): ProfileResponse
+    suspend fun profile(
+        discordUserId: String,
+        requestedBy: String,
+    ): ProfileResponse
 
     /** @throws WareraUnavailableException if the backend cannot load the user from WarEra */
     suspend fun explainRoles(discordUserId: String): RoleExplanationResponse
@@ -76,6 +79,12 @@ interface BackendClient {
 class BackendTimeoutException(
     cause: Throwable,
 ) : RuntimeException("The backend did not answer in time", cause)
+
+/** The member asked too often for something that calls WarEra; they may try again after [retryAfterSeconds]. */
+class TooManyRequestsException(
+    val retryAfterSeconds: Long,
+    cause: Throwable,
+) : RuntimeException("The member reached the backend's rate limit", cause)
 
 class WareraUnavailableException(
     cause: Throwable,

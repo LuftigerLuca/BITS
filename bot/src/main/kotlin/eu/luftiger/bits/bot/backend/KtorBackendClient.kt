@@ -57,6 +57,7 @@ import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.ServerResponseException
@@ -70,6 +71,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.encodedPath
@@ -135,7 +137,10 @@ class KtorBackendClient(
         enabled: Boolean,
     ): NicknamePreferenceResponse = post("api/nickname-preferences", NicknamePreferenceRequest(discordUserId, enabled))
 
-    override suspend fun profile(discordUserId: String): ProfileResponse = post("api/profiles", ProfileRequest(discordUserId))
+    override suspend fun profile(
+        discordUserId: String,
+        requestedBy: String,
+    ): ProfileResponse = post("api/profiles", ProfileRequest(discordUserId, requestedBy))
 
     override suspend fun explainRoles(discordUserId: String): RoleExplanationResponse =
         post("api/role-explanations", RoleExplanationRequest(discordUserId))
@@ -289,7 +294,7 @@ class KtorBackendClient(
         http.post("api/votes/$voteId/result/posted")
     }
 
-    /** The backend answers 503 if WarEra cannot be reached. */
+    /** The backend answers 503 if WarEra cannot be reached, and 429 if the member asked too often, see [TooManyRequestsException]. */
     private suspend inline fun <reified R : Any, reified T> post(
         path: String,
         request: R,
@@ -300,6 +305,11 @@ class KtorBackendClient(
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }.body()
+        } catch (e: ClientRequestException) {
+            if (e.response.status == HttpStatusCode.TooManyRequests) {
+                throw TooManyRequestsException(e.response.headers[HttpHeaders.RetryAfter]?.toLongOrNull() ?: DEFAULT_RETRY_AFTER_SECONDS, e)
+            }
+            throw e
         } catch (e: ServerResponseException) {
             if (e.response.status == HttpStatusCode.ServiceUnavailable) throw WareraUnavailableException(e)
             throw e
@@ -311,6 +321,9 @@ class KtorBackendClient(
 
     private companion object {
         val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(5)
+
+        /** The backend counts per minute; without its header, waiting a minute is always enough. */
+        const val DEFAULT_RETRY_AFTER_SECONDS = 60L
 
         /**
          * Starting a verification makes a few WarEra calls in the backend, each of which waits up to 10 s for the
