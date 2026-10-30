@@ -40,6 +40,7 @@ const SCHEDULED_TASKS: Record<string, string> = {
   'VerificationCleanup.deleteExpired': 'Abgelaufene Verifizierungen löschen',
   'PingLogCleanup.deleteOld': 'Alte Pings löschen',
   'VoteJobs.run': 'Abstimmungen beenden und auswerten',
+  'OverviewSnapshotJob.record': 'Kennzahlen für den Verlauf festhalten',
   'Moments.everyHour': 'Zeitereignis (stündlich)',
   'Moments.everyMidnight': 'Zeitereignis (Mitternacht)',
 }

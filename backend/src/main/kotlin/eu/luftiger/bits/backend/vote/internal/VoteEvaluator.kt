@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.vote.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.event.api.EventPublisher
+import eu.luftiger.bits.backend.rolesync.api.MemberCountries
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.backend.systemstatus.api.BackgroundJob
@@ -31,8 +32,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Works out the result of a vote once the bot has reported the members of the role at the end, on a thread of its own,
- * one vote at a time. It loads the WarEra user of everybody who could vote, about one per second, so a large vote takes
- * minutes.
+ * one vote at a time. The country of everybody who could vote is taken from the last role sync, see [MemberCountries],
+ * so it may be up to an hour old; only users the sync did not load are loaded from WarEra, about one per second.
  *
  * Eligible are the members of the role at the end who are linked, or who voted while they were; the ballots of members
  * who lost the role are dropped. Everybody counts for the party of their country of citizenship they are a member of,
@@ -50,6 +51,7 @@ class VoteEvaluator(
     private val partyResultRepository: PartyResultRepository,
     private val nonVoterRepository: NonVoterRepository,
     private val accountLinks: AccountLinks,
+    private val memberCountries: MemberCountries,
     private val wareraClient: WareraClient,
     private val eventPublisher: EventPublisher,
     private val systemLog: SystemLog,
@@ -156,8 +158,10 @@ class VoteEvaluator(
      * @throws WareraApiException if WarEra cannot be reached
      */
     private fun parties(wareraUserIds: List<String>): Map<String, WareraParty> {
+        val synced = memberCountries.byWareraUserId()
         val countries = HashMap<String, String?>()
-        wareraUserIds.forEachIndexed { index, id ->
+        wareraUserIds.filter { it in synced }.associateWithTo(countries) { synced[it] }
+        wareraUserIds.filter { it !in synced }.forEachIndexed { index, id ->
             if (index > 0 && !properties.userLookupInterval.isZero) Thread.sleep(properties.userLookupInterval)
             countries[id] =
                 try {

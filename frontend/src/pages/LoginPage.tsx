@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { ApiError, DISCORD_LOGIN_URL, adminLogin, getAuthOptions } from '@/lib/api'
 
 /** Error codes the backend appends after a failed Discord login. */
@@ -32,6 +33,7 @@ export function LoginPage() {
   const { user, sessionExpired } = useAuth()
   const [searchParams] = useSearchParams()
   const [adminLoginEnabled, setAdminLoginEnabled] = useState(false)
+  useDocumentTitle('Anmelden')
 
   useEffect(() => {
     getAuthOptions()
@@ -61,7 +63,7 @@ export function LoginPage() {
     >
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>BITS Dashboard</CardTitle>
+          <CardTitle as="h1">BITS Dashboard</CardTitle>
           <CardDescription>
             Verwaltung des BITS-Bots für den deutschen WarEra-Discord.
           </CardDescription>

@@ -48,6 +48,7 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | Namen: Start, Ende, nicht abgestimmt             | `vote`, `vote_non_voter`   | Archiv der Abstimmungen             | unbegrenzt                                                                  |
 | Discord-ID, Name beim Hinzufügen                 | `embassy_manual_member`    | Botschafts-Threads                  | bis ein Admin das Mitglied entfernt oder die Zuordnung aufhebt              |
 | Discord-ID, Name, Grund der Thread-Mitglieder    | `embassy_thread_member`    | Botschafts-Threads im Dashboard     | bis zur nächsten Meldung des Bots oder zum Aufheben der Zuordnung           |
+| Anzahl Mitglieder, Verifizierte, Bürger pro Tag  | `overview_snapshot`        | Verlauf auf der Startseite          | unbegrenzt; nur Zahlen, keine personenbezogenen Daten                       |
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Name des Mitglieds bei Abgleich oder Lösen       | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |

@@ -214,6 +214,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Parteien im Land ihrer Staatsbürgerschaft zu.',
         points: [
           'Wer in keiner Partei ist, zählt als „Parteilos“.',
+          'Das Land der Staatsbürgerschaft stammt aus dem letzten stündlichen Abgleich. Wer erst kurz vor dem Ende ' +
+            'das Land gewechselt hat, zählt deshalb noch für das alte.',
           'Das Ergebnis erscheint als Grafik und Text im Kanal der Abstimmung, mit den Namen derer, die nicht ' +
             'abgestimmt haben.',
           'Unter „Abstimmungen“ im Dashboard stehen beendete Abstimmungen im Archiv.',
@@ -239,8 +241,13 @@ export const MANUAL_PAGES: ManualPage[] = [
         points: [
           'wie viele Mitglieder der Server ohne Bots hat und wie viele davon verifiziert sind',
           'wie viele Bürger, gesamt und aktiv, das Land hat, das du unter „Verwaltung“ einstellst',
+          'unter „Verlauf“, wie sich Mitglieder, Verifizierte und Bürger Tag für Tag entwickelt haben, über 30 Tage ' +
+            'oder ein Jahr',
         ],
         tips: [
+          'BITS hält die Kennzahlen einmal am Tag fest, ab dem Tag, an dem der Verlauf eingeführt wurde. Konnte BITS ' +
+            'einen Wert den ganzen Tag nicht lesen, etwa weil WarEra nicht erreichbar war, bleibt im Verlauf eine ' +
+            'Lücke. Nach einem Wechsel des Landes zeigt er die Bürger erst ab dem Wechsel.',
           'Das Land unter „Verwaltung“ bekommt auch keinen Botschafts-Thread.',
           'Lange Auswahllisten wie Rollen, Kanäle, Länder und Parteien haben oben ein Suchfeld: Tippe einen Teil des ' +
             'Namens, Groß- und Kleinschreibung und Akzente spielen keine Rolle.',
@@ -462,7 +469,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         intro: 'Unter „Verwaltung“ stellst du ein, wer Abstimmungen leiten darf und wie das Ergebnis aussieht.',
         points: [
           '„Wer Abstimmungen verwalten darf“: die Rollen, die Abstimmungen starten, beenden und abbrechen dürfen. ' +
-            'Admins dürfen das immer.',
+            'Admins dürfen das immer. Nimmst du jemandem die Rolle in Discord, verliert er das Recht sofort, auch ' +
+            'im Dashboard, ohne sich neu anzumelden.',
           '„Parteifarben“: eigene Farben für die Parteien des eigenen Landes in der Grafik.',
           '„Bild der Auswertung“: ein eigener Hintergrund für die Grafik.',
         ],

@@ -79,10 +79,11 @@ function ComponentCard({ status, now }: { status: ComponentStatus; now: number }
   return (
     <Card size="sm" role="group" aria-label={name}>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-2">
-          {name}
+        {/* The badge stays out of the heading, so the heading is only the name. */}
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle>{name}</CardTitle>
           <UpBadge up={status.up} />
-        </CardTitle>
+        </div>
         <CardDescription>
           {status.up === null
             ? status.component === 'WARERA'

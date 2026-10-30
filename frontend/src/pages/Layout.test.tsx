@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -150,6 +150,30 @@ describe('layout', () => {
     // The test setup reports a light system setting.
     expect(document.documentElement).not.toHaveClass('dark')
     expect(localStorage.getItem('theme')).toBeNull()
+  })
+
+  it('offers a skip link first and moves the focus to the new page after a navigation', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/audit-log': () => json({ entries: [], nextBefore: null }),
+      'GET /web/admin/audit-log/actors': () => json([]),
+    })
+
+    renderApp('/')
+    await screen.findByRole('heading', { level: 1, name: 'Willkommen, Luca' })
+    await waitFor(() => expect(document.title).toBe('Start – BITS'))
+
+    await userEvent.tab()
+    expect(screen.getByRole('link', { name: 'Zum Inhalt springen' })).toHaveFocus()
+
+    const navigation = screen.getByRole('navigation', { name: 'Hauptnavigation' })
+    await userEvent.click(within(navigation).getByRole('link', { name: 'Audit-Log' }))
+
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Audit-Log' })
+    // The focus moves in an effect after the new page rendered.
+    await waitFor(() => expect(heading).toHaveFocus())
+    expect(document.title).toBe('Audit-Log – BITS')
   })
 
   it('opens the manual from the user menu', async () => {

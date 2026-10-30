@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.members.internal.GuildMemberService
+import eu.luftiger.bits.backend.overview.internal.OverviewHistoryService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,10 +19,15 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @SpringBootTest(properties = ["bits.service-token=$SERVICE_TOKEN"])
 @AutoConfigureMockMvc
@@ -48,6 +54,9 @@ class OverviewTest {
     @Autowired
     lateinit var clock: MutableClock
 
+    @Autowired
+    lateinit var historyService: OverviewHistoryService
+
     private val admin by lazy { session(SessionUser.admin("admin")) }
 
     @BeforeTest
@@ -56,8 +65,8 @@ class OverviewTest {
         syncTrigger.awaitIdle()
         jdbc.awaitOutbox()
         jdbc.execute(
-            "TRUNCATE account_link, account_verification, overview_setting, audit_entry, system_log_entry, system_log_item, " +
-                "event_publication",
+            "TRUNCATE account_link, account_verification, overview_setting, overview_snapshot, audit_entry, system_log_entry, " +
+                "system_log_item, event_publication",
         )
         memberService.forget()
         warera.reset()
@@ -210,6 +219,89 @@ class OverviewTest {
 
         mockMvc.get("/web/admin/overview") { cookie(user) }.andExpect { status { isForbidden() } }
         setCountry("de", user).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `a day gets one snapshot, also from several runs at once`() {
+        setCountry("de")
+        reportMembers("1", "2")
+        val pool = Executors.newFixedThreadPool(4)
+        repeat(8) { pool.submit { historyService.recordSnapshot() } }
+        pool.shutdown()
+        assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS))
+        assertFalse(historyService.recordSnapshot())
+
+        // 23:30 UTC is already the next day in Berlin.
+        clock.now = Instant.parse("2026-01-01T23:30:00Z")
+        assertTrue(historyService.recordSnapshot())
+
+        assertEquals(
+            listOf("2026-01-01", "2026-01-02"),
+            jdbc.queryForList("SELECT day::text FROM overview_snapshot ORDER BY day", String::class.java),
+        )
+    }
+
+    @Test
+    fun `missing figures are gaps that a later run of the day fills in, complete ones stay`() {
+        setCountry("de")
+        warera.down = true
+        historyService.recordSnapshot()
+
+        assertEquals(
+            mapOf("members" to null, "verified_members" to null, "citizens" to null),
+            jdbc.queryForMap("SELECT members, verified_members, citizens FROM overview_snapshot"),
+        )
+
+        link("1", "w1")
+        reportMembers("1", "2")
+        clock.advance(Duration.ofHours(1))
+        historyService.recordSnapshot()
+        reportMembers("1", "2", "3")
+        warera.down = false
+        clock.advance(Duration.ofHours(1))
+        historyService.recordSnapshot()
+
+        assertEquals(
+            mapOf("members" to 2, "verified_members" to 1, "country_id" to "de", "citizens" to 982, "active_citizens" to 925),
+            jdbc.queryForMap("SELECT members, verified_members, country_id, citizens, active_citizens FROM overview_snapshot"),
+        )
+    }
+
+    @Test
+    fun `the history covers the range and counts citizens only of the country set now`() {
+        setCountry("de")
+        reportMembers("1", "2")
+        historyService.recordSnapshot()
+        clock.advance(Duration.ofDays(2))
+        reportMembers("1", "2", "3")
+        historyService.recordSnapshot()
+        // The session from two days ago has expired.
+        val admin = session(SessionUser.admin("admin"))
+
+        val history = mockMvc.get("/web/admin/overview/history?days=3") { cookie(admin) }.andExpect { status { isOk() } }
+
+        assertEquals("2026-01-01", history.read("$.from"))
+        assertEquals("2026-01-03", history.read("$.to"))
+        assertEquals(listOf("2026-01-01", "2026-01-03"), history.read<List<String>>("$.days[*].day"))
+        assertEquals(listOf(2, 3), history.read<List<Int>>("$.days[*].members"))
+        assertEquals(listOf(982, 982), history.read<List<Int>>("$.days[*].citizens"))
+
+        setCountry("fr", admin)
+        val afterSwitch = mockMvc.get("/web/admin/overview/history?days=2") { cookie(admin) }
+        assertEquals(listOf("2026-01-03"), afterSwitch.read<List<String>>("$.days[*].day"))
+        assertEquals(listOf(null), afterSwitch.read<List<Int?>>("$.days[*].citizens"))
+        assertEquals(listOf(3), afterSwitch.read<List<Int>>("$.days[*].members"))
+    }
+
+    @Test
+    fun `the history is limited to a year and only for admins`() {
+        mockMvc.get("/web/admin/overview/history") { cookie(admin) }.andExpect { status { isOk() } }
+        mockMvc.get("/web/admin/overview/history?days=366") { cookie(admin) }.andExpect { status { isOk() } }
+        mockMvc.get("/web/admin/overview/history?days=0") { cookie(admin) }.andExpect { status { isBadRequest() } }
+        mockMvc.get("/web/admin/overview/history?days=367") { cookie(admin) }.andExpect { status { isBadRequest() } }
+
+        val user = session(SessionUser.discord("7", "Member", "https://avatar", Role.USER))
+        mockMvc.get("/web/admin/overview/history") { cookie(user) }.andExpect { status { isForbidden() } }
     }
 
     @Test

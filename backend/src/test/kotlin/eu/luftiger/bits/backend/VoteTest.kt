@@ -4,6 +4,8 @@ import com.jayway.jsonpath.JsonPath
 import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
+import eu.luftiger.bits.backend.members.internal.GuildMemberService
+import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.backend.vote.internal.VoteEvaluator
 import eu.luftiger.bits.backend.vote.internal.VoteJobs
@@ -11,9 +13,11 @@ import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.CloseVoteResponse
+import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.EventStream
 import eu.luftiger.bits.shared.ParticipationResponse
 import eu.luftiger.bits.shared.PartyResultDto
+import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.VoteChoice
 import eu.luftiger.bits.shared.VoteClosedEvent
@@ -78,6 +82,12 @@ class VoteTest {
     @Autowired
     lateinit var clock: MutableClock
 
+    @Autowired
+    lateinit var memberService: GuildMemberService
+
+    @Autowired
+    lateinit var syncService: RoleSyncService
+
     @BeforeTest
     fun reset() {
         jdbc.awaitOutbox()
@@ -90,6 +100,9 @@ class VoteTest {
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
+        memberService.forget()
+        // Countries of an earlier test's sync would answer for the voters of this one.
+        syncService.forget()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
         api("/api/discord-roles", put = true) {
             """{"roles":[
@@ -207,6 +220,26 @@ class VoteTest {
     }
 
     @Test
+    fun `the evaluation takes the countries from the last sync and loads only the users it is missing`() {
+        warera.parties["de"] = listOf(WareraParty("p-de", "Deutsche Partei", listOf("w1")))
+        link("1", "w1")
+        syncService.refreshUsers()
+        // Changed after the sync: the evaluation still counts w1 as German.
+        warera.users["w1"] = warera.users.getValue("w1").copy(country = "fr")
+        link("2", "w2")
+        warera.lookups.clear()
+        val voteId = startByAdmin()
+        cast(voteId, "1", VoteChoice.YES)
+        endByAdmin(voteId)
+
+        reportElectorate(voteId, "1" to "Anna", "2" to "Bernd")
+        evaluator.awaitIdle()
+
+        assertEquals(listOf("Deutsche Partei", null), result(voteId).parties.map { it.name })
+        assertEquals(listOf("w2"), warera.lookups.toList())
+    }
+
+    @Test
     fun `a second report of the role members changes nothing`() {
         link("1", "w1")
         val voteId = startByAdmin()
@@ -312,6 +345,23 @@ class VoteTest {
         val options = mockMvc.get("/web/votes/options") { cookie(user) }
         assertEquals(listOf("r-congress", "r-speaker"), options.read<List<String>>("$.roles[*].id"))
         assertEquals(listOf("c-votes"), options.read<List<String>>("$.channels[*].id"))
+    }
+
+    @Test
+    fun `the dashboard decides by the roles the bot reported last, not by those at login`() {
+        setManagerRoles("r-speaker")
+        val user = session(SessionUser.discord("7", "Member", "https://avatar", Role.USER, discordRoleIds = listOf("r-speaker")))
+
+        reportMembers("7" to listOf("r-congress"))
+        mockMvc.get("/web/votes/access") { cookie(user) }.andExpect { jsonPath("$.canManage") { value(false) } }
+        mockMvc.get("/web/votes") { cookie(user) }.andExpect { status { isForbidden() } }
+
+        val newManager = session(SessionUser.discord("8", "Neu", "https://avatar", Role.USER))
+        reportMembers("7" to listOf("r-congress"), "8" to listOf("r-speaker"))
+        mockMvc.get("/web/votes/access") { cookie(newManager) }.andExpect { jsonPath("$.canManage") { value(true) } }
+
+        reportMembers("8" to listOf("r-speaker"))
+        mockMvc.get("/web/votes/access") { cookie(user) }.andExpect { jsonPath("$.canManage") { value(false) } }
     }
 
     @Test
@@ -598,6 +648,13 @@ class VoteTest {
     private fun vote(voteId: Long): VoteDto = decode(api("/api/votes/$voteId", get = true))
 
     private fun result(voteId: Long): VoteResultDto = decode(api("/api/votes/$voteId/result", get = true))
+
+    private fun reportMembers(vararg roleIdsByMember: Pair<String, List<String>>) {
+        val members = roleIdsByMember.map { (id, roleIds) -> ReportedMember(id, "Member $id", roleIds) }
+        api("/api/discord-members", put = true) {
+            BitsJson.encodeToString(DiscordMembersReport.serializer(), DiscordMembersReport(members.map { it.discordUserId }, members))
+        }.andExpect { status { isNoContent() } }
+    }
 
     private fun setManagerRoles(vararg roleIds: String) {
         mockMvc
