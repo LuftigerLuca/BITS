@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.embassy.internal
 
 import eu.luftiger.bits.backend.embassy.domain.DiscordThread
 import eu.luftiger.bits.backend.embassy.domain.EmbassyThreadMember
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.backend.systemlog.api.EmbassyChange
 import eu.luftiger.bits.backend.systemlog.api.EmbassyChangeOutcome
 import eu.luftiger.bits.backend.systemlog.api.EmbassySyncResult
@@ -13,10 +14,8 @@ import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.EmbassyThreadStatus
 import eu.luftiger.bits.shared.ReportedEmbassyChange
 import eu.luftiger.bits.shared.RoleChangeOutcome
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 /** What the bot reports: the private threads of the guild, and what it did with an embassy sync. */
 @Service
@@ -49,7 +48,7 @@ class EmbassyReportService(
      * Keeps who is in each synced thread for the dashboard, and the changes and threads the bot could not sync in the
      * system log. A report that comes again changes nothing; one for a thread that was unassigned meanwhile is dropped.
      *
-     * @throws ResponseStatusException 404 if there is no such sync, e.g. because it was deleted already
+     * @throws NotFoundException if there is no such sync, e.g. because it was deleted already
      */
     @Transactional
     fun applyReport(
@@ -65,7 +64,7 @@ class EmbassyReportService(
             try {
                 systemLog.recordEmbassySyncResult(syncId, result)
             } catch (e: NoSuchElementException) {
-                throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                throw NotFoundException()
             }
         if (!first) return
         val assigned = threadRepository.findAllById(report.threads.map { it.threadId }).associateBy { it.threadId }

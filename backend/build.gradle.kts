@@ -17,6 +17,7 @@ dependencies {
     // Lets the event publication registry read Kotlin classes back when it hands an event out again.
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-kotlinx-serialization-json")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -43,4 +44,11 @@ allOpen {
 
 tasks.jar {
     enabled = false
+}
+
+kotlin {
+    compilerOptions {
+        // So that Bean Validation sees constraints on elements, e.g. List<@Size(max = 32) String>.
+        freeCompilerArgs.add("-Xemit-jvm-type-annotations")
+    }
 }

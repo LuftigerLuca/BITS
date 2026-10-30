@@ -7,16 +7,15 @@ import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.presence.domain.ActivityType
 import eu.luftiger.bits.backend.presence.domain.BotPresenceSetting
 import eu.luftiger.bits.backend.presence.domain.PresenceStatus
+import eu.luftiger.bits.backend.shared.InvalidInputException
 import eu.luftiger.bits.shared.BotActivity
 import eu.luftiger.bits.shared.BotActivityType
 import eu.luftiger.bits.shared.BotPresence
 import eu.luftiger.bits.shared.BotPresenceChangedEvent
 import eu.luftiger.bits.shared.BotStatus
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
@@ -34,14 +33,14 @@ class BotPresenceService(
     /** Online without activity while no admin has set anything, as the bot was before. */
     fun presence(): BotPresence = repository.findByIdOrNull(BotPresenceSetting.SINGLE_ROW_ID)?.toDto() ?: BotPresence()
 
-    /** @throws ResponseStatusException 400 if the text of the activity is blank or longer than Discord allows */
+    /** @throws InvalidInputException if the text of the activity is blank or longer than Discord allows */
     fun set(
         presence: BotPresence,
         actor: AuditActor,
     ): BotPresence {
         val activity = presence.activity?.let { it.copy(text = it.text.trim()) }
         if (activity != null && (activity.text.isEmpty() || activity.text.length > BotActivity.MAX_TEXT_LENGTH)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity text must have 1 to ${BotActivity.MAX_TEXT_LENGTH} characters")
+            throw InvalidInputException("Activity text must have 1 to ${BotActivity.MAX_TEXT_LENGTH} characters")
         }
         val saved = BotPresence(presence.status, activity)
         transactionTemplate.executeWithoutResult {

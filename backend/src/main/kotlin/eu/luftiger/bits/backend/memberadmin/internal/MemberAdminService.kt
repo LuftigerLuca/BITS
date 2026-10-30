@@ -8,12 +8,12 @@ import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.rolesync.api.RoleExplanations
 import eu.luftiger.bits.backend.rolesync.api.RoleSyncRequests
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.backend.systemlog.api.SystemLogRecords
 import eu.luftiger.bits.shared.ManagedRoleOutcome
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 
 /**
  * The page "Mitglieder", where admins look up a member who asks about their roles: the link, the managed roles with
@@ -53,11 +53,11 @@ class MemberAdminService(
             .toList()
     }
 
-    /** @throws ResponseStatusException 404 for a member who is neither on the guild nor linked */
+    /** @throws NotFoundException for a member who is neither on the guild nor linked */
     fun member(discordUserId: String): MemberDetailResponse {
         val link = accounts.storedData(discordUserId).link
         val onServer = guildMembers.discordUserIds()?.contains(discordUserId)
-        if (link == null && onServer != true) throw notFound()
+        if (link == null && onServer != true) throw NotFoundException()
         val records = systemLog.recordsAbout(discordUserId)
         val events =
             records.entries.map {
@@ -127,7 +127,7 @@ class MemberAdminService(
     /**
      * Syncs the member alone with fresh WarEra data; the bot reports the result to the system log like any sync.
      *
-     * @throws ResponseStatusException 404 for an unknown member, 409 while the role sync, nicknames and status roles
+     * @throws NotFoundException for an unknown member, [ConflictException] while the role sync, nicknames and status roles
      * are all switched off
      */
     fun sync(
@@ -135,25 +135,25 @@ class MemberAdminService(
         actor: AuditActor,
     ) {
         val linked = accountLinks.findByDiscordUserId(discordUserId) != null
-        if (!linked && guildMembers.discordUserIds()?.contains(discordUserId) != true) throw notFound()
+        if (!linked && guildMembers.discordUserIds()?.contains(discordUserId) != true) throw NotFoundException()
         val name = guildMember(discordUserId)?.name ?: discordUserId
         transactionTemplate.executeWithoutResult {
             auditLog.record(actor, AuditAction.MEMBER_SYNC_REQUESTED, "Abgleich von $name angestoßen")
-            if (!roleSync.syncMember(discordUserId)) throw ResponseStatusException(HttpStatus.CONFLICT)
+            if (!roleSync.syncMember(discordUserId)) throw ConflictException()
         }
     }
 
     /**
      * Works like `/unverify`: the link and an open code are deleted, and the following sync takes the managed roles.
      *
-     * @throws ResponseStatusException 404 if the member has no link
+     * @throws NotFoundException if the member has no link
      */
     fun unlink(
         discordUserId: String,
         actor: AuditActor,
     ) {
         transactionTemplate.executeWithoutResult {
-            val link = accountLinks.findByDiscordUserId(discordUserId) ?: throw notFound()
+            val link = accountLinks.findByDiscordUserId(discordUserId) ?: throw NotFoundException()
             val name = guildMember(discordUserId)?.name ?: discordUserId
             accounts.unlink(discordUserId)
             auditLog.record(actor, AuditAction.MEMBER_UNLINKED, "Verknüpfung von $name mit ${link.wareraUsername} gelöst")
@@ -161,8 +161,6 @@ class MemberAdminService(
     }
 
     private fun guildMember(discordUserId: String) = guildMembers.members()?.find { it.discordUserId == discordUserId }
-
-    private fun notFound() = ResponseStatusException(HttpStatus.NOT_FOUND)
 
     private companion object {
         const val MAX_SEARCH_RESULTS = 20

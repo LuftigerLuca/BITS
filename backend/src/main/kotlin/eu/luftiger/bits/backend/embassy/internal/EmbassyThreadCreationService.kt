@@ -9,6 +9,11 @@ import eu.luftiger.bits.backend.embassy.domain.EmbassyThread
 import eu.luftiger.bits.backend.embassy.domain.EmbassyThreadCreation
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.overview.api.OverviewCountry
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.DomainException
+import eu.luftiger.bits.backend.shared.GoneException
+import eu.luftiger.bits.backend.shared.InvalidInputException
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.backend.vote.api.GuildChannels
@@ -21,11 +26,9 @@ import eu.luftiger.bits.warera.WareraCountry
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Duration
 
@@ -58,8 +61,8 @@ class EmbassyThreadCreationService(
      * Asks the bot to create the thread [threadName] for [countryId] in the embassy channel. A failed request for the
      * country is replaced.
      *
-     * @throws ResponseStatusException 400 while no embassy channel is set, for a name that is blank or too long, a
-     * country WarEra does not know or the country under "Verwaltung"; 409 if the country has a thread or one is being
+     * @throws InvalidInputException while no embassy channel is set, for a name that is blank or too long, a
+     * country WarEra does not know or the country under "Verwaltung"; [ConflictException] if the country has a thread or one is being
      * created
      * @throws WareraApiException if WarEra cannot be reached, which the dashboard gets as 503
      */
@@ -69,11 +72,13 @@ class EmbassyThreadCreationService(
         actor: AuditActor,
     ) {
         val name = threadName.trim()
-        if (name.isEmpty() || name.length > MAX_THREAD_NAME_LENGTH) throw badRequest("Thread name must have 1 to 100 characters")
+        if (name.isEmpty() || name.length > MAX_THREAD_NAME_LENGTH) throw InvalidInputException("Thread name must have 1 to 100 characters")
         val channelId =
-            settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)?.channelId ?: throw badRequest("No embassy channel set")
-        if (countryId == overviewCountry.selected()?.id) throw badRequest("Own country $countryId")
-        val country = wareraClient.getAllCountries().firstOrNull { it.id == countryId } ?: throw badRequest("Unknown country $countryId")
+            settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)?.channelId
+                ?: throw InvalidInputException("No embassy channel set")
+        if (countryId == overviewCountry.selected()?.id) throw InvalidInputException("Own country $countryId")
+        val country =
+            wareraClient.getAllCountries().firstOrNull { it.id == countryId } ?: throw InvalidInputException("Unknown country $countryId")
         create(country, name, channelId, actor, "Botschafts-Thread $name für ${country.name} vom Bot anlegen lassen")
     }
 
@@ -114,9 +119,9 @@ class EmbassyThreadCreationService(
                         AUTOMATIC,
                         "Botschafts-Thread $name automatisch angefordert: ${office.label} von ${country.name} ist verknüpft",
                     )
-                } catch (e: ResponseStatusException) {
+                } catch (e: DomainException) {
                     // An admin was quicker.
-                    log.info("Embassy thread for country {} not requested: {}", countryId, e.reason)
+                    log.info("Embassy thread for country {} not requested: {}", countryId, e.message)
                 }
             }
         } catch (e: WareraApiException) {
@@ -124,7 +129,7 @@ class EmbassyThreadCreationService(
         }
     }
 
-    /** @throws ResponseStatusException 409 if the country has a thread or one is being created */
+    /** @throws ConflictException if the country has a thread or one is being created */
     private fun create(
         country: WareraCountry,
         name: String,
@@ -153,10 +158,10 @@ class EmbassyThreadCreationService(
         }
     }
 
-    /** Removes a request that failed, once the admin has seen why. @throws ResponseStatusException 404, 409 while pending */
+    /** Removes a request that failed, once the admin has seen why. @throws NotFoundException, [ConflictException] while pending */
     fun dismiss(creationId: Long) =
         transactionTemplate.executeWithoutResult {
-            val creation = creationRepository.findByIdOrNull(creationId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+            val creation = creationRepository.findByIdOrNull(creationId) ?: throw NotFoundException()
             if (creation.pending) throw conflict()
             creationRepository.delete(creation)
         }
@@ -165,8 +170,8 @@ class EmbassyThreadCreationService(
      * Assigns the thread the bot created, or keeps why it failed. A report that comes again changes nothing. Returns
      * whether a thread was assigned, which then needs a sync.
      *
-     * @throws ResponseStatusException 410 for a thread that comes after the request failed or went away, which the bot
-     * deletes then; 400 for a report with neither thread nor failure
+     * @throws GoneException for a thread that comes after the request failed or went away, which the bot
+     * deletes then; [InvalidInputException] for a report with neither thread nor failure
      */
     fun applyReport(
         creationId: Long,
@@ -179,10 +184,10 @@ class EmbassyThreadCreationService(
                 if (creation == null) {
                     // The same report again, or a failure that came after the timeout.
                     if (created == null || threadRepository.existsById(created.id)) return@execute false
-                    throw ResponseStatusException(HttpStatus.GONE, "Creation $creationId is no longer pending")
+                    throw GoneException("Creation $creationId is no longer pending")
                 }
                 if (created == null) {
-                    fail(creation, failureReason(report.failure ?: throw badRequest("Neither thread nor failure")))
+                    fail(creation, failureReason(report.failure ?: throw InvalidInputException("Neither thread nor failure")))
                     return@execute false
                 }
                 // The bot reports its threads again soon; until then the new one shows with what is known.
@@ -250,9 +255,7 @@ class EmbassyThreadCreationService(
             ThreadCreationFailure.FAILED -> "Discord hat das Anlegen abgelehnt."
         }
 
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
-
-    private fun conflict() = ResponseStatusException(HttpStatus.CONFLICT, "Country has a thread or one is being created")
+    private fun conflict() = ConflictException("Country has a thread or one is being created")
 
     companion object {
         /** Stands for BITS in the audit log when it asks for a thread on its own. */

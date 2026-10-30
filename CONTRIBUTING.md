@@ -118,9 +118,9 @@ Every package directly under `eu.luftiger.bits.backend` is a module, usually one
 backend/src/main/kotlin/eu/luftiger/bits/backend/
 ├── <feature>/
 │   ├── api/        # what other modules may use: interfaces (<Feature>Api, extension points), dto/
-│   ├── domain/     # JPA entities, enums and value types, <Feature>Exception
+│   ├── domain/     # JPA entities, enums and value types
 │   └── internal/   # controllers, services, repositories, jobs, implementations of other modules' api
-└── shared/         # cross-cutting configuration (properties, clock, web, WarEra client bean)
+└── shared/         # cross-cutting configuration (properties, clock, web, WarEra client bean), DomainException
 ```
 
 - **`api/`** is the only part of a module that other modules may use. Annotate every type in it with
@@ -131,6 +131,16 @@ backend/src/main/kotlin/eu/luftiger/bits/backend/
   so a change to the data model cannot change the API by accident. `DtoBoundaryTest` checks this.
 - **`internal/`** holds everything else. Controllers map between REST DTOs and the domain; services hold the
   logic and transactions; repositories are Spring Data interfaces.
+- **Errors:** services know nothing about HTTP. They throw a `DomainException` from `shared`
+  (`InvalidInputException`, `NotFoundException`, `ConflictException`, …), and `ApiExceptionHandler` turns it into
+  the status and a problem detail (RFC 9457), as it does for `WareraApiException` (503) and for what Spring rejects
+  itself, such as failed validation. Controllers neither catch these nor have their own `@ExceptionHandler`.
+  `ServiceLayerTest` checks that no service uses `ResponseStatusException` or `HttpStatus`.
+- **Input limits:** every string and list a controller takes has an upper limit, so overlong input ends in a 400
+  before it reaches WarEra or the database. Under `/web`, request bodies get `@Valid` and `@field:Size`, list
+  elements `List<@Size(max = …) String>`, parameters `@Size`; the limits are in `WebInput` or, if they belong to a
+  feature, in its service (e.g. `VoteService.MAX_QUESTION_LENGTH`). Under `/api`, the controller checks the bot's
+  input with `BotInput`, since its DTOs live in the Gradle module `shared`. `InputLimitTest` shows both.
 - REST DTOs that the bot uses live in the Gradle module `shared` (package `eu.luftiger.bits.shared`), not in
   `api/dto`. `api/dto` is only for types that backend modules exchange with each other. Do not confuse the Gradle
   module `shared` with the backend package `eu.luftiger.bits.backend.shared`.
@@ -157,9 +167,9 @@ What these flows show:
 
 - **Expected outcomes are part of the answer.** A sealed response (`StartVerificationResponse`,
   `CheckVerificationResponse`) has one subtype per outcome the user should hear about, such as "user not found"
-  or "code expired". HTTP errors are for what is not the user's doing: 503 when WarEra cannot be reached
-  (`@ExceptionHandler(WareraApiException::class)`), 400 for malformed input (`BotInput` for the bot,
-  `RoleRuleService` for the dashboard), 409 for a conflict such as a rule that exists already.
+  or "code expired". Errors are for what is not the user's doing: 503 when WarEra cannot be reached, 400 for
+  malformed input (`BotInput` for the bot, `RoleRuleService` for the dashboard), 409 for a conflict such as a rule
+  that exists already, see "Errors" above.
 - **WarEra calls run outside of transactions**, since the rate limiter can make them wait for seconds. Writes go
   into short `TransactionTemplate` blocks before or after them. Work that may take longer than the bot waits runs
   in the background and reports its result as event (`VerificationCheckedEvent`).

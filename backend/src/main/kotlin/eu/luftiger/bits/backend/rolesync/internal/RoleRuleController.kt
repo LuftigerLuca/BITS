@@ -5,7 +5,9 @@ import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.MilitaryUnitRole
-import eu.luftiger.bits.warera.WareraApiException
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -13,7 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -43,7 +44,7 @@ class RoleRuleController(
     @PostMapping("/rules")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
-        @RequestBody request: RuleRequest,
+        @Valid @RequestBody request: RuleRequest,
         @AuthenticationPrincipal session: Jwt,
     ): RuleResponse {
         val rule = ruleService.create(request, actor(session))
@@ -54,8 +55,8 @@ class RoleRuleController(
     /** Replaces the blocks of the rule of the role as a whole. */
     @PutMapping("/rules/{roleId}")
     fun update(
-        @PathVariable roleId: String,
-        @RequestBody request: UpdateRuleRequest,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) roleId: String,
+        @Valid @RequestBody request: UpdateRuleRequest,
         @AuthenticationPrincipal session: Jwt,
     ): RuleResponse {
         val rule = ruleService.update(roleId, request, actor(session))
@@ -66,19 +67,19 @@ class RoleRuleController(
     /** What the rule would change as the rule of its role, in place of the one it has, without saving it. */
     @PostMapping("/rules/preview")
     fun preview(
-        @RequestBody request: RuleRequest,
+        @Valid @RequestBody request: RuleRequest,
     ): RulePreviewResponse = previewService.preview(request)
 
     /** What deleting the rule of the role would change, without deleting it. */
     @GetMapping("/rules/{roleId}/deletion-preview")
     fun previewDelete(
-        @PathVariable roleId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) roleId: String,
     ): RulePreviewResponse = previewService.previewDelete(roleId)
 
     @DeleteMapping("/rules/{roleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(
-        @PathVariable roleId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) roleId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
         val rule = ruleService.delete(roleId, actor(session))
@@ -90,21 +91,15 @@ class RoleRuleController(
 
     @GetMapping("/countries/{countryId}/parties")
     fun parties(
-        @PathVariable countryId: String,
+        @PathVariable @Size(max = WebInput.MAX_WARERA_ID_LENGTH) countryId: String,
     ): List<OptionResponse> = ruleService.parties(countryId)
 
     @GetMapping("/military-units")
     fun militaryUnits(
-        @RequestParam query: String,
+        @RequestParam @Size(max = WebInput.MAX_QUERY_LENGTH) query: String,
     ): List<OptionResponse> = ruleService.searchMilitaryUnits(query)
 
     private fun actor(session: Jwt) = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
-
-    @ExceptionHandler(WareraApiException::class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    fun wareraUnavailable(e: WareraApiException) {
-        log.warn("WarEra API not reachable", e)
-    }
 }
 
 @Serializable
@@ -202,25 +197,38 @@ data class PreviewMember(
  */
 @Serializable
 data class RuleRequest(
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val roleId: String,
-    val blocks: List<List<ConditionRequest>>,
+    @field:Size(max = RoleRuleService.MAX_BLOCKS)
+    val blocks: List<
+        @Size(max = RoleRuleService.MAX_CONDITIONS)
+        List<@Valid ConditionRequest>,
+    >,
 )
 
 /** Like [RuleRequest], for the role the rule has already. */
 @Serializable
 data class UpdateRuleRequest(
-    val blocks: List<List<ConditionRequest>>,
+    @field:Size(max = RoleRuleService.MAX_BLOCKS)
+    val blocks: List<
+        @Size(max = RoleRuleService.MAX_CONDITIONS)
+        List<@Valid ConditionRequest>,
+    >,
 )
 
 /** Which of the optional fields are needed depends on [type]. */
 @Serializable
 data class ConditionRequest(
     val type: RuleType,
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val countryId: String? = null,
     /** For [RuleType.GOVERNMENT_OFFICE], at least one; holding any of them is enough. */
+    @field:Size(max = WebInput.MAX_OFFICES)
     val offices: List<Office> = emptyList(),
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val muId: String? = null,
     val threshold: Int? = null,
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val partyId: String? = null,
     val muRole: MuRole? = null,
 )

@@ -1,8 +1,5 @@
 package eu.luftiger.bits.backend.shared
 
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
-
 /**
  * Checks what the bot sends to the endpoints under `/api`. The bot is trusted, but a bug in it or a leaked service token should end in
  * a 400 right away, not in a database error (500) or in odd input passed on to WarEra. The answer names no details.
@@ -40,6 +37,9 @@ object BotInput {
     private const val MAX_COUNTRY_NAME_LENGTH = 255
     private val STREAM_ID = Regex("[0-9]{1,20}-[0-9]{1,20}")
     private val EVENT_TYPE = Regex("[a-z_]{1,64}")
+
+    /** Discord's CDN URLs are far shorter; checked against the column of the audit log, which leaves room. */
+    private const val MAX_AVATAR_URL_LENGTH = 512
 
     /** Role IDs are snowflakes as well; checked against the column only, so tests can use readable IDs. */
     private const val MAX_ROLE_ID_LENGTH = 32
@@ -85,6 +85,8 @@ object BotInput {
 
     fun eventType(value: String) = check(EVENT_TYPE.matches(value), "event type")
 
+    fun avatarUrl(value: String) = check(value.length <= MAX_AVATAR_URL_LENGTH, "avatar url")
+
     /** Optional, so an older bot can leave it out. */
     fun discordName(value: String?) = value?.let(::memberName)
 
@@ -92,6 +94,6 @@ object BotInput {
         valid: Boolean,
         field: String,
     ) {
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid $field")
+        if (!valid) throw InvalidInputException("Invalid $field")
     }
 }

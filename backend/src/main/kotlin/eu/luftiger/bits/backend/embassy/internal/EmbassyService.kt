@@ -12,16 +12,18 @@ import eu.luftiger.bits.backend.embassy.domain.EmbassyThread
 import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.overview.api.OverviewCountry
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.InvalidInputException
+import eu.luftiger.bits.backend.shared.NotFoundException
+import eu.luftiger.bits.backend.shared.NotPossibleInDiscordException
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.vote.api.GuildChannels
 import eu.luftiger.bits.backend.vote.api.dto.GuildChannel
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
@@ -113,9 +115,9 @@ class EmbassyService(
     }
 
     /**
-     * @throws ResponseStatusException 400 for a thread the bot has not reported, a country WarEra does not know or the
-     * country under "Verwaltung"; 409 if the thread or the country has one already, or the bot is creating one for the
-     * country; 422 if the ambassador role or a
+     * @throws InvalidInputException for a thread the bot has not reported, a country WarEra does not know or the
+     * country under "Verwaltung"; [ConflictException] if the thread or the country has one already, or the bot is creating one for the
+     * country; [NotPossibleInDiscordException] if the ambassador role or a
      * host role may not see the thread's channel, since Discord would refuse to add their members
      * @throws WareraApiException if WarEra cannot be reached, which the dashboard gets as 503
      */
@@ -124,17 +126,18 @@ class EmbassyService(
         countryId: String,
         actor: AuditActor,
     ) {
-        val thread = discordThreadRepository.findByIdOrNull(threadId) ?: throw badRequest("Unknown thread $threadId")
-        if (countryId == overviewCountry.selected()?.id) throw badRequest("Own country $countryId")
+        val thread = discordThreadRepository.findByIdOrNull(threadId) ?: throw InvalidInputException("Unknown thread $threadId")
+        if (countryId == overviewCountry.selected()?.id) throw InvalidInputException("Own country $countryId")
         val blind = blindRoles(listOf(thread), settings())
-        if (blind.isNotEmpty()) throw cannotView("Roles $blind cannot see the channel of thread $threadId")
-        val country = wareraClient.getAllCountries().firstOrNull { it.id == countryId } ?: throw badRequest("Unknown country $countryId")
+        if (blind.isNotEmpty()) throw NotPossibleInDiscordException("Roles $blind cannot see the channel of thread $threadId")
+        val country =
+            wareraClient.getAllCountries().firstOrNull { it.id == countryId } ?: throw InvalidInputException("Unknown country $countryId")
         change {
             if (threadRepository.existsById(threadId) || threadRepository.existsByCountryId(countryId)) {
-                throw ResponseStatusException(HttpStatus.CONFLICT, "Thread or country assigned already")
+                throw ConflictException("Thread or country assigned already")
             }
             creationRepository.findByCountryId(countryId)?.let { creation ->
-                if (creation.pending) throw ResponseStatusException(HttpStatus.CONFLICT, "Thread being created for country")
+                if (creation.pending) throw ConflictException("Thread being created for country")
                 // The country is free again after a failed creation; the failure is done with.
                 creationRepository.delete(creation)
             }
@@ -143,12 +146,12 @@ class EmbassyService(
         }
     }
 
-    /** The thread stays as it is in Discord; BITS just stops managing it. @throws ResponseStatusException 404 */
+    /** The thread stays as it is in Discord; BITS just stops managing it. @throws NotFoundException */
     fun unassign(
         threadId: String,
         actor: AuditActor,
     ) = change {
-        val thread = threadRepository.findByIdOrNull(threadId) ?: throw notFound()
+        val thread = threadRepository.findByIdOrNull(threadId) ?: throw NotFoundException()
         threadRepository.delete(thread)
         auditLog.record(
             actor,
@@ -158,7 +161,7 @@ class EmbassyService(
     }
 
     /**
-     * @throws ResponseStatusException 404 for an unknown thread, 400 for a malformed ID, 409 if added already, 422 if
+     * @throws NotFoundException for an unknown thread, [InvalidInputException] for a malformed ID, [ConflictException] if added already, [NotPossibleInDiscordException] if
      * the member may not see the thread's channel even with the ambassador role, since Discord would refuse to add them
      */
     fun addMember(
@@ -166,17 +169,17 @@ class EmbassyService(
         discordUserId: String,
         actor: AuditActor,
     ) {
-        if (!DISCORD_ID.matches(discordUserId)) throw badRequest("Malformed Discord ID")
+        if (!DISCORD_ID.matches(discordUserId)) throw InvalidInputException("Malformed Discord ID")
         val name = memberNames()[discordUserId]
         val reported = discordThreadRepository.findByIdOrNull(threadId)
         val roleIds = guildMembers.members()?.firstOrNull { it.discordUserId == discordUserId }?.roleIds
         if (reported != null && roleIds != null && !reported.visibleWith(roleIds + listOfNotNull(settings().ambassadorRoleId))) {
-            throw cannotView("Member $discordUserId cannot see the channel of thread $threadId")
+            throw NotPossibleInDiscordException("Member $discordUserId cannot see the channel of thread $threadId")
         }
         change {
-            val thread = threadRepository.findByIdOrNull(threadId) ?: throw notFound()
+            val thread = threadRepository.findByIdOrNull(threadId) ?: throw NotFoundException()
             if (manualMemberRepository.findByThreadIdAndDiscordUserId(threadId, discordUserId) != null) {
-                throw ResponseStatusException(HttpStatus.CONFLICT, "Added already")
+                throw ConflictException("Added already")
             }
             manualMemberRepository.save(EmbassyManualMember(threadId, discordUserId, name, clock.instant()))
             auditLog.record(
@@ -187,7 +190,7 @@ class EmbassyService(
         }
     }
 
-    /** Only members added by hand; whoever is in for their office stays. @throws ResponseStatusException 404 */
+    /** Only members added by hand; whoever is in for their office stays. @throws NotFoundException */
     fun removeMember(
         threadId: String,
         discordUserId: String,
@@ -195,8 +198,8 @@ class EmbassyService(
     ) {
         val name = memberNames()[discordUserId]
         change {
-            val thread = threadRepository.findByIdOrNull(threadId) ?: throw notFound()
-            val member = manualMemberRepository.findByThreadIdAndDiscordUserId(threadId, discordUserId) ?: throw notFound()
+            val thread = threadRepository.findByIdOrNull(threadId) ?: throw NotFoundException()
+            val member = manualMemberRepository.findByThreadIdAndDiscordUserId(threadId, discordUserId) ?: throw NotFoundException()
             manualMemberRepository.delete(member)
             auditLog.record(
                 actor,
@@ -207,9 +210,9 @@ class EmbassyService(
     }
 
     /**
-     * @throws ResponseStatusException 400 for roles or an embassy channel the bot has not reported, 422 if the ambassador
+     * @throws InvalidInputException for roles or an embassy channel the bot has not reported, [NotPossibleInDiscordException] if the ambassador
      * role or a host role may not see the channel of a thread or the embassy channel, since Discord would refuse to add
-     * their members, or if the bot may not create embassy threads in the embassy channel; 400 for a thread name
+     * their members, or if the bot may not create embassy threads in the embassy channel; [InvalidInputException] for a thread name
      * template without `{land}` exactly once or with more than 100 characters
      */
     fun setSettings(
@@ -219,20 +222,24 @@ class EmbassyService(
         val roles = guildRoles.all().associateBy { it.id }
         val roleIds = request.hostRoleIds.distinct() + listOfNotNull(request.ambassadorRoleId)
         val unknown = roleIds.filter { it !in roles }
-        if (unknown.isNotEmpty()) throw badRequest("Unknown roles $unknown")
+        if (unknown.isNotEmpty()) throw InvalidInputException("Unknown roles $unknown")
         val reported = discordThreadRepository.findAllById(threadRepository.findAll().map { it.threadId })
         val blind = blindRoles(reported, request)
-        if (blind.isNotEmpty()) throw cannotView("Roles $blind cannot see the channel of every embassy thread")
+        if (blind.isNotEmpty()) throw NotPossibleInDiscordException("Roles $blind cannot see the channel of every embassy thread")
         val channel =
             request.channelId?.let { channelId ->
-                guildChannels.all().firstOrNull { it.id == channelId } ?: throw badRequest("Unknown channel $channelId")
+                guildChannels.all().firstOrNull { it.id == channelId } ?: throw InvalidInputException("Unknown channel $channelId")
             }
         if (channel != null) {
-            if (!channel.threadsCreatable) throw cannotView("Bot may not create embassy threads in channel ${channel.id}")
+            if (!channel.threadsCreatable) {
+                throw NotPossibleInDiscordException(
+                    "Bot may not create embassy threads in channel ${channel.id}",
+                )
+            }
             val blindInChannel = blindRoles(channel, request)
-            if (blindInChannel.isNotEmpty()) throw cannotView("Roles $blindInChannel cannot see the embassy channel")
+            if (blindInChannel.isNotEmpty()) throw NotPossibleInDiscordException("Roles $blindInChannel cannot see the embassy channel")
         }
-        if (!EmbassyThreadName.isValid(request.threadNameTemplate)) throw badRequest("Malformed thread name template")
+        if (!EmbassyThreadName.isValid(request.threadNameTemplate)) throw InvalidInputException("Malformed thread name template")
         val template = request.threadNameTemplate.trim()
         val offices = request.offices.distinct().sortedBy { it.ordinal }
         change {
@@ -307,12 +314,6 @@ class EmbassyService(
         transactionTemplate.executeWithoutResult { block() }
         syncTrigger.request(SyncTrigger.SETTING_CHANGE)
     }
-
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
-
-    private fun cannotView(reason: String) = ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, reason)
-
-    private fun notFound() = ResponseStatusException(HttpStatus.NOT_FOUND)
 
     private companion object {
         const val MAX_SEARCH_RESULTS = 20

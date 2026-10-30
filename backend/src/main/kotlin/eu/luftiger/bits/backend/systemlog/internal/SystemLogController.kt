@@ -1,11 +1,13 @@
 package eu.luftiger.bits.backend.systemlog.internal
 
+import eu.luftiger.bits.backend.shared.WebInput
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.domain.EntryKind
 import eu.luftiger.bits.backend.systemlog.domain.ItemOutcome
 import eu.luftiger.bits.backend.systemlog.domain.SyncStatus
 import eu.luftiger.bits.backend.systemlog.domain.SystemLogEntry
 import eu.luftiger.bits.backend.systemlog.domain.SystemLogItem
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -29,8 +31,8 @@ class SystemLogController(
     @GetMapping
     fun entries(
         @RequestParam(required = false) category: LogCategory?,
-        @RequestParam(required = false) member: String?,
-        @RequestParam(required = false) roleId: String?,
+        @RequestParam(required = false) @Size(max = WebInput.MAX_QUERY_LENGTH) member: String?,
+        @RequestParam(required = false) @Size(max = WebInput.MAX_ID_LENGTH) roleId: String?,
         @RequestParam(required = false) before: Long?,
     ): SystemLogPage = service.page(category, member, roleId, before)
 
@@ -38,8 +40,8 @@ class SystemLogController(
     @GetMapping("/{id}/items")
     fun items(
         @PathVariable id: Long,
-        @RequestParam(required = false) member: String?,
-        @RequestParam(required = false) roleId: String?,
+        @RequestParam(required = false) @Size(max = WebInput.MAX_QUERY_LENGTH) member: String?,
+        @RequestParam(required = false) @Size(max = WebInput.MAX_ID_LENGTH) roleId: String?,
     ): List<SystemLogItemResponse> = service.items(id, member, roleId)
 
     /** The roles to filter by: every role that appears in the log. */

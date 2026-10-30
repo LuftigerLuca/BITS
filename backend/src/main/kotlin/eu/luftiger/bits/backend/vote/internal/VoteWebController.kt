@@ -5,9 +5,12 @@ import eu.luftiger.bits.backend.feature.api.BitsFeature
 import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
+import eu.luftiger.bits.backend.shared.WebInput
 import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Vote
 import eu.luftiger.bits.backend.vote.domain.VoteStatus
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -91,7 +94,7 @@ class VoteWebController(
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun start(
-        @RequestBody request: CreateVoteRequest,
+        @Valid @RequestBody request: CreateVoteRequest,
         @AuthenticationPrincipal session: Jwt,
     ): VoteResponse {
         if (!features.isEnabled(BitsFeature.VOTES)) throw ResponseStatusException(HttpStatus.LOCKED, "Votes are switched off")
@@ -203,7 +206,7 @@ class VoteAdminController(
     @PutMapping("/manager-roles")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setManagerRoles(
-        @RequestBody request: ManagerRolesRequest,
+        @Valid @RequestBody request: ManagerRolesRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         val actor = SessionPrincipal.of(session).let { VoteManager(it.subject, it.name, it.avatarUrl, it.admin, it.discordRoleIds) }
@@ -296,8 +299,11 @@ data class ChannelOption(
 
 @Serializable
 data class CreateVoteRequest(
+    @field:Size(max = VoteService.MAX_QUESTION_LENGTH)
     val question: String,
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val roleId: String,
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val channelId: String,
     /** Epoch milliseconds, `null` for a vote without end. */
     val endsAt: Long?,
@@ -339,5 +345,9 @@ enum class ThresholdChoice {
 
 @Serializable
 data class ManagerRolesRequest(
-    val roleIds: List<String>,
+    @field:Size(max = WebInput.MAX_ROLES)
+    val roleIds: List<
+        @Size(max = WebInput.MAX_ID_LENGTH)
+        String,
+    >,
 )

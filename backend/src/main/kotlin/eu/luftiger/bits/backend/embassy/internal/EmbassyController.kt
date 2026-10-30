@@ -3,7 +3,9 @@ package eu.luftiger.bits.backend.embassy.internal
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
-import eu.luftiger.bits.warera.WareraApiException
+import eu.luftiger.bits.backend.shared.WebInput
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -13,7 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -41,13 +42,13 @@ class EmbassyController(
     /** Members of the guild to add by hand, by name or ID. */
     @GetMapping("/member-search")
     fun searchMembers(
-        @RequestParam query: String,
+        @RequestParam @Size(max = WebInput.MAX_QUERY_LENGTH) query: String,
     ): List<MemberOption> = embassyService.searchMembers(query)
 
     @PutMapping("/settings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setSettings(
-        @RequestBody request: EmbassySettingsRequest,
+        @Valid @RequestBody request: EmbassySettingsRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         embassyService.setSettings(request, actor(session))
@@ -57,7 +58,7 @@ class EmbassyController(
     @PostMapping("/threads")
     @ResponseStatus(HttpStatus.CREATED)
     fun assign(
-        @RequestBody request: AssignThreadRequest,
+        @Valid @RequestBody request: AssignThreadRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         embassyService.assign(request.threadId, request.countryId, actor(session))
@@ -68,7 +69,7 @@ class EmbassyController(
     @PostMapping("/creations")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun create(
-        @RequestBody request: CreateThreadRequest,
+        @Valid @RequestBody request: CreateThreadRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         creationService.request(request.countryId, request.threadName, actor(session))
@@ -85,7 +86,7 @@ class EmbassyController(
     @DeleteMapping("/threads/{threadId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unassign(
-        @PathVariable threadId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) threadId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
         embassyService.unassign(threadId, actor(session))
@@ -95,8 +96,8 @@ class EmbassyController(
     @PostMapping("/threads/{threadId}/members")
     @ResponseStatus(HttpStatus.CREATED)
     fun addMember(
-        @PathVariable threadId: String,
-        @RequestBody request: AddMemberRequest,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) threadId: String,
+        @Valid @RequestBody request: AddMemberRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         embassyService.addMember(threadId, request.discordUserId, actor(session))
@@ -106,8 +107,8 @@ class EmbassyController(
     @DeleteMapping("/threads/{threadId}/members/{discordUserId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun removeMember(
-        @PathVariable threadId: String,
-        @PathVariable discordUserId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) threadId: String,
+        @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,
         @AuthenticationPrincipal session: Jwt,
     ) {
         embassyService.removeMember(threadId, discordUserId, actor(session))
@@ -128,12 +129,6 @@ class EmbassyController(
     }
 
     /** Only when assigning or creating a thread, which checks the country. */
-    @ExceptionHandler(WareraApiException::class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    fun wareraUnavailable(e: WareraApiException) {
-        log.warn("WarEra API not reachable", e)
-    }
-
     private fun actor(session: Jwt) = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
 }
 
@@ -157,12 +152,19 @@ data class EmbassiesResponse(
 @Serializable
 data class EmbassySettingsRequest(
     /** The offices whose holders belong in the thread of their country. */
+    @field:Size(max = WebInput.MAX_OFFICES)
     val offices: List<GovernmentOffice>,
     /** `null` for none: the bot then gives and takes no role. */
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val ambassadorRoleId: String?,
     /** Roles whose members belong in every thread, without getting the ambassador role. */
-    val hostRoleIds: List<String>,
+    @field:Size(max = WebInput.MAX_ROLES)
+    val hostRoleIds: List<
+        @Size(max = WebInput.MAX_ID_LENGTH)
+        String,
+    >,
     /** Where the bot creates embassy threads; `null` for none, which leaves only assigning threads by hand. */
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val channelId: String? = null,
     /**
      * The name of the threads the bot creates, with `{land}` exactly once for the English name of the country. Always
@@ -244,17 +246,22 @@ data class ThreadOption(
 
 @Serializable
 data class AssignThreadRequest(
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val threadId: String,
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val countryId: String,
 )
 
 @Serializable
 data class CreateThreadRequest(
+    @field:Size(max = WebInput.MAX_WARERA_ID_LENGTH)
     val countryId: String,
+    @field:Size(max = EmbassyThreadName.MAX_LENGTH)
     val threadName: String,
 )
 
 @Serializable
 data class AddMemberRequest(
+    @field:Size(max = WebInput.MAX_ID_LENGTH)
     val discordUserId: String,
 )

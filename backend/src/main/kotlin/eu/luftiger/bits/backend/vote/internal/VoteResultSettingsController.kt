@@ -2,8 +2,10 @@ package eu.luftiger.bits.backend.vote.internal
 
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
-import eu.luftiger.bits.warera.WareraApiException
+import eu.luftiger.bits.backend.shared.WebInput
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Size
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.CacheControl
@@ -14,7 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -78,7 +79,7 @@ class VoteResultSettingsController(
     @PutMapping("/party-colors")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setPartyColors(
-        @RequestBody request: SetPartyColorsRequest,
+        @Valid @RequestBody request: SetPartyColorsRequest,
         @AuthenticationPrincipal session: Jwt,
     ) {
         settingsService.setPartyColors(request.colors.mapValues { parse(it.value) }, request.noPartyColor?.let(::parse), actor(session))
@@ -93,12 +94,6 @@ class VoteResultSettingsController(
             .cacheControl(CacheControl.noStore())
             .contentType(MediaType.IMAGE_PNG)
             .body(settingsService.preview())
-
-    @ExceptionHandler(WareraApiException::class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    fun wareraUnavailable(e: WareraApiException) {
-        log.warn("WarEra API not reachable", e)
-    }
 
     private fun actor(session: Jwt) = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
 
@@ -147,6 +142,13 @@ data class PartyColorResponse(
 @Serializable
 data class SetPartyColorsRequest(
     /** `#RRGGBB` by WarEra party ID; parties left out get the palette's again. */
-    val colors: Map<String, String>,
+    @field:Size(max = WebInput.MAX_PARTIES)
+    val colors: Map<
+        @Size(max = WebInput.MAX_WARERA_ID_LENGTH)
+        String,
+        @Size(max = WebInput.MAX_COLOR_LENGTH)
+        String,
+    >,
+    @field:Size(max = WebInput.MAX_COLOR_LENGTH)
     val noPartyColor: String?,
 )

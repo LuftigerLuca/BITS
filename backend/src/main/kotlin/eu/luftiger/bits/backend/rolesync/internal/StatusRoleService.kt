@@ -5,11 +5,11 @@ import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.rolesync.api.DskRoles
 import eu.luftiger.bits.backend.rolesync.domain.StatusRoleSetting
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.InvalidInputException
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
@@ -53,7 +53,7 @@ class StatusRoleService(
     /**
      * Sets both roles, `null` for none.
      *
-     * @throws ResponseStatusException 400 if both are the same role or a new one cannot be given by the bot; 409 if a new
+     * @throws InvalidInputException if both are the same role or a new one cannot be given by the bot; [ConflictException] if a new
      * one has a rule or belongs to a DSK
      */
     fun set(
@@ -61,7 +61,7 @@ class StatusRoleService(
         actor: AuditActor,
     ) {
         if (request.verifiedRoleId != null && request.verifiedRoleId == request.unverifiedRoleId) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Verified and unverified must be different roles")
+            throw InvalidInputException("Verified and unverified must be different roles")
         }
         val before = lookup.saved()
         // A role set before may be gone in Discord meanwhile, which must not keep the admin from changing the other one.
@@ -86,9 +86,9 @@ class StatusRoleService(
 
     private fun validate(roleId: String) {
         val role = roleRepository.findByIdOrNull(roleId)
-        if (role == null || !role.assignable) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Role $roleId cannot be assigned")
-        if (ruleRepository.findByRoleId(roleId) != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Role $roleId has a rule")
-        if (dskRoles.all().any { it.roleId == roleId }) throw ResponseStatusException(HttpStatus.CONFLICT, "Role $roleId belongs to a DSK")
+        if (role == null || !role.assignable) throw InvalidInputException("Role $roleId cannot be assigned")
+        if (ruleRepository.findByRoleId(roleId) != null) throw ConflictException("Role $roleId has a rule")
+        if (dskRoles.all().any { it.roleId == roleId }) throw ConflictException("Role $roleId belongs to a DSK")
     }
 
     /** For the audit log, readable after a role is gone, e.g. "Verifiziert: @Verified, Unverifiziert: keine". */

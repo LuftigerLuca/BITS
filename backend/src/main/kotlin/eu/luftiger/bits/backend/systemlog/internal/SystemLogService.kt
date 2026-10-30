@@ -1,5 +1,6 @@
 package eu.luftiger.bits.backend.systemlog.internal
 
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
 import eu.luftiger.bits.backend.systemlog.api.AccountRemovalRecord
 import eu.luftiger.bits.backend.systemlog.api.EmbassyChangeOutcome
@@ -20,10 +21,8 @@ import eu.luftiger.bits.shared.RoleChangeOutcome
 import eu.luftiger.bits.shared.RoleSyncReport
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Duration
 
@@ -297,7 +296,7 @@ class SystemLogService(
      * Stores what the bot changed for the sync [syncId]. A report that comes again, e.g. because the answer to the first
      * got lost, changes nothing.
      *
-     * @throws ResponseStatusException 404 if there is no such sync run, e.g. because it was deleted already
+     * @throws NotFoundException if there is no such sync run, e.g. because it was deleted already
      */
     @Transactional
     fun applyReport(
@@ -306,7 +305,7 @@ class SystemLogService(
     ) {
         val entry =
             entries.findByIdOrNull(syncId)?.takeIf { it.kind == EntryKind.SYNC_RUN }
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                ?: throw NotFoundException()
         if (entry.reportedAt != null) return
         items.saveAll(
             report.changes.map {
@@ -365,7 +364,7 @@ class SystemLogService(
         member: String?,
         roleId: String?,
     ): List<SystemLogItemResponse> {
-        if (!entries.existsById(entryId)) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        if (!entries.existsById(entryId)) throw NotFoundException()
         return items.findByEntry(entryId, member?.trim()?.ifEmpty { null }, roleId).map(SystemLogItemResponse::of)
     }
 
