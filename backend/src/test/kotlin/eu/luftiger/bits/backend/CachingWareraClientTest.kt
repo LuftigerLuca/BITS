@@ -49,6 +49,9 @@ class CachingWareraClientTest {
                 return WareraUser(userId, "Spieler", country = "de")
             }
 
+            // Not the default of the interface, which `by unused()` would hand to unused().
+            override fun getUsers(userIds: Collection<String>) = userIds.associateWith { runCatching { getUser(it) } }
+
             override fun getGovernment(countryId: String): WareraGovernment {
                 calls += "government $countryId"
                 if (down) throw WareraApiException("down")
@@ -134,6 +137,19 @@ class CachingWareraClientTest {
         clock.advance(Duration.ofSeconds(1))
         assertEquals(WareraUser("u1", "Spieler", country = "de"), client.getUser("u1"))
         assertEquals(listOf("user u1", "user u2", "user u1"), calls)
+    }
+
+    @Test
+    fun `users are loaded together and only those not cached`() {
+        client.getUser("u1")
+
+        val users = client.getUsers(listOf("u1", "u2", "u3"))
+
+        assertEquals(listOf("u1", "u2", "u3"), users.keys.toList())
+        assertEquals(listOf("user u1", "user u2", "user u3"), calls)
+        client.getUsers(listOf("u2", "u3"))
+        client.getUser("u3")
+        assertEquals(listOf("user u1", "user u2", "user u3"), calls)
     }
 
     @Test

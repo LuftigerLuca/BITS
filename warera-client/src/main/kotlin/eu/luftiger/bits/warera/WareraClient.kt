@@ -9,6 +9,25 @@ interface WareraClient {
 
     fun getUser(userId: String): WareraUser
 
+    /**
+     * The users with [userIds], each either loaded or failed on its own, e.g. with [WareraNotFoundException] for a user
+     * WarEra no longer knows. Clients that can, load many users with one request.
+     *
+     * @throws WareraApiException if WarEra cannot be reached at all
+     */
+    fun getUsers(userIds: Collection<String>): Map<String, Result<WareraUser>> =
+        userIds.distinct().associateWith { id ->
+            try {
+                Result.success(getUser(id))
+            } catch (e: WareraNotFoundException) {
+                Result.failure(e)
+            } catch (e: WareraBadRequestException) {
+                Result.failure(e)
+            } catch (e: WareraSchemaException) {
+                Result.failure(e)
+            }
+        }
+
     /** IDs of all companies owned by the user, across all pages. */
     fun getCompanyIds(userId: String): List<String>
 

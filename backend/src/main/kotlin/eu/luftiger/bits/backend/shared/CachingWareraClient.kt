@@ -47,6 +47,15 @@ class CachingWareraClient(
 
     override fun getUser(userId: String): WareraUser = users.load(userId, delegate::getUser)
 
+    /** The users cached are served from the cache, the others loaded with one call to the delegate. */
+    override fun getUsers(userIds: Collection<String>): Map<String, Result<WareraUser>> {
+        val cached = userIds.distinct().associateWith { users.fresh(it) }
+        val missing = cached.filterValues { it == null }.keys
+        val loaded = if (missing.isEmpty()) emptyMap() else delegate.getUsers(missing)
+        loaded.forEach { (id, result) -> result.onSuccess { users.put(id, it) } }
+        return cached.mapValues { (id, user) -> if (user != null) Result.success(user) else loaded.getValue(id) }
+    }
+
     private inner class Cache<T>(
         private val ttl: Duration,
     ) {
@@ -68,7 +77,14 @@ class CachingWareraClient(
             }
         }
 
-        private fun fresh(key: String): T? = entries[key]?.takeIf { it.isFresh() }?.value
+        fun fresh(key: String): T? = entries[key]?.takeIf { it.isFresh() }?.value
+
+        fun put(
+            key: String,
+            value: T,
+        ) {
+            entries[key] = Cached(value, clock.instant().plus(ttl))
+        }
     }
 
     private inner class Cached<T>(
