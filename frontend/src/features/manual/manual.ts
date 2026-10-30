@@ -214,6 +214,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Parteien im Land ihrer Staatsbürgerschaft zu.',
         points: [
           'Wer in keiner Partei ist, zählt als „Parteilos“.',
+          'Das Land der Staatsbürgerschaft stammt aus dem letzten stündlichen Abgleich. Wer erst kurz vor dem Ende ' +
+            'das Land gewechselt hat, zählt deshalb noch für das alte.',
           'Das Ergebnis erscheint als Grafik und Text im Kanal der Abstimmung, mit den Namen derer, die nicht ' +
             'abgestimmt haben.',
           'Unter „Abstimmungen“ im Dashboard stehen beendete Abstimmungen im Archiv.',

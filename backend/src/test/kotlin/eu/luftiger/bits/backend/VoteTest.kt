@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.auth.domain.Role
 import eu.luftiger.bits.backend.auth.domain.SessionUser
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import eu.luftiger.bits.backend.members.internal.GuildMemberService
+import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService
 import eu.luftiger.bits.backend.rolesync.internal.RoleSyncTrigger
 import eu.luftiger.bits.backend.vote.internal.VoteEvaluator
 import eu.luftiger.bits.backend.vote.internal.VoteJobs
@@ -84,6 +85,9 @@ class VoteTest {
     @Autowired
     lateinit var memberService: GuildMemberService
 
+    @Autowired
+    lateinit var syncService: RoleSyncService
+
     @BeforeTest
     fun reset() {
         jdbc.awaitOutbox()
@@ -97,6 +101,8 @@ class VoteTest {
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
         memberService.forget()
+        // Countries of an earlier test's sync would answer for the voters of this one.
+        syncService.forget()
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
         api("/api/discord-roles", put = true) {
             """{"roles":[
@@ -211,6 +217,26 @@ class VoteTest {
 
         api("/api/votes/$voteId/result/posted").andExpect { status { isNoContent() } }
         assertEquals(true, result(voteId).posted)
+    }
+
+    @Test
+    fun `the evaluation takes the countries from the last sync and loads only the users it is missing`() {
+        warera.parties["de"] = listOf(WareraParty("p-de", "Deutsche Partei", listOf("w1")))
+        link("1", "w1")
+        syncService.refreshUsers()
+        // Changed after the sync: the evaluation still counts w1 as German.
+        warera.users["w1"] = warera.users.getValue("w1").copy(country = "fr")
+        link("2", "w2")
+        warera.lookups.clear()
+        val voteId = startByAdmin()
+        cast(voteId, "1", VoteChoice.YES)
+        endByAdmin(voteId)
+
+        reportElectorate(voteId, "1" to "Anna", "2" to "Bernd")
+        evaluator.awaitIdle()
+
+        assertEquals(listOf("Deutsche Partei", null), result(voteId).parties.map { it.name })
+        assertEquals(listOf("w2"), warera.lookups.toList())
     }
 
     @Test

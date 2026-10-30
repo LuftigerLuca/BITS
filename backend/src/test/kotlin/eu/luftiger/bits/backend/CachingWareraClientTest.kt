@@ -7,14 +7,21 @@ import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraParty
+import eu.luftiger.bits.warera.WareraUser
 import java.time.Duration
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class CachingWareraClientTest {
     private val clock = MutableClock()
-    private val calls = mutableListOf<String>()
+    private val calls = Collections.synchronizedList(mutableListOf<String>())
     private var down = false
 
     private val delegate =
@@ -34,6 +41,12 @@ class CachingWareraClientTest {
                 calls += "parties $countryId"
                 if (down) throw WareraApiException("down")
                 return listOf(WareraParty("p-$countryId", "Partei"))
+            }
+
+            override fun getUser(userId: String): WareraUser {
+                calls += "user $userId"
+                if (down) throw WareraApiException("down")
+                return WareraUser(userId, "Spieler", country = "de")
             }
 
             override fun getGovernment(countryId: String): WareraGovernment {
@@ -108,6 +121,64 @@ class CachingWareraClientTest {
             client.getGovernment("de")
         }
         assertEquals(listOf("parties de", "government de", "parties de", "government de"), calls)
+    }
+
+    @Test
+    fun `users are kept for two minutes each`() {
+        client.getUser("u1")
+        client.getUser("u2")
+        clock.advance(Duration.ofSeconds(119))
+        client.getUser("u1")
+        assertEquals(listOf("user u1", "user u2"), calls)
+
+        clock.advance(Duration.ofSeconds(1))
+        assertEquals(WareraUser("u1", "Spieler", country = "de"), client.getUser("u1"))
+        assertEquals(listOf("user u1", "user u2", "user u1"), calls)
+    }
+
+    @Test
+    fun `a slow load holds up only the callers of the same key`() {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val loads = AtomicInteger()
+        val slow =
+            object : WareraClient by delegate {
+                override fun getParties(countryId: String): List<WareraParty> {
+                    if (countryId == "de") {
+                        loads.incrementAndGet()
+                        started.countDown()
+                        release.await(5, TimeUnit.SECONDS)
+                    }
+                    return delegate.getParties(countryId)
+                }
+            }
+        val client = CachingWareraClient(slow, clock)
+        client.getAllCountries()
+        val executor = Executors.newFixedThreadPool(3)
+        try {
+            val first = executor.submit<List<WareraParty>> { client.getParties("de") }
+            assertTrue(started.await(5, TimeUnit.SECONDS))
+            val second = executor.submit<List<WareraParty>> { client.getParties("de") }
+
+            // A hit and another key go through while "de" is still loading.
+            assertEquals(
+                listOf(WareraCountry("de", "Germany")),
+                executor
+                    .submit<List<WareraCountry>> {
+                        client.getAllCountries()
+                    }.get(1, TimeUnit.SECONDS),
+            )
+            assertEquals(
+                listOf(WareraParty("p-fr", "Partei")),
+                executor.submit<List<WareraParty>> { client.getParties("fr") }.get(1, TimeUnit.SECONDS),
+            )
+
+            release.countDown()
+            assertEquals(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS))
+            assertEquals(1, loads.get())
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     private fun unused(): WareraClient =
