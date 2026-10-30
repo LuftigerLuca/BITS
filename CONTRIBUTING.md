@@ -191,7 +191,10 @@ What these flows show:
   components. UI building blocks come from shadcn/ui. If one is missing, add it with the shadcn CLI instead of
   building it yourself; custom markup is limited to layout. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
   mutation invalidates what it changes instead of reloading by hand. While data loads or after it failed, show
-  `LoadingState` or `ErrorState` from `components/QueryState.tsx`, never the empty state.
+  `LoadingState` or `ErrorState` from `components/QueryState.tsx`, never the empty state. Every page starts with
+  `PageHeader`, which renders its `h1` and names the browser tab; a page without one (login, start page) calls
+  `useDocumentTitle` and marks its title as `h1` itself. `CardTitle` is an `h2`, headings inside a card start at
+  `h3`, so no level is skipped. Form fields are at most `sm:max-w-sm` wide.
 - `.editorconfig` defines indentation and line endings.
 - **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (Discord messages,
   dashboard) is in German.

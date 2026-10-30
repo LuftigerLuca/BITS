@@ -3,12 +3,13 @@ import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
 import { DsksCard } from '@/features/military-units/DsksCard'
 import { ERROR_MESSAGE } from '@/features/military-units/labels'
 import { useMilitaryUnits } from '@/features/military-units/queries'
+import { PageHeader } from '@/components/PageHeader'
 
 export function MilitaryUnitsPage() {
   const militaryUnits = useMilitaryUnits()
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl font-semibold">Militäreinheiten</h1>
+      <PageHeader title="Militäreinheiten" />
       <FeatureOffNotice feature="ROLE_SYNC">
         Der Rollen-Sync pausiert: Du kannst die DSKs weiter bearbeiten, aber BITS vergibt und entzieht ihre Rollen erst
         wieder, wenn er unter „Verwaltung“ eingeschaltet ist.

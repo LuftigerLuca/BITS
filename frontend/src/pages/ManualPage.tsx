@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/context'
 import { ManualArticle } from '@/features/manual/ManualArticle'
 import { ManualOverview } from '@/features/manual/ManualOverview'
 import { MANUAL_PATH, manualPage } from '@/features/manual/manual'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 
 /**
  * The user manual, open without a login: members use most of BITS in Discord and may never sign in. Without a
@@ -14,12 +14,7 @@ export function ManualPage() {
   const { user } = useAuth()
   const page = manualPage(slug)
 
-  useEffect(() => {
-    document.title = page ? `${page.title} – Handbuch – BITS` : 'Handbuch – BITS'
-    return () => {
-      document.title = 'BITS'
-    }
-  }, [page])
+  useDocumentTitle(...(page ? [page.title, 'Handbuch'] : ['Handbuch']))
 
   if (slug !== undefined && !page) return <Navigate to={MANUAL_PATH} replace />
 

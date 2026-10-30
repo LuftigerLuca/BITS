@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ActivityIcon,
   BookOpenIcon,
@@ -14,7 +14,7 @@ import {
   UsersIcon,
   VoteIcon,
 } from 'lucide-react'
-import { Link, Outlet, useMatch, useNavigate } from 'react-router'
+import { Link, Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
 import { useVoteAccess } from '@/features/votes/queries'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -53,6 +53,7 @@ export function Layout() {
   const { user } = useAuth()
   // Whether the user may manage votes depends on their Discord roles, which only the backend knows.
   const voteAccess = useVoteAccess()
+  const mainRef = useFocusPageOnNavigation()
   if (!user) return null
   const isAdmin = user.role === 'ADMIN'
   const canManageVotes = voteAccess.data?.canManage === true
@@ -60,6 +61,12 @@ export function Layout() {
   return (
     // On the desktop the sidebar is always open; the open state only applies there, so changes are ignored.
     <SidebarProvider open onOpenChange={() => {}}>
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium ring-2 ring-ring focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Zum Inhalt springen
+      </a>
       {/* The sidebar of shadcn is a plain div; the landmarks let screen readers jump to it. */}
       <aside aria-label="Seitenleiste">
         <Sidebar>
@@ -140,17 +147,38 @@ export function Layout() {
           </SidebarFooter>
         </Sidebar>
       </aside>
-      <SidebarInset>
+      <SidebarInset id="main" ref={mainRef} tabIndex={-1} className="outline-none">
         <header className="flex items-center gap-2 border-b px-4 py-2 md:hidden">
           <SidebarTrigger />
           <span className="font-heading font-semibold">BITS</span>
         </header>
-        <div className="w-full p-4">
+        <div className="mx-auto w-full max-w-6xl p-4">
           <Outlet />
         </div>
       </SidebarInset>
     </SidebarProvider>
   )
+}
+
+/**
+ * After a navigation within the dashboard, moves the focus to the heading of the new page, so that screen readers
+ * announce it and the next Tab starts there rather than in the sidebar. Not on the first load, which the browser
+ * announces itself.
+ */
+function useFocusPageOnNavigation() {
+  const { pathname } = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    const main = mainRef.current
+    const heading = main?.querySelector<HTMLElement>('h1[tabindex]')
+    ;(heading ?? main)?.focus()
+  }, [pathname])
+  return mainRef
 }
 
 function NavItem({ to, end = false, icon, children }: { to: string; end?: boolean; icon: ReactNode; children: string }) {

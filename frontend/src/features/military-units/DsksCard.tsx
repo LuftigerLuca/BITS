@@ -259,7 +259,7 @@ function MilitaryUnitSearch({ dsk }: { dsk: Dsk }) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5 sm:max-w-md">
+    <div className="flex flex-col gap-1.5 sm:max-w-sm">
       <Label htmlFor={inputId}>MU hinzufügen</Label>
       <div className="flex gap-2">
         <Input

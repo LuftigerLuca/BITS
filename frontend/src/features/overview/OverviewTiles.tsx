@@ -2,7 +2,7 @@ import { BadgeCheckIcon, FlagIcon, type LucideIcon, UsersIcon } from 'lucide-rea
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import type { CountryOverview } from '@/lib/api'
 import { ERROR_MESSAGE, formatCount } from './labels'
 import { useOverview } from './queries'
@@ -91,8 +91,8 @@ function Tile({
           <Icon aria-hidden="true" className="size-5" />
         </div>
         <div className="grid min-w-0 gap-1">
-          <CardDescription>{title}</CardDescription>
-          <CardTitle className={value === null ? 'text-2xl text-muted-foreground' : 'text-4xl tabular-nums'}>
+          <h2 className="text-sm text-muted-foreground">{title}</h2>
+          <CardTitle as="p" className={value === null ? 'text-2xl text-muted-foreground' : 'text-4xl tabular-nums'}>
             {value === null ? placeholder : formatCount(value)}
           </CardTitle>
           {(note || children) && <p className="text-sm text-muted-foreground">{note ?? children}</p>}
