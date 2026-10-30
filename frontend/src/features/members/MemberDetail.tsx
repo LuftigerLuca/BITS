@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
+import { RefreshButton } from '@/components/RefreshButton'
 import { RoleName } from '@/components/RoleName'
 import { Rules } from '@/features/account/RolesCard'
 import { OUTCOMES } from '@/features/account/labels'
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { MemberDetail as Member } from '@/lib/api'
 import { ON_SERVER, describeEvent, memberErrorMessage, rolesErrorMessage } from './labels'
@@ -119,6 +120,9 @@ function RolesCard({ discordUserId }: { discordUserId: string }) {
           Die Rollen, die BITS nach den aktuellen WarEra-Daten des Mitglieds vergibt, und ob es sie auf dem Server
           gerade hat. Weicht beides ab, bringt der nächste Abgleich es in Ordnung.
         </CardDescription>
+        <CardAction>
+          <RefreshButton query={roles} />
+        </CardAction>
       </CardHeader>
       <CardContent className="text-sm">
         {roles.isPending ? (

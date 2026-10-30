@@ -1,8 +1,9 @@
 import { CheckIcon, CircleHelpIcon, XIcon } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
+import { RefreshButton } from '@/components/RefreshButton'
 import { RoleName } from '@/components/RoleName'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { AccountRole } from '@/lib/api'
 import { OUTCOMES, rolesErrorMessage } from './labels'
@@ -20,6 +21,9 @@ export function RolesCard() {
           Die Rollen, die BITS nach deinen aktuellen WarEra-Daten vergibt. Eine erfüllte Regel reicht für die Rolle; auf
           dem Server ändert sich deine Rolle beim nächsten Abgleich.
         </CardDescription>
+        <CardAction>
+          <RefreshButton query={roles} />
+        </CardAction>
       </CardHeader>
       <CardContent className="text-sm">
         {roles.isPending ? (

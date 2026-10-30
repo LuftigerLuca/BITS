@@ -5,7 +5,8 @@ const AUDIT_LOG = ['audit-log'] as const
 
 /**
  * Pages of the audit log for [filter], loaded one after the other. Changes are made on other pages, so the log is
- * loaded anew every time the page is opened instead of after the usual 30 seconds.
+ * loaded anew every time the page is opened instead of after the usual 30 seconds, and when the window gets focus
+ * again, as it reads the database only.
  */
 export function useAuditLog(filter: AuditLogFilter) {
   return useInfiniteQuery({
@@ -14,6 +15,7 @@ export function useAuditLog(filter: AuditLogFilter) {
     initialPageParam: null as number | null,
     getNextPageParam: (page) => page.nextBefore,
     staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 
