@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { notify } from '@/lib/notify'
 import {
   closeVote,
   createVote,
@@ -14,7 +15,6 @@ import {
   uploadResultBackground,
   type CreateVote,
 } from './api'
-import { notify } from '@/lib/notify'
 import { backgroundErrorMessage, errorMessage, partyColorsErrorMessage } from './labels'
 
 const VOTES = ['votes'] as const

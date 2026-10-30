@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMember, getMemberRoles, searchMembers, syncMember, unlinkMember } from './api'
 import { notify } from '@/lib/notify'
+import { getMember, getMemberRoles, searchMembers, syncMember, unlinkMember } from './api'
 import { UNLINK_ERROR, syncErrorMessage } from './labels'
 
 const MEMBERS = ['members'] as const

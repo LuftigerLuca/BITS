@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getFeatures, setFeature, type Feature } from './api'
 import { notify } from '@/lib/notify'
+import { getFeatures, setFeature, type Feature } from './api'
 import { ERROR_MESSAGE, FEATURES } from './labels'
 
 const FEATURES_KEY = ['features'] as const

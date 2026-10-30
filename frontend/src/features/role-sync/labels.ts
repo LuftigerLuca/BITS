@@ -1,5 +1,5 @@
-import { type ConditionType, type GovernmentOffice, type MuRole, type RuleStatus } from './api'
 import { ApiError } from '@/lib/api'
+import { type ConditionType, type GovernmentOffice, type MuRole, type RuleStatus } from './api'
 
 export const CONDITION_TYPES: Record<ConditionType, string> = {
   CITIZENSHIP: 'Staatsbürgerschaft',

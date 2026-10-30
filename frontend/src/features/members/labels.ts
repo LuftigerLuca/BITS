@@ -1,7 +1,7 @@
-import { type MemberLogEvent } from './api'
 import { type LogEntryType } from '@/features/system-log/api'
 import { ApiError } from '@/lib/api'
 import { OUTCOMES, TRIGGERS } from '@/features/system-log/labels'
+import { type MemberLogEvent } from './api'
 
 /** Short names of the entries that are no sync, for the events of one member. */
 const KINDS: Record<LogEntryType, string> = {

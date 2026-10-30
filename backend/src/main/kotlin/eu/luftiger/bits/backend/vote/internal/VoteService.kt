@@ -2,7 +2,6 @@ package eu.luftiger.bits.backend.vote.internal
 
 import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.audit.api.AuditAction
-import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
@@ -11,11 +10,8 @@ import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Elector
 import eu.luftiger.bits.backend.vote.domain.Vote
-import eu.luftiger.bits.backend.vote.domain.VoteManagerRole
 import eu.luftiger.bits.backend.vote.domain.VoteStatus
-import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.VoteClosedEvent
-import eu.luftiger.bits.shared.VoteEvaluatedEvent
 import eu.luftiger.bits.shared.VoteStartedEvent
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -40,7 +36,7 @@ class VoteService(
     private val electorRepository: ElectorRepository,
     private val partyResultRepository: PartyResultRepository,
     private val nonVoterRepository: NonVoterRepository,
-    private val managerRoleRepository: VoteManagerRoleRepository,
+    private val managerRoles: VoteManagerRoles,
     private val channelRepository: DiscordChannelRepository,
     private val guildRoles: GuildRoles,
     private val accountLinks: AccountLinks,
@@ -50,34 +46,6 @@ class VoteService(
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
 ) {
-    fun mayManage(manager: VoteManager): Boolean {
-        if (manager.admin) return true
-        val managerRoles = managerRoleRepository.findAll().mapTo(HashSet()) { it.roleId }
-        return manager.roleIds.any { it in managerRoles }
-    }
-
-    fun managerRoleIds(): List<String> = managerRoleRepository.findAll().map { it.roleId }.sorted()
-
-    /** Only admins get here, see the controller. */
-    fun setManagerRoleIds(
-        roleIds: List<String>,
-        actor: AuditActor,
-    ) {
-        val known = guildRoles.all().associateBy { it.id }
-        val unknown = roleIds.filter { it !in known }
-        if (unknown.isNotEmpty()) throw InvalidInputException("Unknown roles $unknown")
-        transactionTemplate.executeWithoutResult {
-            managerRoleRepository.deleteAllInBatch()
-            managerRoleRepository.saveAll(roleIds.distinct().map(::VoteManagerRole))
-            val names = roleIds.distinct().mapNotNull { known[it]?.name }.sorted()
-            auditLog.record(
-                actor,
-                AuditAction.VOTE_MANAGER_ROLES_CHANGED,
-                if (names.isEmpty()) "Abstimmungen verwalten: nur Admins" else "Abstimmungen verwalten: ${names.joinToString { "@$it" }}",
-            )
-        }
-    }
-
     /**
      * [threshold] ends the vote early once more than its share of the eligible members chose its option, see
      * [participation].
@@ -93,7 +61,7 @@ class VoteService(
         endsAt: Instant?,
         threshold: Threshold? = null,
     ): StartOutcome {
-        if (!mayManage(manager)) return StartOutcome.Forbidden
+        if (!managerRoles.mayManage(manager)) return StartOutcome.Forbidden
         val text = question.trim()
         if (text.isEmpty() ||
             text.length > MAX_QUESTION_LENGTH
@@ -146,7 +114,7 @@ class VoteService(
         manager: VoteManager?,
         cancel: Boolean,
     ): CloseOutcome {
-        if (manager != null && !mayManage(manager)) return CloseOutcome.Forbidden
+        if (manager != null && !managerRoles.mayManage(manager)) return CloseOutcome.Forbidden
         return requireNotNull(
             transactionTemplate.execute {
                 val vote = voteRepository.findForUpdate(voteId)
@@ -301,38 +269,6 @@ class VoteService(
         }
     }
 
-    /**
-     * Gets results out that are stuck: evaluations that failed are tried again after
-     * [VoteProperties.retryInterval], and the bot is asked again for the role members or to post the result after
-     * [VoteProperties.botTimeout], in case it lost the event.
-     */
-    fun retryStuck(properties: VoteProperties) {
-        val now = clock.instant()
-        voteRepository.findByStatusOrderByStartedAtDesc(VoteStatus.COUNTING).forEach { vote ->
-            val lastAttempt = vote.lastAttemptAt ?: Instant.MIN
-            if (vote.electorateReportedAt != null) {
-                if (!lastAttempt.isAfter(now - properties.retryInterval)) evaluator.evaluateSoon(requireNotNull(vote.id))
-            } else if (!lastAttempt.isAfter(now - properties.botTimeout)) {
-                republish(requireNotNull(vote.id)) { VoteClosedEvent(it, clock.millis()) }
-            }
-        }
-        voteRepository
-            .findByStatusOrderByStartedAtDesc(VoteStatus.EVALUATED)
-            .filter { it.resultPostedAt == null && !(it.lastAttemptAt ?: Instant.MIN).isAfter(now - properties.botTimeout) }
-            .forEach { vote -> republish(requireNotNull(vote.id)) { VoteEvaluatedEvent(it, clock.millis()) } }
-    }
-
-    private fun republish(
-        voteId: Long,
-        event: (Long) -> BitsEvent,
-    ) {
-        transactionTemplate.executeWithoutResult {
-            val vote = voteRepository.findForUpdate(voteId) ?: return@executeWithoutResult
-            vote.lastAttemptAt = clock.instant()
-            eventPublisher.publish(event(voteId))
-        }
-    }
-
     private fun Vote.acceptsBallots() = status == VoteStatus.OPEN && (endsAt == null || clock.instant().isBefore(endsAt))
 
     /** For the audit log, readable after role and channel are gone; e.g. "„Neue Steuern?“ (@Kongress, #abstimmungen)". */
@@ -356,54 +292,3 @@ class VoteService(
         fun format(instant: Instant): String = TIME.format(instant)
     }
 }
-
-/** Who starts, ends or cancels a vote: a member in Discord or a user of the dashboard. */
-data class VoteManager(
-    /** `discord:<id>` or `admin:<username>`, as in the audit log. */
-    val subject: String,
-    val name: String,
-    val avatarUrl: String?,
-    val admin: Boolean,
-    val roleIds: List<String>,
-) {
-    fun auditActor() = AuditActor(subject, name, avatarUrl)
-}
-
-sealed interface StartOutcome {
-    data class Started(
-        val vote: Vote,
-    ) : StartOutcome
-
-    data object Forbidden : StartOutcome
-
-    data object ChannelNotPostable : StartOutcome
-}
-
-sealed interface CloseOutcome {
-    data object Closed : CloseOutcome
-
-    data object Forbidden : CloseOutcome
-
-    data object NotOpen : CloseOutcome
-}
-
-sealed interface CastOutcome {
-    data class Cast(
-        val previous: Choice?,
-    ) : CastOutcome
-
-    data object NotLinked : CastOutcome
-
-    data object Closed : CastOutcome
-}
-
-/** Ends a vote early once more than [percent] of the eligible members chose [choice]. */
-data class Threshold(
-    val percent: Int,
-    val choice: Choice,
-)
-
-data class Participation(
-    val voted: Int,
-    val eligible: Int,
-)

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/context'
-import { getAccount, getAccountRoles, unlinkAccount } from './api'
 import { notify } from '@/lib/notify'
+import { getAccount, getAccountRoles, unlinkAccount } from './api'
 import { UNLINK_ERROR } from './labels'
 
 /** Link and roles change together: without a link, no role is met. */

@@ -42,6 +42,7 @@ import java.time.Instant
 @RequestMapping("/web/votes")
 class VoteWebController(
     private val voteService: VoteService,
+    private val voteManagerRoles: VoteManagerRoles,
     private val channelService: DiscordChannelService,
     private val guildRoles: GuildRoles,
     private val settingsService: VoteResultSettingsService,
@@ -53,7 +54,7 @@ class VoteWebController(
     @GetMapping("/access")
     fun access(
         @AuthenticationPrincipal session: Jwt,
-    ): VoteAccessResponse = VoteAccessResponse(canManage = voteService.mayManage(manager(session)))
+    ): VoteAccessResponse = VoteAccessResponse(canManage = voteManagerRoles.mayManage(manager(session)))
 
     @GetMapping
     fun votes(
@@ -152,7 +153,7 @@ class VoteWebController(
     }
 
     private fun requireManager(session: Jwt) {
-        if (!voteService.mayManage(manager(session))) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        if (!voteManagerRoles.mayManage(manager(session))) throw ResponseStatusException(HttpStatus.FORBIDDEN)
     }
 
     private fun manager(session: Jwt): VoteManager {
@@ -198,10 +199,10 @@ class VoteWebController(
 @PreAuthorize("hasRole('ADMIN')")
 @RequestMapping("/web/admin/votes")
 class VoteAdminController(
-    private val voteService: VoteService,
+    private val voteManagerRoles: VoteManagerRoles,
 ) {
     @GetMapping("/manager-roles")
-    fun managerRoles() = ManagerRolesRequest(voteService.managerRoleIds())
+    fun managerRoles() = ManagerRolesRequest(voteManagerRoles.managerRoleIds())
 
     @PutMapping("/manager-roles")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -210,7 +211,7 @@ class VoteAdminController(
         @AuthenticationPrincipal session: Jwt,
     ) {
         val actor = SessionPrincipal.of(session).let { VoteManager(it.subject, it.name, it.avatarUrl, it.admin, it.discordRoleIds) }
-        voteService.setManagerRoleIds(request.roleIds, actor.auditActor())
+        voteManagerRoles.setManagerRoleIds(request.roleIds, actor.auditActor())
     }
 }
 

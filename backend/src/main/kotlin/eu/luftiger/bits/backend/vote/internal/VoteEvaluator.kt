@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit
  *
  * The parties' counts and the names of the non-voters are stored, and the ballots and the role members deleted, in the
  * transaction that publishes the [VoteEvaluatedEvent]. If WarEra cannot be reached, nothing changes and
- * [VoteService.retryStuck] tries again later; the first failure of a vote is recorded in the [SystemLog].
+ * [VoteStuckRetry.retryStuck] tries again later; the first failure of a vote is recorded in the [SystemLog].
  */
 @Component
 class VoteEvaluator(

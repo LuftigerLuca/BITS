@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getOverview, getOverviewHistory, setOverviewCountry } from './api'
 import { notify } from '@/lib/notify'
 import { RESULT_IMAGE } from '@/features/votes/queries'
+import { getOverview, getOverviewHistory, setOverviewCountry } from './api'
 import { countryErrorMessage } from './labels'
 
 const OVERVIEW = ['overview'] as const
