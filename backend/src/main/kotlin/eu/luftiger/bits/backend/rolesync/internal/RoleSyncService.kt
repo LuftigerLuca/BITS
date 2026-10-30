@@ -15,6 +15,7 @@ import eu.luftiger.bits.backend.systemlog.api.SystemProblem
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.StatusRoles
+import eu.luftiger.bits.warera.RestWareraClient
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraUser
@@ -36,8 +37,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Every sync is a run in the [SystemLog], written together with its event; members whose WarEra data is missing and
  * governments, parties or military units that cannot be loaded are recorded there as problems of the run.
  *
- * The companies of a user cost a call of their own, so they are loaded only while a rule has a company condition. All
- * calls per user are paced by [RoleSyncProperties.userLookupInterval].
+ * Users are loaded in batches of [RestWareraClient.USER_BATCH_SIZE], which WarEra counts as one call each. The
+ * companies of a user cost a call of their own, so they are loaded only while a rule has a company condition. All calls
+ * are paced by [RoleSyncProperties.userLookupInterval].
  *
  * The event also carries the WarEra names the bot sets as nicknames of members who opted in, and for those who lost
  * their link the name to clear again. With opt-ins, a sync runs even without rules.
@@ -100,8 +102,7 @@ class RoleSyncService(
         val links = accountLinks.findAll()
         val withCompanies = needsCompanies(ruleInputs.activeRules())
         users.keys.retainAll(links.mapTo(HashSet()) { it.wareraUserId })
-        val pace = Pace()
-        links.forEach { link -> load(link.wareraUserId, withCompanies, pace) }
+        load(links.map { it.wareraUserId }, withCompanies, Pace())
         loadedAll = true
         log.info("WarEra data of {} linked users refreshed", links.size)
     }
@@ -171,15 +172,15 @@ class RoleSyncService(
         val withCompanies = needsCompanies(rules)
         val pace = Pace()
         val needsUsers = rules.isNotEmpty() || dsks.isNotEmpty() || optedIn.isNotEmpty()
+        val syncedLinks = if (needsUsers) links else emptyList()
+        // A copy, since a refresh running alongside may replace entries meanwhile.
+        val known: Map<String, LoadedUser> = if (refresh) emptyMap() else HashMap(users)
+        val fresh = load(syncedLinks.map { it.wareraUserId }.filter { it !in known }, withCompanies, pace)
         val loadedUsers =
-            (if (needsUsers) links else emptyList()).associateWith { link ->
-                val cached = users[link.wareraUserId]?.takeUnless { refresh }
-                when {
-                    cached == null -> load(link.wareraUserId, withCompanies, pace)
-                    // A company rule was added since the user was loaded.
-                    withCompanies && cached.user != null && !cached.companiesLoaded -> loadCompanies(cached, pace)
-                    else -> cached
-                }
+            syncedLinks.associateWith { link ->
+                val cached = fresh[link.wareraUserId] ?: known.getValue(link.wareraUserId)
+                // A company rule was added since the user was loaded.
+                if (withCompanies && cached.user != null && !cached.companiesLoaded) loadCompanies(cached, pace) else cached
             }
         // The users first, since a leadership rule for any military unit needs the units of the members.
         val memberMuIds = if (ruleInputs.needsMemberMilitaryUnits(rules)) loadedUsers.values.mapNotNull { it.user?.mu } else emptyList()
@@ -235,24 +236,34 @@ class RoleSyncService(
 
     private fun needsCompanies(rules: List<RoleRule>) = rules.any { rule -> rule.conditions.any { it.type == ConditionType.COMPANIES } }
 
-    /** The user, and with [withCompanies] their companies too. */
+    /** The users, a batch per call, and with [withCompanies] their companies too. */
     private fun load(
-        wareraUserId: String,
+        wareraUserIds: List<String>,
         withCompanies: Boolean,
         pace: Pace,
-    ): LoadedUser {
-        pace.next()
-        val user =
-            try {
-                wareraClient.getUser(wareraUserId)
-            } catch (e: WareraApiException) {
-                log.warn("WarEra user {} could not be loaded, their roles stay as they are", wareraUserId, e)
-                null
-            }
-        val loaded = LoadedUser(wareraUserId, user)
-        users[wareraUserId] = loaded
-        return if (withCompanies && user != null) loadCompanies(loaded, pace) else loaded
-    }
+    ): Map<String, LoadedUser> =
+        wareraUserIds
+            .distinct()
+            .chunked(RestWareraClient.USER_BATCH_SIZE)
+            .flatMap { batch ->
+                pace.next()
+                val results =
+                    try {
+                        wareraClient.getUsers(batch)
+                    } catch (e: WareraApiException) {
+                        log.warn("A batch of {} WarEra users could not be loaded, their roles stay as they are", batch.size, e)
+                        emptyMap()
+                    }
+                batch.map { id ->
+                    val user =
+                        results[id]
+                            ?.onFailure { e ->
+                                log.warn("WarEra user {} could not be loaded, their roles stay as they are", id, e)
+                            }?.getOrNull()
+                    val loaded = LoadedUser(id, user).also { users[id] = it }
+                    id to if (withCompanies && user != null) loadCompanies(loaded, pace) else loaded
+                }
+            }.toMap()
 
     private fun loadCompanies(
         loaded: LoadedUser,

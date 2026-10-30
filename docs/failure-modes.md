@@ -26,7 +26,7 @@ down, it ends only with the next report or at its end date. If the
 vote's channel was deleted, the result is only in the dashboard. Without WarEra, admins cannot list the parties to pick their
 colours; result images are still drawn with the colours saved, and the preview uses invented parties. The evaluation
 takes each voter's country from the last role sync and loads from WarEra only the voters the sync could not load, so
-after a restart of the backend, before the first sync, it loads everybody and takes minutes for a large vote.
+after a restart of the backend, before the first sync, it loads everybody, 50 users per call.
 
 Whether a member may manage votes in the dashboard follows the roles in the bot's last member list, so losing or gaining
 a manager role counts within seconds. Only until the bot has sent its list since the backend started, e.g. while the bot

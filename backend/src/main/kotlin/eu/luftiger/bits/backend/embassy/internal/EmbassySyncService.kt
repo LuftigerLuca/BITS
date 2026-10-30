@@ -114,11 +114,18 @@ class EmbassySyncService(
         if (settingRepository.findByIdOrNull(EmbassySetting.SINGLE_ROW_ID)?.channelId == null) return
         val linked = accountLinks.findAll().mapTo(HashSet()) { it.wareraUserId }
         val countries = memberCountries.byWareraUserId().filterKeys { it in linked }.toMutableMap()
-        newWareraUserIds.filter { it in linked && it !in countries }.forEach { id ->
+        val missing = newWareraUserIds.filter { it in linked && it !in countries }
+        if (missing.isNotEmpty()) {
             try {
-                wareraClient.getUser(id).country?.let { countries[id] = it }
+                wareraClient.getUsers(missing).forEach { (id, result) ->
+                    result
+                        .onSuccess { user -> user.country?.let { countries[id] = it } }
+                        .onFailure { e ->
+                            log.warn("WarEra user {} could not be loaded, their country gets no embassy thread for now", id, e)
+                        }
+                }
             } catch (e: WareraApiException) {
-                log.warn("WarEra user {} could not be loaded, their country gets no embassy thread for now", id, e)
+                log.warn("{} WarEra users could not be loaded, their countries get no embassy thread for now", missing.size, e)
             }
         }
         creationService.createMissing(countries)

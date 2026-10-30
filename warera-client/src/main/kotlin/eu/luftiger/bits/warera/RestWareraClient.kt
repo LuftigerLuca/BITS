@@ -9,11 +9,16 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.ResourceAccessException
@@ -42,6 +47,49 @@ class RestWareraClient(
 
     override fun getUser(userId: String): WareraUser =
         query(WareraProcedure.USER, WareraUser.serializer(), buildJsonObject { put("userId", userId) })
+
+    /**
+     * Up to [USER_BATCH_SIZE] users per request: WarEra serves a tRPC batch as one request against its limit and answers
+     * every entry on its own, so a user it does not know fails alone.
+     */
+    override fun getUsers(userIds: Collection<String>): Map<String, Result<WareraUser>> =
+        userIds
+            .distinct()
+            .chunked(USER_BATCH_SIZE)
+            .flatMap { ids ->
+                val entries = batch(WareraProcedure.USER, ids.map { id -> buildJsonObject { put("userId", id) } })
+                ids.zip(entries) { id, entry -> id to user(entry) }
+            }.toMap()
+
+    private fun user(entry: JsonElement): Result<WareraUser> {
+        val error = (entry as? JsonObject)?.get("error")
+        if (error != null) {
+            val status =
+                runCatching {
+                    error.jsonObject["data"]
+                        ?.jsonObject
+                        ?.get("httpStatus")
+                        ?.jsonPrimitive
+                        ?.intOrNull
+                }.getOrNull()
+            return Result.failure(
+                when (status) {
+                    404 -> WareraNotFoundException("WarEra API call ${WareraProcedure.USER} found nothing")
+                    400 -> WareraBadRequestException("WarEra API call ${WareraProcedure.USER} rejected its input")
+                    else -> WareraApiException("WarEra API call ${WareraProcedure.USER} failed in a batch with status $status")
+                },
+            )
+        }
+        return try {
+            Result.success(json.decodeFromJsonElement(TrpcResponse.serializer(WareraUser.serializer()), entry).result.data)
+        } catch (e: IllegalArgumentException) {
+            Result.failure(
+                WareraSchemaException(
+                    "WarEra API call ${WareraProcedure.USER} returned an unexpected response: ${e.message?.lineSequence()?.first()}",
+                ),
+            )
+        }
+    }
 
     override fun getCompanyIds(userId: String): List<String> {
         val ids = mutableListOf<String>()
@@ -96,22 +144,19 @@ class RestWareraClient(
         serializer: KSerializer<T>,
         input: JsonObject? = null,
     ): T {
-        // Every attempt of the retry waits for a permit of its own, since every one counts against the limit.
-        var attempts = 0
-        val call =
-            Callable {
-                if (++attempts > 1) listener.retried(procedure)
-                val waitStart = System.nanoTime()
-                try {
-                    RateLimiter.decorateCallable(rateLimiter) { send(procedure, input, waitStart) }.call()
-                } catch (e: RequestNotPermitted) {
-                    listener.throttled(procedure)
-                    throw e
-                }
-            }
         val body =
             try {
-                Retry.decorateCallable(retry, call).call()
+                send(procedure) {
+                    restClient
+                        .get()
+                        .uri { builder ->
+                            builder.path("/{procedure}")
+                            // tRPC takes the input of a query as JSON in the query string.
+                            if (input != null) builder.queryParam("input", "{input}")
+                            builder.build(mapOf("procedure" to procedure, "input" to input?.toString().orEmpty()))
+                        }.retrieve()
+                        .toEntity(String::class.java)
+                } ?: throw WareraApiException("Empty response from $procedure")
             } catch (e: HttpClientErrorException.NotFound) {
                 throw WareraNotFoundException("WarEra API call $procedure found nothing", e)
             } catch (e: HttpClientErrorException.BadRequest) {
@@ -130,26 +175,84 @@ class RestWareraClient(
         }
     }
 
+    /**
+     * Calls [procedure] once per input in one request and returns the entries of the answer in the same order. An
+     * answer in which some or all entries failed comes with a status of 207 or that of the errors; it is still read,
+     * since every entry carries its own result.
+     */
+    private fun batch(
+        procedure: String,
+        inputs: List<JsonObject>,
+    ): List<JsonElement> {
+        val input = JsonObject(inputs.withIndex().associate { (index, value) -> index.toString() to value })
+        val body =
+            try {
+                send(procedure) {
+                    restClient
+                        .get()
+                        .uri { builder ->
+                            // Literally, not as a template variable, which would encode the commas between the procedures.
+                            builder.path("/" + List(inputs.size) { procedure }.joinToString(","))
+                            builder.queryParam("batch", "1")
+                            builder.queryParam("input", "{input}")
+                            builder.build(mapOf("input" to input.toString()))
+                        }.retrieve()
+                        // Entries fail on their own; only a rate limit or a server error is retried as a whole.
+                        .onStatus({ it.is4xxClientError && it.value() != TOO_MANY_REQUESTS }) { _, _ -> }
+                        .toEntity(String::class.java)
+                } ?: throw WareraApiException("Empty response from $procedure")
+            } catch (e: RestClientException) {
+                throw WareraApiException("WarEra API batch of $procedure failed", e)
+            } catch (e: RequestNotPermitted) {
+                throw WareraApiException("WarEra API batch of $procedure was throttled for too long", e)
+            }
+        val entries =
+            try {
+                json.parseToJsonElement(body).jsonArray
+            } catch (e: IllegalArgumentException) {
+                throw WareraSchemaException("WarEra API batch of $procedure returned no list: ${e.message?.lineSequence()?.first()}")
+            }
+        if (entries.size != inputs.size) {
+            throw WareraSchemaException("WarEra API batch of $procedure returned ${entries.size} entries for ${inputs.size} inputs")
+        }
+        return entries
+    }
+
+    /**
+     * Sends [request] behind the rate limiter and retries it. Every attempt waits for a permit of its own, since every
+     * one counts against the limit, and is reported to [listener]; a batch counts as one request.
+     */
     private fun send(
         procedure: String,
-        input: JsonObject?,
+        request: () -> ResponseEntity<String>,
+    ): String? {
+        var attempts = 0
+        val call =
+            Callable {
+                if (++attempts > 1) listener.retried(procedure)
+                val waitStart = System.nanoTime()
+                try {
+                    RateLimiter.decorateCallable(rateLimiter) { measured(procedure, waitStart, request) }.call()
+                } catch (e: RequestNotPermitted) {
+                    listener.throttled(procedure)
+                    throw e
+                }
+            }
+        return Retry.decorateCallable(retry, call).call()
+    }
+
+    private fun measured(
+        procedure: String,
         waitStart: Long,
-    ): String {
+        request: () -> ResponseEntity<String>,
+    ): String? {
         val start = System.nanoTime()
 
         fun report(status: Int?) =
             listener.requestSent(procedure, status, Duration.ofNanos(start - waitStart), Duration.ofNanos(System.nanoTime() - start))
-        val body =
+        val response =
             try {
-                restClient
-                    .get()
-                    .uri { builder ->
-                        builder.path("/{procedure}")
-                        // tRPC takes the input of a query as JSON in the query string.
-                        if (input != null) builder.queryParam("input", "{input}")
-                        builder.build(mapOf("procedure" to procedure, "input" to input?.toString().orEmpty()))
-                    }.retrieve()
-                    .body(String::class.java)
+                request()
             } catch (e: RestClientResponseException) {
                 report(e.statusCode.value())
                 throw e
@@ -157,8 +260,8 @@ class RestWareraClient(
                 report(null)
                 throw e
             }
-        report(HttpStatus.OK.value())
-        return body ?: throw WareraApiException("Empty response from $procedure")
+        report(response.statusCode.value())
+        return response.body
     }
 
     @Serializable
@@ -194,6 +297,11 @@ class RestWareraClient(
 
         /** Largest page size the API accepts. */
         private const val COMPANY_PAGE_SIZE = 100
+
+        /** Keeps the URL around 4 kB; WarEra served 100 users per batch in a test, too. */
+        const val USER_BATCH_SIZE = 50
+
+        private const val TOO_MANY_REQUESTS = 429
 
         /** Largest page size the API accepts; Germany has about 20 parties. */
         private const val PARTY_PAGE_SIZE = 100

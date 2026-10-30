@@ -26,7 +26,6 @@ bits:
     snapshot-cron: "-"
   vote:
     cron: "-"
-    user-lookup-interval: 0s
   auth:
     public-url: https://bits.test
     jwt-secret: test-signing-key-that-is-at-least-32-bytes-long
