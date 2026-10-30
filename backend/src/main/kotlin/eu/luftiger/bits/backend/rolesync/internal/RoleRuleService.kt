@@ -9,16 +9,17 @@ import eu.luftiger.bits.backend.rolesync.domain.DiscordRole
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleBlock
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.InvalidInputException
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraNotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
@@ -70,8 +71,8 @@ class RoleRuleService(
     }
 
     /**
-     * @throws ResponseStatusException 400 if the role cannot be given or a block or condition is invalid, see
-     * [newBlocks]; 409 if the role has a rule already, which is to be edited instead
+     * @throws InvalidInputException if the role cannot be given or a block or condition is invalid, see
+     * [newBlocks]; [ConflictException] if the role has a rule already, which is to be edited instead
      */
     fun create(
         request: RuleRequest,
@@ -101,7 +102,7 @@ class RoleRuleService(
     /**
      * Replaces the blocks of the rule of [roleId] as a whole.
      *
-     * @throws ResponseStatusException 404 if the role has no rule, 400 like [create]
+     * @throws NotFoundException if the role has no rule, [InvalidInputException] like [create]
      */
     fun update(
         roleId: String,
@@ -112,7 +113,7 @@ class RoleRuleService(
         val saved =
             requireNotNull(
                 transactionTemplate.execute {
-                    val rule = ruleRepository.findByRoleId(roleId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                    val rule = ruleRepository.findByRoleId(roleId) ?: throw NotFoundException()
                     val before = rule.label
                     rule.replaceBlocks(blocks)
                     val updated = ruleRepository.saveAndFlush(rule)
@@ -131,30 +132,34 @@ class RoleRuleService(
     /**
      * The blocks [request] asks for, not saved yet, with their role.
      *
-     * @throws ResponseStatusException 400 if the role cannot be given; there are no or too many blocks, or a block has
+     * @throws InvalidInputException if the role cannot be given; there are no or too many blocks, or a block has
      * no or too many conditions; a condition is incomplete or unknown; or the same condition stands twice in a block, or
-     * the same block twice in the rule. 409 if the role belongs to a DSK or is a status role, which gives it instead.
+     * the same block twice in the rule. [ConflictException] if the role belongs to a DSK or is a status role, which gives it instead.
      */
     fun newBlocks(request: RuleRequest): Pair<DiscordRole, List<RuleBlock>> {
         val role = roleRepository.findByIdOrNull(request.roleId)
-        if (role == null || !role.assignable) throw badRequest("Role ${request.roleId} cannot be assigned")
+        if (role == null || !role.assignable) throw InvalidInputException("Role ${request.roleId} cannot be assigned")
         if (dskRoles.all().any { it.roleId == role.id }) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} belongs to a DSK")
+            throw ConflictException("Role ${role.id} belongs to a DSK")
         }
-        if (role.id in statusRoles.saved().ids) throw ResponseStatusException(HttpStatus.CONFLICT, "Role ${role.id} is a status role")
-        if (request.blocks.isEmpty()) throw badRequest("Blocks missing")
-        if (request.blocks.size > MAX_BLOCKS) throw badRequest("At most $MAX_BLOCKS blocks")
+        if (role.id in statusRoles.saved().ids) throw ConflictException("Role ${role.id} is a status role")
+        if (request.blocks.isEmpty()) throw InvalidInputException("Blocks missing")
+        if (request.blocks.size > MAX_BLOCKS) throw InvalidInputException("At most $MAX_BLOCKS blocks")
         // The countries for every condition at once, and only if needed.
         val countries by lazy { wareraClient.getAllCountries().associate { it.id to it.name } }
         val blocks =
             request.blocks.map { conditions ->
-                if (conditions.isEmpty()) throw badRequest("Conditions missing")
-                if (conditions.size > MAX_CONDITIONS) throw badRequest("At most $MAX_CONDITIONS conditions per block")
+                if (conditions.isEmpty()) throw InvalidInputException("Conditions missing")
+                if (conditions.size > MAX_CONDITIONS) throw InvalidInputException("At most $MAX_CONDITIONS conditions per block")
                 val block = RuleBlock(conditions.map { condition(it) { countryId -> countries[countryId] } })
-                if (block.conditions.distinctBy { it.key }.size < block.conditions.size) throw badRequest("The same condition twice")
+                if (block.conditions.distinctBy { it.key }.size <
+                    block.conditions.size
+                ) {
+                    throw InvalidInputException("The same condition twice")
+                }
                 block
             }
-        if (blocks.distinctBy { it.key }.size < blocks.size) throw badRequest("The same block twice")
+        if (blocks.distinctBy { it.key }.size < blocks.size) throw InvalidInputException("The same block twice")
         return role to blocks
     }
 
@@ -173,27 +178,28 @@ class RoleRuleService(
                 RuleCondition(
                     type,
                     countryId = countryId,
-                    offices = request.offices.ifEmpty { throw badRequest("Offices missing") }.mapTo(sortedSetOf()) { it.office },
+                    offices = request.offices.ifEmpty { throw InvalidInputException("Offices missing") }.mapTo(sortedSetOf()) { it.office },
                     targetName = knownCountry(countryId, countryName),
                 )
             }
             ConditionType.MILITARY_UNIT -> {
-                val muId = request.muId?.takeIf { it.isNotBlank() } ?: throw badRequest("Military unit missing")
+                val muId = request.muId?.takeIf { it.isNotBlank() } ?: throw InvalidInputException("Military unit missing")
                 val mu = knownMilitaryUnit(muId)
                 RuleCondition(type, muId = mu.id, targetName = mu.name)
             }
             ConditionType.MU_LEADERSHIP -> {
-                val role = request.muRole?.role ?: throw badRequest("Rank missing")
+                val role = request.muRole?.role ?: throw InvalidInputException("Rank missing")
                 // Without a unit, any unit counts.
                 val mu = request.muId?.takeIf { it.isNotBlank() }?.let(::knownMilitaryUnit)
                 RuleCondition(type, muId = mu?.id, targetName = mu?.name, muRole = role)
             }
             ConditionType.PARTY -> {
                 val countryId = countryId(request)
-                val partyId = request.partyId?.takeIf { it.isNotBlank() } ?: throw badRequest("Party missing")
+                val partyId = request.partyId?.takeIf { it.isNotBlank() } ?: throw InvalidInputException("Party missing")
                 knownCountry(countryId, countryName)
                 val party =
-                    wareraClient.getParties(countryId).firstOrNull { it.id == partyId } ?: throw badRequest("Unknown party $partyId")
+                    wareraClient.getParties(countryId).firstOrNull { it.id == partyId }
+                        ?: throw InvalidInputException("Unknown party $partyId")
                 RuleCondition(type, countryId = countryId, partyId = party.id, targetName = party.name)
             }
             ConditionType.PARTY_LEADER -> {
@@ -202,12 +208,13 @@ class RoleRuleService(
                 // Without a party, any party of the country counts.
                 val party =
                     request.partyId?.takeIf { it.isNotBlank() }?.let { partyId ->
-                        wareraClient.getParties(countryId).firstOrNull { it.id == partyId } ?: throw badRequest("Unknown party $partyId")
+                        wareraClient.getParties(countryId).firstOrNull { it.id == partyId }
+                            ?: throw InvalidInputException("Unknown party $partyId")
                     }
                 RuleCondition(type, countryId = countryId, partyId = party?.id, targetName = party?.name ?: country)
             }
             ConditionType.LEVEL, ConditionType.MILITARY_RANK, ConditionType.COMPANIES -> {
-                val threshold = request.threshold?.takeIf { it >= 1 } ?: throw badRequest("Threshold must be at least 1")
+                val threshold = request.threshold?.takeIf { it >= 1 } ?: throw InvalidInputException("Threshold must be at least 1")
                 RuleCondition(type, threshold = threshold)
             }
         }
@@ -217,7 +224,7 @@ class RoleRuleService(
      * Deletes the rule of [roleId]; BITS no longer manages the role.
      *
      * @return the deleted rule, for the log
-     * @throws ResponseStatusException 404 if the role has no rule
+     * @throws NotFoundException if the role has no rule
      */
     fun delete(
         roleId: String,
@@ -226,7 +233,7 @@ class RoleRuleService(
         val rule =
             requireNotNull(
                 transactionTemplate.execute {
-                    val found = ruleRepository.findByRoleId(roleId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                    val found = ruleRepository.findByRoleId(roleId) ?: throw NotFoundException()
                     ruleRepository.delete(found)
                     val roleName = roleRepository.findByIdOrNull(found.roleId)?.name
                     auditLog.record(actor, AuditAction.ROLE_RULE_DELETED, describe(found.roleId, roleName, found.label))
@@ -241,7 +248,7 @@ class RoleRuleService(
 
     /** The parties of a known country, by name. */
     fun parties(countryId: String): List<OptionResponse> {
-        if (wareraClient.getAllCountries().none { it.id == countryId }) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        if (wareraClient.getAllCountries().none { it.id == countryId }) throw NotFoundException()
         return wareraClient.getParties(countryId).map { OptionResponse(it.id, it.name) }.sortedBy { it.name }
     }
 
@@ -261,19 +268,19 @@ class RoleRuleService(
             wareraClient.getMilitaryUnit(muId)
         } catch (_: WareraNotFoundException) {
             // Without the cause, which would let the 503 handler for WarEra errors take over.
-            throw badRequest("Unknown military unit $muId")
+            throw InvalidInputException("Unknown military unit $muId")
         } catch (_: WareraBadRequestException) {
             // An ID in a format WarEra does not accept.
-            throw badRequest("Unknown military unit $muId")
+            throw InvalidInputException("Unknown military unit $muId")
         }
 
     private fun countryId(request: ConditionRequest): String =
-        request.countryId?.takeIf { it.isNotBlank() } ?: throw badRequest("Country missing")
+        request.countryId?.takeIf { it.isNotBlank() } ?: throw InvalidInputException("Country missing")
 
     private fun knownCountry(
         countryId: String,
         countryName: (countryId: String) -> String?,
-    ): String = countryName(countryId) ?: throw badRequest("Unknown country $countryId")
+    ): String = countryName(countryId) ?: throw InvalidInputException("Unknown country $countryId")
 
     /**
      * A snapshot for the audit log, readable after the rule and the role are gone; e.g. "Rolle @Bürger:
@@ -315,11 +322,9 @@ class RoleRuleService(
             label = condition.label,
         )
 
-    private fun conflict(roleId: String) = ResponseStatusException(HttpStatus.CONFLICT, "Role $roleId has a rule already")
+    private fun conflict(roleId: String) = ConflictException("Role $roleId has a rule already")
 
     private fun now() = clock.instant()
-
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 
     companion object {
         /** Conditions per block; more would hardly be met by anybody. */

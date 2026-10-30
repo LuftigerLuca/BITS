@@ -4,6 +4,8 @@ import eu.luftiger.bits.backend.audit.api.AuditAction
 import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.overview.api.OverviewCountry
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.InvalidInputException
 import eu.luftiger.bits.backend.vote.domain.PartyColor
 import eu.luftiger.bits.backend.vote.domain.PartyResult
 import eu.luftiger.bits.backend.vote.domain.VoteResultSetting
@@ -12,10 +14,8 @@ import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraParty
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.awt.Color
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -81,7 +81,7 @@ class VoteResultSettingsService(
      * Stores [upload] as the new background, scaled down to what an image needs and as JPEG, so neither its size nor
      * its metadata end up in the database.
      *
-     * @throws ResponseStatusException 400 if it is no PNG or JPEG BITS can read, or larger than [MAX_PIXELS]
+     * @throws InvalidInputException if it is no PNG or JPEG BITS can read, or larger than [MAX_PIXELS]
      */
     fun setBackground(
         upload: ByteArray,
@@ -118,7 +118,7 @@ class VoteResultSettingsService(
      * Replaces the colours of the parties of the country under "Verwaltung" with [colors] (0xRRGGBB by party ID);
      * parties left out get the palette's again.
      *
-     * @throws ResponseStatusException 409 if no country is set, 400 for parties not in it
+     * @throws ConflictException if no country is set, [InvalidInputException] for parties not in it
      * @throws WareraApiException if WarEra cannot be reached
      */
     fun setPartyColors(
@@ -126,10 +126,10 @@ class VoteResultSettingsService(
         noPartyColor: Int?,
         actor: AuditActor,
     ) {
-        val country = overviewCountry.selected() ?: throw ResponseStatusException(HttpStatus.CONFLICT, "No country set")
+        val country = overviewCountry.selected() ?: throw ConflictException("No country set")
         val parties = wareraClient.getParties(country.id).associateBy { it.id }
         val unknown = colors.keys.filter { it !in parties }
-        if (unknown.isNotEmpty()) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown parties $unknown")
+        if (unknown.isNotEmpty()) throw InvalidInputException("Unknown parties $unknown")
         val described =
             sorted(parties.values).mapNotNull { party -> colors[party.id]?.let { "${party.name} ${hex(it)}" } } +
                 listOfNotNull(noPartyColor?.let { "${VoteResultRenderer.NO_PARTY} ${hex(it)}" })
@@ -191,19 +191,19 @@ class VoteResultSettingsService(
 
     /** Checks format and size before decoding, so a small file cannot unpack into a huge image. */
     private fun read(upload: ByteArray): BufferedImage {
-        val input = ImageIO.createImageInputStream(ByteArrayInputStream(upload)) ?: throw invalid("No image")
+        val input = ImageIO.createImageInputStream(ByteArrayInputStream(upload)) ?: throw InvalidInputException("No image")
         input.use {
             val reader =
                 ImageIO.getImageReaders(input).asSequence().firstOrNull { it.formatName.lowercase() in FORMATS }
-                    ?: throw invalid("Neither PNG nor JPEG")
+                    ?: throw InvalidInputException("Neither PNG nor JPEG")
             try {
                 reader.input = input
                 val width = reader.getWidth(0)
                 val height = reader.getHeight(0)
-                if (width.toLong() * height > MAX_PIXELS) throw invalid("Image too large: $width×$height")
+                if (width.toLong() * height > MAX_PIXELS) throw InvalidInputException("Image too large: $width×$height")
                 return reader.read(0)
             } catch (e: IOException) {
-                throw invalid("Unreadable image: ${e.message}")
+                throw InvalidInputException("Unreadable image: ${e.message}")
             } finally {
                 reader.dispose()
             }
@@ -258,8 +258,6 @@ class VoteResultSettingsService(
             log.error("Stored background of the result image is unreadable, using the eagle", e)
             null
         }
-
-    private fun invalid(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 
     private companion object {
         val FORMATS = setOf("png", "jpeg", "jpg")

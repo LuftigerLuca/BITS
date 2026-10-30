@@ -56,6 +56,10 @@ class MemberRateLimitTest {
         bot("/api/profiles", """{"discordUserId":"9001"}""").andExpect {
             status { isTooManyRequests() }
             header { string("Retry-After", "45") }
+            // Every error is a problem detail, see ApiExceptionHandler.
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.status") { value(429) }
+            jsonPath("$.detail") { value("Too many requests, retry in 45 s") }
         }
         bot("/api/verifications", """{"discordUserId":"9001","wareraUsername":"Luftiger"}""").andExpect { status { isTooManyRequests() } }
         bot("/api/profiles", """{"discordUserId":"9002"}""").andExpect { status { isOk() } }
@@ -74,7 +78,10 @@ class MemberRateLimitTest {
         bot("/api/profiles", """{"discordUserId":"9003"}""").andExpect { status { isOk() } }
         bot("/api/profiles", """{"discordUserId":"9003"}""").andExpect { status { isOk() } }
 
-        mockMvc.get("/web/account/roles") { cookie(session) }.andExpect { status { isTooManyRequests() } }
+        mockMvc.get("/web/account/roles") { cookie(session) }.andExpect {
+            status { isTooManyRequests() }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+        }
     }
 
     private fun bot(

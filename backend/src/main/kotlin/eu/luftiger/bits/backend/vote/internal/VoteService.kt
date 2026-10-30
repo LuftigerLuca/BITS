@@ -6,6 +6,8 @@ import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
+import eu.luftiger.bits.backend.shared.InvalidInputException
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Elector
 import eu.luftiger.bits.backend.vote.domain.Vote
@@ -15,10 +17,8 @@ import eu.luftiger.bits.shared.BitsEvent
 import eu.luftiger.bits.shared.VoteClosedEvent
 import eu.luftiger.bits.shared.VoteEvaluatedEvent
 import eu.luftiger.bits.shared.VoteStartedEvent
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -65,7 +65,7 @@ class VoteService(
     ) {
         val known = guildRoles.all().associateBy { it.id }
         val unknown = roleIds.filter { it !in known }
-        if (unknown.isNotEmpty()) throw badRequest("Unknown roles $unknown")
+        if (unknown.isNotEmpty()) throw InvalidInputException("Unknown roles $unknown")
         transactionTemplate.executeWithoutResult {
             managerRoleRepository.deleteAllInBatch()
             managerRoleRepository.saveAll(roleIds.distinct().map(::VoteManagerRole))
@@ -82,7 +82,7 @@ class VoteService(
      * [threshold] ends the vote early once more than its share of the eligible members chose its option, see
      * [participation].
      *
-     * @throws ResponseStatusException 400 if the question is empty or too long, the end has passed, the threshold is
+     * @throws InvalidInputException if the question is empty or too long, the end has passed, the threshold is
      * not 1 to 99 percent for Yes or No, or the role is unknown
      */
     fun start(
@@ -95,11 +95,15 @@ class VoteService(
     ): StartOutcome {
         if (!mayManage(manager)) return StartOutcome.Forbidden
         val text = question.trim()
-        if (text.isEmpty() || text.length > MAX_QUESTION_LENGTH) throw badRequest("Question must have 1 to $MAX_QUESTION_LENGTH characters")
-        if (endsAt != null && !endsAt.isAfter(clock.instant())) throw badRequest("The end has passed already")
-        if (threshold != null && threshold.percent !in 1..99) throw badRequest("Threshold must be 1 to 99 percent")
-        if (threshold != null && threshold.choice == Choice.ABSTAIN) throw badRequest("Threshold must be for Yes or No")
-        val role = guildRoles.all().firstOrNull { it.id == roleId } ?: throw badRequest("Unknown role $roleId")
+        if (text.isEmpty() ||
+            text.length > MAX_QUESTION_LENGTH
+        ) {
+            throw InvalidInputException("Question must have 1 to $MAX_QUESTION_LENGTH characters")
+        }
+        if (endsAt != null && !endsAt.isAfter(clock.instant())) throw InvalidInputException("The end has passed already")
+        if (threshold != null && threshold.percent !in 1..99) throw InvalidInputException("Threshold must be 1 to 99 percent")
+        if (threshold != null && threshold.choice == Choice.ABSTAIN) throw InvalidInputException("Threshold must be for Yes or No")
+        val role = guildRoles.all().firstOrNull { it.id == roleId } ?: throw InvalidInputException("Unknown role $roleId")
         val channel = channelRepository.findById(channelId).orElse(null)
         if (channel == null || !channel.postable) return StartOutcome.ChannelNotPostable
         val vote =
@@ -194,7 +198,7 @@ class VoteService(
      * [Vote.thresholdPercent] for [Vote.thresholdChoice]; the bot reports the participation after each vote, so this
      * is where it is checked.
      *
-     * @throws ResponseStatusException 404 if there is no such vote
+     * @throws NotFoundException if there is no such vote
      */
     fun participation(
         voteId: Long,
@@ -204,7 +208,7 @@ class VoteService(
         val participation =
             requireNotNull(
                 transactionTemplate.execute {
-                    val vote = voteRepository.findById(voteId).orElseThrow { notFound() }
+                    val vote = voteRepository.findById(voteId).orElseThrow { NotFoundException() }
                     val choices = ballotRepository.findByVoteId(voteId).associate { it.discordUserId to it.choice }
                     val voters = choices.keys
                     val linked = accountLinks.findAll().mapTo(HashSet()) { it.discordUserId }
@@ -227,8 +231,8 @@ class VoteService(
         return participation
     }
 
-    /** @throws ResponseStatusException 404 if there is no such vote */
-    fun find(voteId: Long): Vote = voteRepository.findById(voteId).orElseThrow { notFound() }
+    /** @throws NotFoundException if there is no such vote */
+    fun find(voteId: Long): Vote = voteRepository.findById(voteId).orElseThrow { NotFoundException() }
 
     fun open(): List<Vote> = voteRepository.findByStatusOrderByStartedAtDesc(VoteStatus.OPEN)
 
@@ -249,19 +253,19 @@ class VoteService(
         }
     }
 
-    /** @throws ResponseStatusException 404 if there is no evaluated vote of this ID */
+    /** @throws NotFoundException if there is no evaluated vote of this ID */
     fun result(voteId: Long): Pair<Vote, VoteResult> {
         val vote = find(voteId)
-        return vote to (results(listOf(vote))[voteId] ?: throw notFound())
+        return vote to (results(listOf(vote))[voteId] ?: throw NotFoundException())
     }
 
-    /** @throws ResponseStatusException 404 if there is no such vote */
+    /** @throws NotFoundException if there is no such vote */
     fun reportMessage(
         voteId: Long,
         messageId: String,
     ) {
         transactionTemplate.executeWithoutResult {
-            voteRepository.findById(voteId).orElseThrow { notFound() }.messageId = messageId
+            voteRepository.findById(voteId).orElseThrow { NotFoundException() }.messageId = messageId
         }
     }
 
@@ -269,7 +273,7 @@ class VoteService(
      * Keeps the members of the role at the end and starts the evaluation. A second report, e.g. after the backend
      * asked again, changes nothing.
      *
-     * @throws ResponseStatusException 404 if there is no such vote
+     * @throws NotFoundException if there is no such vote
      */
     fun reportElectorate(
         voteId: Long,
@@ -278,7 +282,7 @@ class VoteService(
         val accepted =
             requireNotNull(
                 transactionTemplate.execute {
-                    val vote = voteRepository.findForUpdate(voteId) ?: throw notFound()
+                    val vote = voteRepository.findForUpdate(voteId) ?: throw NotFoundException()
                     if (vote.status != VoteStatus.COUNTING || vote.electorateReportedAt != null) return@execute false
                     electorRepository.saveAll(electors.distinctBy { it.discordUserId })
                     vote.electorateReportedAt = clock.instant()
@@ -288,11 +292,11 @@ class VoteService(
         if (accepted) evaluator.evaluateSoon(voteId)
     }
 
-    /** @throws ResponseStatusException 404 if there is no evaluated vote of this ID */
+    /** @throws NotFoundException if there is no evaluated vote of this ID */
     fun markResultPosted(voteId: Long) {
         transactionTemplate.executeWithoutResult {
-            val vote = voteRepository.findById(voteId).orElseThrow { notFound() }
-            if (vote.status != VoteStatus.EVALUATED) throw notFound()
+            val vote = voteRepository.findById(voteId).orElseThrow { NotFoundException() }
+            if (vote.status != VoteStatus.EVALUATED) throw NotFoundException()
             if (vote.resultPostedAt == null) vote.resultPostedAt = clock.instant()
         }
     }
@@ -341,10 +345,6 @@ class VoteService(
             Choice.NO -> "Nein"
             Choice.ABSTAIN -> "Enthaltung"
         }
-
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
-
-    private fun notFound() = ResponseStatusException(HttpStatus.NOT_FOUND)
 
     companion object {
         const val MAX_QUESTION_LENGTH = 500

@@ -8,14 +8,10 @@ import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.UnlinkAccountRequest
 import eu.luftiger.bits.shared.UnlinkAccountResponse
-import eu.luftiger.bits.warera.WareraApiException
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -57,11 +53,5 @@ class VerificationController(
     ): UnlinkAccountResponse {
         BotInput.discordUserId(request.discordUserId)
         return verificationService.unlink(request.discordUserId)
-    }
-
-    @ExceptionHandler(WareraApiException::class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    fun wareraUnavailable(e: WareraApiException) {
-        log.warn("WarEra API not reachable", e)
     }
 }

@@ -1,8 +1,5 @@
 package eu.luftiger.bits.backend.shared
 
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
-
 /**
  * Checks what the bot sends to the endpoints under `/api`. The bot is trusted, but a bug in it or a leaked service token should end in
  * a 400 right away, not in a database error (500) or in odd input passed on to WarEra. The answer names no details.
@@ -92,6 +89,6 @@ object BotInput {
         valid: Boolean,
         field: String,
     ) {
-        if (!valid) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid $field")
+        if (!valid) throw InvalidInputException("Invalid $field")
     }
 }

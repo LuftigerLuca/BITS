@@ -4,10 +4,9 @@ import eu.luftiger.bits.backend.account.api.AccountLinks
 import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.members.api.dto.GuildMember
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
+import eu.luftiger.bits.backend.shared.NotFoundException
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 /**
@@ -33,16 +32,16 @@ class RulePreviewService(
      * What [request] would change as the rule of its role, in place of the one the role has, for a new rule and for an
      * edited one alike.
      *
-     * @throws ResponseStatusException 400 like [RoleRuleService.create]
+     * @throws InvalidInputException like [RoleRuleService.create]
      */
     fun preview(request: RuleRequest): RulePreviewResponse {
         val (role, blocks) = ruleService.newBlocks(request)
         return preview(role.id, listOf(RoleRule(role.id, blocks, Instant.EPOCH)))
     }
 
-    /** @throws ResponseStatusException 404 if the role has no rule */
+    /** @throws NotFoundException if the role has no rule */
     fun previewDelete(roleId: String): RulePreviewResponse {
-        ruleRepository.findByRoleId(roleId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        ruleRepository.findByRoleId(roleId) ?: throw NotFoundException()
         return preview(roleId, emptyList())
     }
 

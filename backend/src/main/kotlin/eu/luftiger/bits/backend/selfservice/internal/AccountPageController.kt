@@ -2,7 +2,6 @@ package eu.luftiger.bits.backend.selfservice.internal
 
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.shared.MemberRateLimit
-import eu.luftiger.bits.warera.WareraApiException
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.springframework.http.ContentDisposition
@@ -13,7 +12,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -77,12 +75,6 @@ class AccountPageController(
                     .build()
                     .toString(),
             ).body(service.export(discordUserId))
-    }
-
-    @ExceptionHandler(WareraApiException::class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    fun wareraUnavailable(e: WareraApiException) {
-        log.warn("WarEra API not reachable", e)
     }
 
     private fun discordUserId(jwt: Jwt): String =

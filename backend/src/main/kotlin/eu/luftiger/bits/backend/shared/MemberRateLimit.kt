@@ -3,10 +3,7 @@ package eu.luftiger.bits.backend.shared
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Duration
 
@@ -54,10 +51,3 @@ data class MemberRateLimitProperties(
     /** Actions per member and minute that call WarEra. */
     val perMinute: Int = 6,
 )
-
-/** 429 with `Retry-After`, so the bot can tell the member how long to wait. */
-class TooManyRequestsException(
-    val retryAfterSeconds: Long,
-) : ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS) {
-    override fun getHeaders(): HttpHeaders = HttpHeaders().apply { set(HttpHeaders.RETRY_AFTER, retryAfterSeconds.toString()) }
-}

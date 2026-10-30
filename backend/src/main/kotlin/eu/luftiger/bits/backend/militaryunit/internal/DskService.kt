@@ -7,16 +7,17 @@ import eu.luftiger.bits.backend.militaryunit.domain.Dsk
 import eu.luftiger.bits.backend.militaryunit.domain.DskMilitaryUnit
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
 import eu.luftiger.bits.backend.rolesync.api.RoleSyncRequests
+import eu.luftiger.bits.backend.shared.ConflictException
+import eu.luftiger.bits.backend.shared.InvalidInputException
+import eu.luftiger.bits.backend.shared.NotFoundException
 import eu.luftiger.bits.warera.WareraBadRequestException
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraNotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
@@ -88,7 +89,7 @@ class DskService(
         )
     }
 
-    /** @throws ResponseStatusException 400 if the name or the role is invalid, see [validRole]; 409 if either is taken */
+    /** @throws InvalidInputException if the name or the role is invalid, see [validRole]; [ConflictException] if either is taken */
     fun create(
         request: DskRequest,
         actor: AuditActor,
@@ -107,7 +108,7 @@ class DskService(
     /**
      * Renames the DSK and sets its role, `null` for none.
      *
-     * @throws ResponseStatusException 404 if the DSK does not exist; 400 and 409 like [create]
+     * @throws NotFoundException if the DSK does not exist; [InvalidInputException] and [ConflictException] like [create]
      */
     fun update(
         dskId: Long,
@@ -115,12 +116,12 @@ class DskService(
         actor: AuditActor,
     ) {
         val name = validName(request.name)
-        val current = dskRepository.findByIdOrNull(dskId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val current = dskRepository.findByIdOrNull(dskId) ?: throw NotFoundException()
         // The role it has may be gone in Discord meanwhile, which must not keep the DSK from being renamed.
         val roleId = request.roleId?.let { if (it == current.roleId) it else validRole(it) }
         val formerRoleId =
             transactionTemplate.execute {
-                val dsk = dskRepository.findByIdOrNull(dskId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                val dsk = dskRepository.findByIdOrNull(dskId) ?: throw NotFoundException()
                 if (!name.equals(dsk.name, ignoreCase = true) && dskRepository.existsByNameIgnoreCase(name)) {
                     throw conflict("DSK $name exists already")
                 }
@@ -142,7 +143,7 @@ class DskService(
     /**
      * Deletes the DSK with its military units; its role is no longer managed and taken from everybody.
      *
-     * @throws ResponseStatusException 404 if the DSK does not exist
+     * @throws NotFoundException if the DSK does not exist
      */
     fun delete(
         dskId: Long,
@@ -150,7 +151,7 @@ class DskService(
     ) {
         val roleId =
             transactionTemplate.execute {
-                val dsk = dskRepository.findByIdOrNull(dskId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                val dsk = dskRepository.findByIdOrNull(dskId) ?: throw NotFoundException()
                 val units = militaryUnitRepository.findByDskId(dskId)
                 militaryUnitRepository.deleteAllInBatch(units)
                 dskRepository.delete(dsk)
@@ -183,7 +184,7 @@ class DskService(
     }
 
     /**
-     * @throws ResponseStatusException 400 if WarEra does not know the unit; 404 if the DSK does not exist; 409 if the unit
+     * @throws InvalidInputException if WarEra does not know the unit; [NotFoundException] if the DSK does not exist; [ConflictException] if the unit
      * belongs to a DSK already
      */
     fun addMilitaryUnit(
@@ -194,7 +195,7 @@ class DskService(
         val mu = knownMilitaryUnit(muId)
         val roleId =
             transactionTemplate.execute {
-                val dsk = dskRepository.findByIdOrNull(dskId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                val dsk = dskRepository.findByIdOrNull(dskId) ?: throw NotFoundException()
                 if (militaryUnitRepository.existsById(mu.id)) throw conflict("Military unit ${mu.id} belongs to a DSK already")
                 try {
                     militaryUnitRepository.saveAndFlush(DskMilitaryUnit(mu.id, dskId, mu.name, clock.instant()))
@@ -208,7 +209,7 @@ class DskService(
         roleId?.let { syncRequests.syncAfterChange(listOf(it)) }
     }
 
-    /** @throws ResponseStatusException 404 if the unit does not belong to the DSK */
+    /** @throws NotFoundException if the unit does not belong to the DSK */
     fun removeMilitaryUnit(
         dskId: Long,
         muId: String,
@@ -218,7 +219,7 @@ class DskService(
             transactionTemplate.execute {
                 val unit =
                     militaryUnitRepository.findByIdOrNull(muId)?.takeIf { it.dskId == dskId }
-                        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                        ?: throw NotFoundException()
                 val dsk = dskRepository.getReferenceById(dskId)
                 militaryUnitRepository.delete(unit)
                 auditLog.record(actor, AuditAction.DSK_MILITARY_UNIT_REMOVED, "MU ${unit.muName} aus ${dsk.name}")
@@ -238,16 +239,20 @@ class DskService(
 
     private fun validName(name: String): String {
         val trimmed = name.trim()
-        if (trimmed.isEmpty() || trimmed.length > MAX_NAME_LENGTH) throw badRequest("Name must have 1 to $MAX_NAME_LENGTH characters")
+        if (trimmed.isEmpty() ||
+            trimmed.length > MAX_NAME_LENGTH
+        ) {
+            throw InvalidInputException("Name must have 1 to $MAX_NAME_LENGTH characters")
+        }
         return trimmed
     }
 
     /**
-     * @throws ResponseStatusException 400 if the bot cannot give the role; 409 if it has a rule of the role sync or is a
+     * @throws InvalidInputException if the bot cannot give the role; [ConflictException] if it has a rule of the role sync or is a
      * status role, which gives it instead
      */
     private fun validRole(roleId: String): String {
-        if (guildRoles.assignable().none { it.id == roleId }) throw badRequest("Role $roleId cannot be assigned")
+        if (guildRoles.assignable().none { it.id == roleId }) throw InvalidInputException("Role $roleId cannot be assigned")
         if (roleId in guildRoles.withRuleIds()) throw conflict("Role $roleId has a rule")
         if (roleId in guildRoles.statusIds()) throw conflict("Role $roleId is a status role")
         return roleId
@@ -258,10 +263,10 @@ class DskService(
             wareraClient.getMilitaryUnit(muId)
         } catch (_: WareraNotFoundException) {
             // Without the cause, which would let the 503 handler for WarEra errors take over.
-            throw badRequest("Unknown military unit $muId")
+            throw InvalidInputException("Unknown military unit $muId")
         } catch (_: WareraBadRequestException) {
             // An ID in a format WarEra does not accept.
-            throw badRequest("Unknown military unit $muId")
+            throw InvalidInputException("Unknown military unit $muId")
         }
 
     /** For the audit log, readable after the role is gone, e.g. "Rolle @DSK1". */
@@ -271,9 +276,7 @@ class DskService(
         return "Rolle ${name?.let { "@$it" } ?: "$roleId (in Discord gelöscht)"}"
     }
 
-    private fun conflict(reason: String) = ResponseStatusException(HttpStatus.CONFLICT, reason)
-
-    private fun badRequest(reason: String) = ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
+    private fun conflict(reason: String) = ConflictException(reason)
 
     private companion object {
         const val MAX_NAME_LENGTH = 100

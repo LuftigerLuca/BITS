@@ -8,14 +8,13 @@ import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.overview.api.OverviewCountry
 import eu.luftiger.bits.backend.overview.api.dto.SelectedCountry
 import eu.luftiger.bits.backend.overview.domain.OverviewSetting
+import eu.luftiger.bits.backend.shared.InvalidInputException
 import eu.luftiger.bits.warera.WareraApiException
 import eu.luftiger.bits.warera.WareraClient
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 
 /**
@@ -45,7 +44,7 @@ class OverviewService(
         settingRepository.findByIdOrNull(OverviewSetting.SINGLE_ROW_ID)?.let { SelectedCountry(it.countryId, it.countryName) }
 
     /**
-     * @throws ResponseStatusException 400 if WarEra does not know the country
+     * @throws InvalidInputException if WarEra does not know the country
      * @throws WareraApiException if WarEra cannot be reached, which the dashboard gets as 503
      */
     fun setCountry(
@@ -54,7 +53,7 @@ class OverviewService(
     ): CountryResponse {
         val country =
             wareraClient.getAllCountries().firstOrNull { it.id == countryId }
-                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown country $countryId")
+                ?: throw InvalidInputException("Unknown country $countryId")
         transactionTemplate.executeWithoutResult {
             val setting = settingRepository.findByIdOrNull(OverviewSetting.SINGLE_ROW_ID)
             if (setting == null) {
