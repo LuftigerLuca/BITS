@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
-import type { Me, Overview } from '@/lib/api'
+import type { Me, Overview, OverviewHistory } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 
@@ -14,6 +14,17 @@ const overview: Overview = {
   country: { id: 'de', name: 'Germany', available: true, citizens: 982, activeCitizens: 925 },
 }
 
+const history: OverviewHistory = {
+  from: '2026-10-01',
+  to: '2026-10-04',
+  // 10-02 has no snapshot, 10-04 had no figures from the bot.
+  days: [
+    { day: '2026-10-01', members: 1200, verifiedMembers: 590, citizens: 990, activeCitizens: 930 },
+    { day: '2026-10-03', members: 1234, verifiedMembers: 617, citizens: null, activeCitizens: null },
+    { day: '2026-10-04', members: null, verifiedMembers: null, citizens: null, activeCitizens: null },
+  ],
+}
+
 /** The text of each tile: what it counts, the number and the note below. */
 async function tiles() {
   const section = await screen.findByRole('region', { name: 'Kennzahlen' })
@@ -22,7 +33,8 @@ async function tiles() {
 
 describe('home page', () => {
   it('shows admins the members, how many are verified and the citizens of the country', async () => {
-    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json(overview) })
+    stubFetch({ 'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history), 'GET /web/admin/overview': () => json(overview) })
 
     renderApp('/')
 
@@ -36,6 +48,7 @@ describe('home page', () => {
   it('marks each tile with a decorative icon, also when a figure is missing', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history),
       'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
     })
 
@@ -68,6 +81,7 @@ describe('home page', () => {
   it('says the members are unknown until the bot reported them, and links to the country setting', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history),
       'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
       'GET /web/admin/role-sync/countries': () => json([]),
     })
@@ -86,6 +100,7 @@ describe('home page', () => {
   it('keeps the Discord figures when WarEra cannot be reached', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history),
       'GET /web/admin/overview': () =>
         json({ ...overview, country: { id: 'de', name: 'Germany', available: false, citizens: null, activeCitizens: null } }),
     })
@@ -100,7 +115,8 @@ describe('home page', () => {
   })
 
   it('offers to try again if the figures cannot be loaded', async () => {
-    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => status(500) })
+    stubFetch({ 'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history), 'GET /web/admin/overview': () => status(500) })
 
     renderApp('/')
 
@@ -108,8 +124,42 @@ describe('home page', () => {
     expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument()
   })
 
+  it('sums up the history of the chosen figure, leaving out the gaps', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history),
+      'GET /web/admin/overview': () => json(overview),
+    })
+
+    renderApp('/')
+
+    expect(await screen.findByText('1.234 am 03.10.2026, +34 seit 01.10.2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bürger' }))
+    expect(screen.getByText('990 am 01.10.2026, ±0 seit 01.10.2026')).toBeInTheDocument()
+  })
+
+  it('loads a year when asked, and says when there is nothing yet', async () => {
+    const fetch = stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json({ from: '2025-10-05', to: '2026-10-04', days: [] }),
+      'GET /web/admin/overview': () => json(overview),
+    })
+
+    renderApp('/')
+    await screen.findByText('Für diesen Zeitraum gibt es noch keine Werte.')
+    await userEvent.click(screen.getByRole('button', { name: '1 Jahr' }))
+
+    expect(screen.getByRole('button', { name: '1 Jahr' })).toHaveAttribute('aria-pressed', 'true')
+    const urls = fetch.mock.calls.map(([input]) => String(input))
+    expect(urls).toContainEqual(expect.stringContaining('/web/admin/overview/history?days=30'))
+    expect(urls).toContainEqual(expect.stringContaining('/web/admin/overview/history?days=365'))
+  })
+
   it('has no accessibility violations axe can find without a browser', async () => {
-    stubFetch({ 'GET /web/me': () => json(admin), 'GET /web/admin/overview': () => json(overview) })
+    stubFetch({ 'GET /web/me': () => json(admin),
+      'GET /web/admin/overview/history': () => json(history), 'GET /web/admin/overview': () => json(overview) })
     renderApp('/')
     await tiles()
 

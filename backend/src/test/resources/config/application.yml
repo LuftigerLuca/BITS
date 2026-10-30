@@ -22,6 +22,8 @@ bits:
   embassy:
     cron: "-"
     creation-cron: "-"
+  overview:
+    snapshot-cron: "-"
   vote:
     cron: "-"
     user-lookup-interval: 0s
