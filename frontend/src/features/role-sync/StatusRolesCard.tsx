@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
 import type { DiscordRole, StatusRole, StatusRoles } from '@/lib/api'
@@ -132,8 +132,8 @@ function StatusRoleSelect({
       : []),
   ]
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <SearchableSelect
         id={id}
         className="w-full"
@@ -146,6 +146,6 @@ function StatusRoleSelect({
           <Badge variant={STATUS[saved.status].variant}>{STATUS[saved.status].label}</Badge>
         </div>
       )}
-    </div>
+    </Field>
   )
 }

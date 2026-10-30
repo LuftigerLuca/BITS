@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Embassies, EmbassyCreation, EmbassyThread } from '@/lib/api'
@@ -75,8 +75,8 @@ function RenameButton({ template }: { template: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Bestehende Threads umbenennen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Der Bot benennt alle zugeordneten Threads nach der Vorlage „{template}“ um. Archivierte Threads überspringt
-              er, Threads mit passendem Namen bleiben unberührt.
+              Der Bot benennt alle zugeordneten Threads nach der Vorlage „{template}“ um. Archivierte Threads
+              überspringt er, Threads mit passendem Namen bleiben unberührt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -173,15 +173,15 @@ function CreateDialog({
               Der Bot legt im Botschafts-Kanal einen privaten Thread an und ordnet ihn {countryName} zu.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`embassy-create-name-${countryId}`}>Name</Label>
+          <Field>
+            <FieldLabel htmlFor={`embassy-create-name-${countryId}`}>Name</FieldLabel>
             <Input
               id={`embassy-create-name-${countryId}`}
               value={name}
               maxLength={MAX_THREAD_NAME_LENGTH}
               onChange={(event) => setName(event.target.value)}
             />
-          </div>
+          </Field>
           <AlertDialogFooter>
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <Button type="submit" disabled={trimmed.length === 0 || create.isPending}>
@@ -256,7 +256,9 @@ function ThreadSection({ thread }: { thread: EmbassyThread }) {
                     size="icon-sm"
                     aria-label={`${name} aus ${thread.countryName} entfernen`}
                     disabled={removeMember.isPending}
-                    onClick={() => removeMember.mutate({ threadId: thread.threadId, discordUserId: member.discordUserId })}
+                    onClick={() =>
+                      removeMember.mutate({ threadId: thread.threadId, discordUserId: member.discordUserId })
+                    }
                   >
                     <Trash2Icon />
                   </Button>
@@ -279,8 +281,8 @@ function MemberSearch({ thread }: { thread: EmbassyThread }) {
   const inputId = `embassy-member-${thread.threadId}`
   const added = new Set(thread.manualMembers.map((m) => m.discordUserId))
   return (
-    <div className="flex flex-col gap-1.5 sm:max-w-sm">
-      <Label htmlFor={inputId}>Mitglied hinzufügen</Label>
+    <Field className="sm:max-w-sm">
+      <FieldLabel htmlFor={inputId}>Mitglied hinzufügen</FieldLabel>
       <Input id={inputId} value={query} placeholder="Name oder Discord-ID" onChange={(e) => setQuery(e.target.value)} />
       {search.isFetching && <LoadingState label="Mitglieder werden gesucht …" />}
       {search.isError && <ErrorState message={errorMessage(search.error)} onRetry={() => search.refetch()} />}
@@ -312,7 +314,7 @@ function MemberSearch({ thread }: { thread: EmbassyThread }) {
           })}
         </ul>
       )}
-    </div>
+    </Field>
   )
 }
 
@@ -362,8 +364,8 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
           <ErrorState message={errorMessage(countries.error)} onRetry={() => countries.refetch()} />
         )}
         <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor="embassy-thread">Thread</Label>
+          <Field className="flex-1">
+            <FieldLabel htmlFor="embassy-thread">Thread</FieldLabel>
             <SearchableSelect
               id="embassy-thread"
               className="w-full"
@@ -372,9 +374,9 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
               onValueChange={setThreadId}
               placeholder={threadItems.length === 0 ? 'Keine freien privaten Threads' : 'Thread wählen'}
             />
-          </div>
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor="embassy-country">Land</Label>
+          </Field>
+          <Field className="flex-1">
+            <FieldLabel htmlFor="embassy-country">Land</FieldLabel>
             <SearchableSelect
               id="embassy-country"
               className="w-full"
@@ -384,7 +386,7 @@ function AssignForm({ embassies }: { embassies: Embassies }) {
               disabled={countries.isPending}
               placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'}
             />
-          </div>
+          </Field>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={!threadId || !countryId || assign.isPending}>

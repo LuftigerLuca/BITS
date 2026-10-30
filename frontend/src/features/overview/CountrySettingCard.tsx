@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { ErrorState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useCountries } from '@/lib/countries'
 import { ERROR_MESSAGE, countryErrorMessage } from './labels'
@@ -36,8 +36,8 @@ export function CountrySettingCard() {
           {countries.isError && (
             <ErrorState message={countryErrorMessage(countries.error)} onRetry={() => countries.refetch()} />
           )}
-          <div className="flex flex-col gap-1.5 sm:max-w-sm">
-            <Label htmlFor="overview-country">Land der Startseite</Label>
+          <Field className="sm:max-w-sm">
+            <FieldLabel htmlFor="overview-country">Land der Startseite</FieldLabel>
             <SearchableSelect
               id="overview-country"
               className="w-full"
@@ -47,7 +47,7 @@ export function CountrySettingCard() {
               disabled={countries.isPending || overview.isPending}
               placeholder={countries.isPending ? 'Länder werden geladen …' : 'Land wählen'}
             />
-          </div>
+          </Field>
           <Button type="submit" className="self-start" disabled={setCountry.isPending || !countryId || unchanged}>
             Speichern
           </Button>

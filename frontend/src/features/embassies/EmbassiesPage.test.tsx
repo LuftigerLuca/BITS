@@ -153,6 +153,8 @@ describe('embassies', () => {
     expect(screen.getByText('Der Thread-Name darf nicht leer sein.')).toBeInTheDocument()
     await userEvent.type(name, 'Botschaft')
     expect(screen.getByText('Der Thread-Name muss {land} genau einmal enthalten.')).toBeInTheDocument()
+    expect(name).toHaveAttribute('aria-invalid', 'true')
+    expect(name).toHaveAccessibleDescription('Der Thread-Name muss {land} genau einmal enthalten.')
     expect(save).toBeDisabled()
     await userEvent.type(name, ' {{land}{{land}')
     expect(save).toBeDisabled()

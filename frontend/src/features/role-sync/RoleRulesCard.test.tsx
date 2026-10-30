@@ -327,7 +327,7 @@ describe('rule form', () => {
     await userEvent.click(within(second).getByLabelText('Land'))
     await userEvent.click(await screen.findByRole('option', { name: 'Germany' }))
 
-    expect(screen.getByText('Eine Bedingung steht doppelt in einem Block.')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Eine Bedingung steht doppelt in einem Block.')
     expect(submit()).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Bedingung 1 entfernen' }))
     expect(submit()).toBeEnabled()

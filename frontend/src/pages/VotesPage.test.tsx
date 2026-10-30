@@ -93,7 +93,7 @@ describe('votes page', () => {
     await userEvent.type(await screen.findByLabelText('Frage'), 'Krieg erklären?')
     await choose('Stimmberechtigte Rolle', 'Kongress')
     await choose('Kanal', '#abstimmungen (Politik)')
-    await userEvent.click(screen.getByLabelText('Ohne Enddatum, bis jemand sie beendet'))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Ohne Enddatum, bis jemand sie beendet' }))
     await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
 
     const toast = await expectToast('success', 'Abstimmung gestartet')
@@ -110,7 +110,7 @@ describe('votes page', () => {
     await userEvent.type(await screen.findByLabelText('Frage'), 'Krieg erklären?')
     await choose('Stimmberechtigte Rolle', 'Kongress')
     await choose('Kanal', '#abstimmungen (Politik)')
-    await userEvent.click(screen.getByLabelText('Ohne Enddatum, bis jemand sie beendet'))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Ohne Enddatum, bis jemand sie beendet' }))
     await userEvent.click(screen.getByRole('button', { name: 'Abstimmung starten' }))
 
     await expectToast('error', 'Abstimmungen sind gerade ausgeschaltet.')

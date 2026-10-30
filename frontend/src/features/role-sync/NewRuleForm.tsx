@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Separator } from '@/components/ui/separator'
 import { useCountries } from '@/lib/countries'
@@ -129,8 +129,8 @@ export function NewRuleForm({
         </Alert>
       )}
       {countries.isError && <ErrorState message={errorMessage(countries.error)} onRetry={() => countries.refetch()} />}
-      <div className="flex flex-col gap-1.5 sm:max-w-[calc(50%-0.5rem)]">
-        <Label htmlFor="rule-role">Rolle</Label>
+      <Field className="sm:max-w-[calc(50%-0.5rem)]">
+        <FieldLabel htmlFor="rule-role">Rolle</FieldLabel>
         <SearchableSelect
           id="rule-role"
           className="w-full"
@@ -140,11 +140,12 @@ export function NewRuleForm({
           disabled={editing !== null}
           placeholder="Rolle wählen"
           renderItem={(item) => <RoleName name={item.label} color={colors.get(item.value) ?? null} />}
+          aria-describedby="rule-role-hint"
         />
-        <p className="text-xs text-muted-foreground">
+        <FieldDescription id="rule-role-hint">
           Nur Rollen unter der höchsten Rolle des Bots, ohne @everyone, Integrationsrollen und die Rollen der DSKs.
-        </p>
-      </div>
+        </FieldDescription>
+      </Field>
       {existing && (
         <Alert>
           <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -173,12 +174,12 @@ export function NewRuleForm({
           </Fragment>
         ))}
       </div>
-      {duplicateCondition && <p className="text-sm text-destructive">Eine Bedingung steht doppelt in einem Block.</p>}
-      {duplicateBlock && <p className="text-sm text-destructive">Ein Block steht doppelt in der Regel.</p>}
+      {duplicateCondition && <FieldError>Eine Bedingung steht doppelt in einem Block.</FieldError>}
+      {duplicateBlock && <FieldError>Ein Block steht doppelt in der Regel.</FieldError>}
       {tooMany && (
-        <p className="text-sm text-destructive">
+        <FieldError>
           Höchstens {MAX_CONDITIONS} Bedingungen je Block und {MAX_BLOCKS} Blöcke je Regel.
-        </p>
+        </FieldError>
       )}
       <Button
         type="button"

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -69,8 +69,8 @@ export function SystemLogCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="system-log-category">Typ</Label>
+          <Field>
+            <FieldLabel htmlFor="system-log-category">Typ</FieldLabel>
             <Select items={categoryItems} value={category} onValueChange={(value) => setCategory(value ?? ALL)}>
               <SelectTrigger id="system-log-category" className="w-full">
                 <SelectValue />
@@ -83,9 +83,9 @@ export function SystemLogCard() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="system-log-role">Rolle</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="system-log-role">Rolle</FieldLabel>
             <SearchableSelect
               id="system-log-role"
               className="w-full"
@@ -93,20 +93,22 @@ export function SystemLogCard() {
               value={roleId}
               onValueChange={(value) => setRoleId(value ?? ALL)}
             />
-          </div>
-          <form className="flex flex-col gap-1.5" onSubmit={searchMember}>
-            <Label htmlFor="system-log-member">Mitglied</Label>
-            <div className="flex gap-2">
-              <Input
-                id="system-log-member"
-                placeholder="Name oder Discord-ID"
-                value={memberInput}
-                onChange={(event) => setMemberInput(event.target.value)}
-              />
-              <Button type="submit" variant="outline">
-                Suchen
-              </Button>
-            </div>
+          </Field>
+          <form onSubmit={searchMember}>
+            <Field>
+              <FieldLabel htmlFor="system-log-member">Mitglied</FieldLabel>
+              <div className="flex gap-2">
+                <Input
+                  id="system-log-member"
+                  placeholder="Name oder Discord-ID"
+                  value={memberInput}
+                  onChange={(event) => setMemberInput(event.target.value)}
+                />
+                <Button type="submit" variant="outline">
+                  Suchen
+                </Button>
+              </div>
+            </Field>
           </form>
         </div>
         {log.isPending ? (

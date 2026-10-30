@@ -3,8 +3,8 @@ import { Link } from 'react-router'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SEARCH_ERROR } from './labels'
 import { useMemberSearch } from './queries'
@@ -30,14 +30,16 @@ export function MemberSearchCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 text-sm">
-        <form className="flex flex-col gap-1.5" onSubmit={search}>
-          <Label htmlFor="member-search">Name oder Discord-ID</Label>
-          <div className="flex gap-2">
-            <Input id="member-search" value={input} onChange={(event) => setInput(event.target.value)} />
-            <Button type="submit" variant="outline">
-              Suchen
-            </Button>
-          </div>
+        <form onSubmit={search}>
+          <Field>
+            <FieldLabel htmlFor="member-search">Name oder Discord-ID</FieldLabel>
+            <div className="flex gap-2">
+              <Input id="member-search" value={input} onChange={(event) => setInput(event.target.value)} />
+              <Button type="submit" variant="outline">
+                Suchen
+              </Button>
+            </div>
+          </Field>
         </form>
         {query === '' ? null : results.isPending ? (
           <LoadingState label="Mitglieder werden gesucht …" />
