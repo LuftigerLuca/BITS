@@ -109,3 +109,13 @@ describe('SearchableSelect without matches', () => {
     expect(screen.getByText('Keine Treffer')).toBeVisible()
   })
 })
+
+describe('SearchableSelect list', () => {
+  it('is named after the label of its field', async () => {
+    render(<Field />)
+
+    await userEvent.click(screen.getByLabelText('Land'))
+
+    expect(await screen.findByRole('dialog', { name: 'Land' })).toBeInTheDocument()
+  })
+})

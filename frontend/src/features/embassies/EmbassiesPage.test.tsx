@@ -5,6 +5,7 @@ import type { Embassies, Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -308,5 +309,16 @@ describe('embassies', () => {
       'error',
       'Dem Bot fehlen im Botschafts-Kanal die Rechte „Private Threads erstellen“, „Threads verwalten“ oder „Nachrichten in Threads senden“.',
     )
+  })
+
+  it('has no accessibility violations axe can find, also with a dialog open', async () => {
+    stub()
+    renderApp('/admin/embassies')
+    await screen.findByRole('region', { name: 'Botschaft France' })
+    await expectNoAxeViolations()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Guest aus France entfernen' }))
+    await screen.findByRole('alertdialog')
+    await expectNoAxeViolations(document.body, { popup: true })
   })
 })

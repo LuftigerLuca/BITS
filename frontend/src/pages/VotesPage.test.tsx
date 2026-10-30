@@ -5,6 +5,7 @@ import type { Me, Vote, VoteOptions } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: 'luca', discordUser: true }
 
@@ -204,5 +205,17 @@ describe('votes page', () => {
     expect(await screen.findByText('Willkommen, Luca')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
     expect(screen.queryByRole('link', { name: 'Abstimmungen' })).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations axe can find, also with the start form filled and a dialog open', async () => {
+    stubVotes(member)
+    renderApp('/votes')
+    await screen.findByRole('button', { name: 'Beenden' })
+    await userEvent.type(screen.getByLabelText('Frage'), 'Krieg erklären?')
+    await expectNoAxeViolations()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
+    await screen.findByRole('alertdialog')
+    await expectNoAxeViolations(document.body, { popup: true })
   })
 })

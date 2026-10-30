@@ -1,11 +1,11 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Me, MemberDetail, MemberRoles, MemberSummary } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const admin: Me = {
   name: 'Admina',
@@ -204,11 +204,6 @@ describe('members page', () => {
     renderApp('/admin/members?id=1')
     await screen.findByText('Bürger Deutschland')
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, {
-      rules: { 'color-contrast': { enabled: false } },
-    })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

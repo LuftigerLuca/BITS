@@ -5,6 +5,7 @@ import type { Me, MilitaryUnits } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -144,5 +145,20 @@ describe('military units', () => {
       'error',
       'Der Name, die Rolle oder die MU ist schon vergeben, oder die Rolle hat eine Regel unter „Rollen“.',
     )
+  })
+
+  it('has no accessibility violations axe can find, also while editing and with a dialog open', async () => {
+    stub()
+    renderApp('/admin/military-units')
+    await screen.findByRole('region', { name: 'DSK1' })
+    await expectNoAxeViolations()
+
+    await userEvent.click(screen.getByRole('button', { name: 'DSK1 bearbeiten' }))
+    await expectNoAxeViolations()
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'DSK1 löschen' }))
+    await screen.findByRole('alertdialog')
+    await expectNoAxeViolations(document.body, { popup: true })
   })
 })

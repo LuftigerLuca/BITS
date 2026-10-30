@@ -51,7 +51,9 @@ export function RoleRulesCard({ onEdit = () => {} }: { onEdit?: (rule: RoleRule)
                 <TableHead>Rolle</TableHead>
                 <TableHead>Bedingungen</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-0" />
+                <TableHead className="w-0">
+                  <span className="sr-only">Aktionen</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

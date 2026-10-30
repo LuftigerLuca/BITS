@@ -237,6 +237,8 @@ What these flows show:
 - Tests never call external services (WarEra, Discord). Replace them with fakes.
 - Frontend tests use Vitest and Testing Library in jsdom (`npm test`), next to the code they test. They stub `fetch`
   with `src/test/fetch.ts` instead of talking to a backend, and render whole pages with `src/test/renderApp.tsx`.
+  Every route has a test that calls `expectNoAxeViolations()` from `src/test/axe.ts`, once with the page loaded and
+  again with its forms filled and its dialogs and menus open (`{ popup: true }`). A new page gets one as well.
 
 ## Configuration and secrets
 

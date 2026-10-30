@@ -51,7 +51,9 @@ export function OpenVotesCard() {
                 <TableHead>Rolle und Kanal</TableHead>
                 <TableHead>Ende</TableHead>
                 <TableHead>Beteiligung</TableHead>
-                <TableHead className="w-0" />
+                <TableHead className="w-0">
+                  <span className="sr-only">Aktionen</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
