@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.ExpectedCount.times
 import org.springframework.test.web.client.MockRestServiceServer
+import org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
@@ -132,6 +133,96 @@ class RestWareraClientTest {
             client.getMilitaryUnit("m1"),
         )
         server.verify()
+    }
+
+    @Test
+    fun `users are loaded in batches, each entry with its own result`() {
+        server
+            .expect(
+                requestTo(
+                    "https://warera.test/trpc/user.getUserLite,user.getUserLite,user.getUserLite?batch=1&input=" +
+                        "%7B%220%22%3A%7B%22userId%22%3A%22u1%22%7D%2C%221%22%3A%7B%22userId%22%3A%22u9%22%7D%2C%222%22%3A%7B%22userId%22%3A%22u2%22%7D%7D",
+                ),
+            ).andRespond(
+                withStatus(HttpStatus.MULTI_STATUS)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(
+                        """[{"result":{"data":$USER_U1}},""" +
+                            """{"error":{"message":"Users not found.","code":-32004,"data":{"code":"NOT_FOUND","httpStatus":404}}},""" +
+                            """{"result":{"data":{"_id":"u2"}}}]""",
+                    ),
+            )
+
+        val users = client.getUsers(listOf("u1", "u9", "u2", "u1"))
+
+        assertEquals(listOf("u1", "u9", "u2"), users.keys.toList())
+        assertEquals(WareraUser(id = "u1", username = "Luftiger"), users.getValue("u1").getOrThrow())
+        assertTrue(users.getValue("u9").exceptionOrNull() is WareraNotFoundException)
+        assertTrue(users.getValue("u2").exceptionOrNull() is WareraSchemaException)
+        server.verify()
+    }
+
+    @Test
+    fun `a batch in which every user fails is still read entry by entry`() {
+        server
+            .expect(queryParam("batch", "1"))
+            .andRespond(
+                withStatus(HttpStatus.NOT_FOUND)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("""[{"error":{"message":"Users not found.","data":{"httpStatus":404}}}]"""),
+            )
+
+        assertTrue(client.getUsers(listOf("u9")).getValue("u9").exceptionOrNull() is WareraNotFoundException)
+        server.verify()
+    }
+
+    @Test
+    fun `more users than fit in one batch take several requests`() {
+        val ids = (1..RestWareraClient.USER_BATCH_SIZE + 1).map { "u$it" }
+        server
+            .expect(times(1), queryParam("batch", "1"))
+            .andRespond(
+                withSuccess(
+                    List(RestWareraClient.USER_BATCH_SIZE) {
+                        """{"result":{"data":$USER_U1}}"""
+                    }.joinToString(",", "[", "]"),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        server
+            .expect(times(1), queryParam("batch", "1"))
+            .andRespond(withSuccess("""[{"result":{"data":$USER_U1}}]""", MediaType.APPLICATION_JSON))
+
+        assertEquals(ids.size, client.getUsers(ids).values.count { it.isSuccess })
+        server.verify()
+    }
+
+    @Test
+    fun `a batch is retried as a whole when rate limited`() {
+        server.expect(times(1), queryParam("batch", "1")).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        server
+            .expect(
+                times(1),
+                queryParam("batch", "1"),
+            ).andRespond(withSuccess("""[{"result":{"data":$USER_U1}}]""", MediaType.APPLICATION_JSON))
+
+        assertTrue(client.getUsers(listOf("u1")).getValue("u1").isSuccess)
+        server.verify()
+    }
+
+    @Test
+    fun `a batch fails as a whole when WarEra is down`() {
+        server.expect(times(3), queryParam("batch", "1")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+
+        assertFailsWith<WareraApiException> { client.getUsers(listOf("u1")) }
+        server.verify()
+    }
+
+    @Test
+    fun `a batch answer with a different number of entries is a schema error`() {
+        server.expect(queryParam("batch", "1")).andRespond(withSuccess("""[{"result":{"data":$USER_U1}}]""", MediaType.APPLICATION_JSON))
+
+        assertFailsWith<WareraSchemaException> { client.getUsers(listOf("u1", "u2")) }
     }
 
     @Test
@@ -368,5 +459,9 @@ class RestWareraClientTest {
         }
         assertTrue(maxInMinute <= RestWareraClient.WARERA_LIMIT_PER_MINUTE, "$maxInMinute calls in one sliding minute")
         assertTrue(maxInMinute >= 80, "only $maxInMinute calls in one sliding minute, the limiter is too strict")
+    }
+
+    private companion object {
+        const val USER_U1 = """{"_id":"u1","username":"Luftiger","country":null,"militaryRank":0,"leveling":{"level":0}}"""
     }
 }

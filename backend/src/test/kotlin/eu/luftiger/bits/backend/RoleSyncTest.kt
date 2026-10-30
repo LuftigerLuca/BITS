@@ -485,6 +485,20 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `a sync of all members loads the users in batches`() {
+        link("1", "w1")
+        link("2", "w2")
+        createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
+        awaitEvents(1)
+        warera.userBatches.clear()
+
+        syncTrigger.hourly()
+        awaitEvents(2)
+
+        assertEquals(listOf(setOf("w1", "w2")), warera.userBatches.map { it.toSet() })
+    }
+
+    @Test
     fun `rule change reuses the WarEra data of the last sync, the hourly sync loads it again`() {
         link("1", "w1")
         createRule("""{"roleId":"r-veteran","blocks":[[{"type":"LEVEL","threshold":10}]]}""")
@@ -1537,6 +1551,9 @@ class RoleSyncTest {
         /** Users WarEra no longer knows. */
         val deletedUsers = mutableSetOf<String>()
         val lookups = CopyOnWriteArrayList<String>()
+
+        /** The user IDs of each call of [getUsers], i.e. of each batch request. */
+        val userBatches = CopyOnWriteArrayList<List<String>>()
         private val heldUsers = ConcurrentHashMap.newKeySet<String>()
         private var gate = CountDownLatch(0)
 
@@ -1576,6 +1593,7 @@ class RoleSyncTest {
         fun reset() {
             release()
             lookups.clear()
+            userBatches.clear()
             users.clear()
             users["w1"] = WareraUser("w1", "Luftiger", country = "de", mu = "m1", militaryRank = 40, leveling = WareraUser.Leveling(30))
             users["w2"] = WareraUser("w2", "Other", country = "fr", leveling = WareraUser.Leveling(3))
@@ -1622,6 +1640,11 @@ class RoleSyncTest {
                 if (userId in deletedUsers) throw WareraNotFoundException("no such user")
                 users.getValue(userId)
             }
+
+        override fun getUsers(userIds: Collection<String>): Map<String, Result<WareraUser>> {
+            available { userBatches += userIds.toList() }
+            return super.getUsers(userIds)
+        }
 
         override fun getCompanyIds(userId: String) =
             available {

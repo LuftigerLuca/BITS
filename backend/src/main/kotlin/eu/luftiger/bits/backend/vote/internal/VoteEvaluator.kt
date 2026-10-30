@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Works out the result of a vote once the bot has reported the members of the role at the end, on a thread of its own,
  * one vote at a time. The country of everybody who could vote is taken from the last role sync, see [MemberCountries],
- * so it may be up to an hour old; only users the sync did not load are loaded from WarEra, about one per second.
+ * so it may be up to an hour old; only users the sync did not load are loaded from WarEra, in batches.
  *
  * Eligible are the members of the role at the end who are linked, or who voted while they were; the ballots of members
  * who lost the role are dropped. Everybody counts for the party of their country of citizenship they are a member of,
@@ -158,14 +158,12 @@ class VoteEvaluator(
         val synced = memberCountries.byWareraUserId()
         val countries = HashMap<String, String?>()
         wareraUserIds.filter { it in synced }.associateWithTo(countries) { synced[it] }
-        wareraUserIds.filter { it !in synced }.forEachIndexed { index, id ->
-            if (index > 0 && !properties.userLookupInterval.isZero) Thread.sleep(properties.userLookupInterval)
-            countries[id] =
-                try {
-                    wareraClient.getUser(id).country
-                } catch (_: WareraNotFoundException) {
-                    null
-                }
+        val missing = wareraUserIds.filter { it !in synced }
+        if (missing.isNotEmpty()) {
+            wareraClient.getUsers(missing).forEach { (id, result) ->
+                countries[id] =
+                    result.fold({ it.country }) { e -> if (e is WareraNotFoundException) null else throw e }
+            }
         }
         val partiesByCountry =
             countries.values
