@@ -49,6 +49,8 @@ function SearchableSelect({
   "aria-describedby"?: string
 }) {
   const [query, setQuery] = React.useState("")
+  // The open list is a dialog and needs a name; it takes the one of the field's label.
+  const [label, setLabel] = React.useState<string | undefined>()
   const byValue = React.useMemo(() => new Map(items.map((item) => [item.value, item])), [items])
   const values = React.useMemo(() => items.map((item) => item.value), [items])
 
@@ -61,6 +63,7 @@ function SearchableSelect({
       onInputValueChange={setQuery}
       onOpenChange={(open) => {
         if (!open) setQuery("")
+        else setLabel(id ? (document.querySelector(`label[for="${id}"]`)?.textContent ?? undefined) : undefined)
       }}
       itemToStringLabel={(itemValue: string) => byValue.get(itemValue)?.label ?? ""}
       filter={(itemValue: string, search: string) => {
@@ -89,6 +92,7 @@ function SearchableSelect({
         <ComboboxPrimitive.Positioner sideOffset={4} className="isolate z-50">
           <ComboboxPrimitive.Popup
             data-slot="searchable-select-content"
+            aria-label={label ?? "Auswahl"}
             className="relative isolate z-50 flex max-h-[min(var(--available-height),24rem)] w-(--anchor-width) min-w-36 origin-(--transform-origin) flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
           >
             <div className="flex items-center gap-1.5 border-b px-2.5">

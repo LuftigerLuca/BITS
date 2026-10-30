@@ -1,11 +1,11 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Account, AccountRoles, Me } from '@/lib/api'
 import { features, json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: 'Luftiger', discordUser: true }
 
@@ -67,8 +67,8 @@ describe('account page', () => {
     await screen.findByText('Bürger Deutschland')
     expect(screen.getByText('Rollen', { selector: '[data-slot=card-title]' })).toBeInTheDocument()
     expect(rows()).toEqual([
-      ['Bürger Deutschland', 'Erfüllt', 'Staatsbürgerschaft Germany'],
-      ['Veteran', 'Nicht erfüllt', 'Level ab 50 (Level 30 von 50)'],
+      ['Bürger Deutschland', 'Erfüllt', 'Erfüllt: Staatsbürgerschaft Germany'],
+      ['Veteran', 'Nicht erfüllt', 'Nicht erfüllt: Level ab 50 (Level 30 von 50)'],
     ])
     expect(screen.getByRole('link', { name: 'Daten herunterladen' })).toHaveAttribute('href', '/web/account/export')
   })
@@ -195,9 +195,6 @@ describe('account page', () => {
     renderApp('/account')
     await screen.findByText('Bürger Deutschland')
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

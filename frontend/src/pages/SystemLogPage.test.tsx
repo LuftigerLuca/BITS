@@ -1,10 +1,10 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Me, SystemLogEntry, SystemLogItem } from '@/lib/api'
 import { json, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -168,9 +168,6 @@ describe('system log page', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Details anzeigen' }))
     await screen.findByText('Veteran')
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

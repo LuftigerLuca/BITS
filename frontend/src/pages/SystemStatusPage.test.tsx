@@ -1,10 +1,10 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Me, SystemStatus } from '@/lib/api'
 import { json, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -234,9 +234,6 @@ describe('system status page', () => {
     renderApp('/admin/system-status')
     await screen.findByText('12 / 90')
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

@@ -1,10 +1,10 @@
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: null, discordUser: true }
 const admin: Me = { ...member, role: 'ADMIN' }
@@ -15,7 +15,7 @@ describe('guards', () => {
 
     const router = renderApp('/')
 
-    expect(await screen.findByRole('button', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
     expect(screen.queryByText(/Sitzung ist abgelaufen/)).not.toBeInTheDocument()
   })
@@ -53,7 +53,7 @@ describe('guards', () => {
     expect(await screen.findByText('Dashboard gerade nicht erreichbar')).toBeInTheDocument()
     answer = () => status(401)
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
-    expect(await screen.findByRole('button', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
   })
 
   it('keep a logged-in user when the check after returning to the tab gets no answer', async () => {
@@ -87,8 +87,6 @@ describe('guards', () => {
     renderApp('/')
     await screen.findByText('Willkommen, Luca')
 
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

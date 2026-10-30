@@ -1,9 +1,9 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectNoAxeViolations } from '@/test/axe'
 
 function stubLogin(loginStatus: number) {
   return stubFetch({
@@ -41,7 +41,7 @@ describe('login page', () => {
 
     renderApp('/login')
 
-    await screen.findByRole('button', { name: 'Mit Discord anmelden' })
+    await screen.findByRole('link', { name: 'Mit Discord anmelden' })
     expect(screen.queryByLabelText('Benutzername')).not.toBeInTheDocument()
   })
 
@@ -50,7 +50,7 @@ describe('login page', () => {
 
     renderApp('/login')
 
-    const button = await screen.findByRole('button', { name: 'Mit Discord anmelden' })
+    const button = await screen.findByRole('link', { name: 'Mit Discord anmelden' })
     expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 
@@ -77,9 +77,6 @@ describe('login page', () => {
     renderApp('/login')
     await screen.findByLabelText('Benutzername')
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

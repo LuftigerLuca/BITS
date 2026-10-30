@@ -185,7 +185,17 @@ function useFocusPageOnNavigation() {
   return mainRef
 }
 
-function NavItem({ to, end = false, icon, children }: { to: string; end?: boolean; icon: ReactNode; children: string }) {
+function NavItem({
+  to,
+  end = false,
+  icon,
+  children,
+}: {
+  to: string
+  end?: boolean
+  icon: ReactNode
+  children: string
+}) {
   const active = useMatch({ path: to, end }) !== null
   const { setOpenMobile } = useSidebar()
 
@@ -230,45 +240,48 @@ function UserMenu({ user }: { user: Me }) {
   }
 
   return (
-    <SidebarMenu>
+    <>
+      {/* Outside of the menu, since a list may only hold list items. */}
       {logoutFailed && (
         <p role="alert" className="px-2 text-sm text-destructive">
           Abmelden fehlgeschlagen, versuche es erneut.
         </p>
       )}
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
-            <Avatar size="sm">
-              {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-              <AvatarFallback>{user.name.slice(0, 1).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <span className="flex-1 truncate font-medium">{user.name}</span>
-            <ChevronsUpDownIcon className="ml-auto" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" className="min-w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Theme</DropdownMenuLabel>
-              <DropdownMenuRadioGroup value={theme} onValueChange={(value: Theme) => onThemeChange(value)}>
-                {THEMES.map(({ value, label }) => (
-                  <DropdownMenuRadioItem key={value} value={value}>
-                    {label}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link to="/docs" />}>
-              <BookOpenIcon />
-              Handbuch
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onLogout}>
-              <LogOutIcon />
-              Abmelden
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
+              <Avatar size="sm">
+                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+                <AvatarFallback>{user.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="flex-1 truncate font-medium">{user.name}</span>
+              <ChevronsUpDownIcon className="ml-auto" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" className="min-w-48">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Darstellung</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={theme} onValueChange={(value: Theme) => onThemeChange(value)}>
+                  {THEMES.map(({ value, label }) => (
+                    <DropdownMenuRadioItem key={value} value={value}>
+                      {label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem render={<Link to="/docs" />}>
+                <BookOpenIcon />
+                Handbuch
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onLogout}>
+                <LogOutIcon />
+                Abmelden
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </>
   )
 }

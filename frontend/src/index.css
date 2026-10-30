@@ -59,16 +59,21 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    /* The blue of the login page's digital rain, the same in both themes. White on it reaches 5.0:1. */
+    /*
+     * The blue of the login page's digital rain, the same in both themes. White on it reaches 4.9:1. It is no text
+     * colour: on the dark backgrounds it reaches only 3:1, enough for icons (text-primary) but not for text.
+     */
     --primary: oklch(0.56 0.23 272);
     --primary-foreground: oklch(1 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    /* 4.6:1 on muted, 5:1 on white; shadcn's 0.556 missed 4.5:1 on muted. */
+    --muted-foreground: oklch(0.54 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
+    /* Text in this colour sits on its own tint (destructive buttons and badges); 4.9:1 there, 4.5:1 on the hover tint. */
+    --destructive: oklch(0.5 0.245 27.325);
     /* Status colours for text, icons and borders, always next to an icon or a label. On white they reach 6:1, on their own 10 % tint 5:1. */
     --success: #137333;
     --warning: #a14a06;

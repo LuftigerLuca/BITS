@@ -1,11 +1,11 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { describe, expect, it } from 'vitest'
 import type { Me } from '@/lib/api'
 import { MANUAL_PAGES } from '@/features/manual/manual'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const member: Me = { name: 'Luca', avatarUrl: null, role: 'USER', wareraUsername: null, discordUser: true }
 
@@ -71,9 +71,6 @@ describe('manual', () => {
     renderApp('/docs/mitglieder')
     await screen.findByRole('heading', { level: 1, name: 'Mitglieder' })
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 })

@@ -1,10 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import axe from 'axe-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
+import { expectNoAxeViolations } from '@/test/axe'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 
@@ -198,7 +198,7 @@ describe('layout', () => {
     await openUserMenu()
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Abmelden' }))
 
-    expect(await screen.findByRole('button', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 
@@ -247,10 +247,7 @@ describe('layout', () => {
     renderApp('/admin/audit-log')
     await screen.findByText('Noch keine Einträge')
 
-    // jsdom does not lay out the page, so contrast is left to the browser.
-    const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations()
   })
 
   it('has no accessibility violations axe can find without a browser with the user menu open', async () => {
@@ -259,12 +256,6 @@ describe('layout', () => {
 
     await openUserMenu()
     await screen.findByRole('menu')
-    // jsdom does not lay out the page, so contrast is left to the browser. The open menu is rendered at the end of
-    // the body like every popup, outside the landmarks; the guards tests check the landmarks with the menu closed.
-    const results = await axe.run(document.body, {
-      rules: { 'color-contrast': { enabled: false }, region: { enabled: false } },
-    })
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([])
+    await expectNoAxeViolations(document.body, { popup: true })
   })
 })
