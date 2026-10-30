@@ -1,10 +1,12 @@
 package eu.luftiger.bits.backend.shared
 
+import eu.luftiger.bits.warera.WareraCallListener
 import eu.luftiger.bits.warera.WareraClient
 import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraParty
+import eu.luftiger.bits.warera.WareraProcedure
 import eu.luftiger.bits.warera.WareraUser
 import java.time.Clock
 import java.time.Duration
@@ -21,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
  * who changed something in WarEra sees it in BITS after a short while. Errors are not kept.
  *
  * A hit never waits. A miss waits only for a load of the same key, which may take seconds behind the rate limiter, so
- * that one key is loaded once however many callers ask at the same time.
+ * that one key is loaded once however many callers ask at the same time. [listener] learns about every lookup; one that
+ * finds the answer after waiting for such a load counts as a hit, since it calls nobody.
  */
 class CachingWareraClient(
     private val delegate: WareraClient,
@@ -30,12 +33,13 @@ class CachingWareraClient(
     private val militaryUnitTtl: Duration = Duration.ofMinutes(10),
     private val countryDetailsTtl: Duration = Duration.ofMinutes(10),
     private val userTtl: Duration = Duration.ofMinutes(2),
+    private val listener: WareraCallListener = WareraCallListener.NONE,
 ) : WareraClient by delegate {
-    private val countries = Cache<List<WareraCountry>>(countriesTtl)
-    private val militaryUnits = Cache<WareraMilitaryUnit>(militaryUnitTtl)
-    private val parties = Cache<List<WareraParty>>(countryDetailsTtl)
-    private val governments = Cache<WareraGovernment>(countryDetailsTtl)
-    private val users = Cache<WareraUser>(userTtl)
+    private val countries = Cache<List<WareraCountry>>(WareraProcedure.ALL_COUNTRIES, countriesTtl)
+    private val militaryUnits = Cache<WareraMilitaryUnit>(WareraProcedure.MILITARY_UNIT, militaryUnitTtl)
+    private val parties = Cache<List<WareraParty>>(WareraProcedure.PARTIES, countryDetailsTtl)
+    private val governments = Cache<WareraGovernment>(WareraProcedure.GOVERNMENT, countryDetailsTtl)
+    private val users = Cache<WareraUser>(WareraProcedure.USER, userTtl)
 
     override fun getAllCountries(): List<WareraCountry> = countries.load(ALL) { delegate.getAllCountries() }
 
@@ -51,12 +55,14 @@ class CachingWareraClient(
     override fun getUsers(userIds: Collection<String>): Map<String, Result<WareraUser>> {
         val cached = userIds.distinct().associateWith { users.fresh(it) }
         val missing = cached.filterValues { it == null }.keys
+        cached.values.forEach { listener.cacheLookup(WareraProcedure.USER, hit = it != null) }
         val loaded = if (missing.isEmpty()) emptyMap() else delegate.getUsers(missing)
         loaded.forEach { (id, result) -> result.onSuccess { users.put(id, it) } }
         return cached.mapValues { (id, user) -> if (user != null) Result.success(user) else loaded.getValue(id) }
     }
 
     private inner class Cache<T>(
+        private val procedure: String,
         private val ttl: Duration,
     ) {
         private val entries = ConcurrentHashMap<String, Cached<T>>()
@@ -68,13 +74,19 @@ class CachingWareraClient(
             key: String,
             loader: (String) -> T,
         ): T {
-            fresh(key)?.let { return it }
+            fresh(key)?.let { return hit(it) }
             synchronized(locks.computeIfAbsent(key) { Any() }) {
                 // Another caller may have loaded it while this one waited.
-                fresh(key)?.let { return it }
+                fresh(key)?.let { return hit(it) }
+                listener.cacheLookup(procedure, hit = false)
                 entries.values.removeIf { !it.isFresh() }
                 return loader(key).also { entries[key] = Cached(it, clock.instant().plus(ttl)) }
             }
+        }
+
+        private fun hit(value: T): T {
+            listener.cacheLookup(procedure, hit = true)
+            return value
         }
 
         fun fresh(key: String): T? = entries[key]?.takeIf { it.isFresh() }?.value

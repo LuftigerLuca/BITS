@@ -80,3 +80,11 @@ role and nickname changes Discord refused or the bot could not make, events move
 A sync the bot does not report back on within 15 minutes shows as "Keine Rückmeldung vom Bot", which is what a bot or
 Redis outage looks like there. Without Postgres or the backend, nothing is recorded; the bot keeps its reports for
 about an hour.
+
+The page "System-Status" shows the state itself. Postgres and Redis are checked every 15 seconds on a thread of
+their own, so the page loads at once while Postgres is down and shows the last sizes it read. WarEra is not asked for
+the page: its state follows from the last real call, so while BITS makes none, the page only shows when the last
+contact was. The bot sends a heartbeat every 30 seconds and counts as down after 90 seconds without one; a heartbeat
+the backend misses loses nothing, since its counts run since the bot started. All counts live in the memory of the
+backend and start from zero after a restart (ADR 0010). While Redis or the backend is down, the dashboard does not
+open at all and cannot show the page; it says that BITS cannot be reached.

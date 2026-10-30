@@ -486,6 +486,31 @@ export const MANUAL_PAGES: ManualPage[] = [
         ],
       },
       {
+        id: 'system-status',
+        title: 'System-Status',
+        intro:
+          'Die Seite „System-Status“ zeigt, ob die Teile von BITS laufen und wie viel sie zu tun haben. Sie lädt sich ' +
+          'alle 15 Sekunden neu.',
+        points: [
+          'Oben stehen Datenbank, Redis, WarEra und der Bot, jeweils mit „Erreichbar“ oder „Gestört“, seit wann und ' +
+            'der letzten Störung. Datenbank und Redis prüft BITS alle 15 Sekunden. Der Bot meldet sich alle 30 ' +
+            'Sekunden; bleibt er 90 Sekunden still, gilt er als gestört.',
+          'WarEra fragt BITS dafür nicht eigens, denn jeder Aufruf zählt gegen das Limit. Der Status folgt aus den ' +
+            'letzten echten Aufrufen; ohne Aufruf steht dort, wann der letzte Kontakt war.',
+          '„WarEra-API“: wie viele Requests BITS an WarEra schickt, gemessen an den 90 pro Minute, die es sich erlaubt, ' +
+            'nach Prozedur und danach, wofür sie gebraucht wurden, etwa Rollen-Sync oder Verifizierung. Dazu Fehler, ' +
+            'Wiederholungen, wie oft WarEra BITS bremsen musste und was der Cache gespart hat.',
+          '„Bot ↔ Backend“: die Anfragen des Bots an das Backend, auch aus seiner Sicht mit Zeitüberschreitungen, und ' +
+            'die Events an den Bot mit allem, was noch auf ihn wartet.',
+          'Außerdem: die Verbindung des Bots zu Discord, die Hintergrund-Jobs mit ihrem letzten Lauf sowie Versionen ' +
+            'und Speicher von Backend, Bot, Datenbank und Redis.',
+          'Die Zahlen gelten seit dem letzten Start des Backends, die Verläufe für die letzten 24 Stunden. Nach einem ' +
+            'Neustart beginnen sie bei null.',
+          'Sind das Backend oder Redis ganz weg, öffnet sich das Dashboard nicht; dann zeigt es stattdessen, dass ' +
+            'BITS nicht erreichbar ist.',
+        ],
+      },
+      {
         id: 'safety',
         title: 'Schutz vor Fehlern',
         intro:

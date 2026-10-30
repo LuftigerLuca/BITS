@@ -8,6 +8,8 @@ import eu.luftiger.bits.backend.feature.api.FeatureToggles
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundJob
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundWork
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.modulith.events.ApplicationModuleListener
@@ -33,6 +35,7 @@ class EmbassySyncTrigger(
     private val syncService: EmbassySyncService,
     private val systemLog: SystemLog,
     private val features: FeatureToggles,
+    private val work: BackgroundWork,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val syncs = Executors.newSingleThreadExecutor { Thread(it, "embassy-sync") }
@@ -83,7 +86,7 @@ class EmbassySyncTrigger(
                 (trigger to newWareraUserIds.toSet()).also { newWareraUserIds.clear() }
             }
         try {
-            syncService.sync(trigger, newUsers)
+            work.run(BackgroundJob.EMBASSY_SYNC, trigger.name) { syncService.sync(trigger, newUsers) }
         } catch (e: Exception) {
             log.error("Embassy sync failed", e)
             try {

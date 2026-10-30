@@ -464,4 +464,95 @@ class RestWareraClientTest {
     private companion object {
         const val USER_U1 = """{"_id":"u1","username":"Luftiger","country":null,"militaryRank":0,"leveling":{"level":0}}"""
     }
+
+    @Test
+    fun `tells the listener about every request, retries included, and about throttled calls`() {
+        val requests = mutableListOf<Pair<String, Int?>>()
+        val throttled = mutableListOf<String>()
+        val retried = mutableListOf<String>()
+        val listener =
+            object : WareraCallListener {
+                override fun requestSent(
+                    procedure: String,
+                    status: Int?,
+                    permitWait: Duration,
+                    duration: Duration,
+                ) {
+                    requests += procedure to status
+                }
+
+                override fun throttled(procedure: String) {
+                    throttled += procedure
+                }
+
+                override fun retried(procedure: String) {
+                    retried += procedure
+                }
+            }
+        val builder = RestClient.builder().baseUrl("https://warera.test/trpc")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val limiter = RestWareraClient.defaultRateLimiter(period = Duration.ofHours(1), timeout = Duration.ZERO)
+        val client = RestWareraClient(builder.build(), limiter, RestWareraClient.defaultRetry(Duration.ofMillis(1)), listener)
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond { throw java.io.IOException("connection reset") }
+        server
+            .expect(requestTo("https://warera.test/trpc/country.getAllCountries"))
+            .andRespond(withSuccess("""{"result":{"data":[]}}""", MediaType.APPLICATION_JSON))
+
+        client.getAllCountries()
+        // The limiter allows three calls per period, all of which went to the retries above.
+        assertFailsWith<WareraApiException> { client.getAllCountries() }
+
+        assertEquals(
+            listOf("country.getAllCountries" to 429, "country.getAllCountries" to null, "country.getAllCountries" to 200),
+            requests,
+        )
+        assertEquals(listOf("country.getAllCountries"), throttled)
+        assertEquals(listOf("country.getAllCountries", "country.getAllCountries"), retried)
+        server.verify()
+    }
+
+    @Test
+    fun `a batch counts as one request with the status of its answer`() {
+        val requests = mutableListOf<Pair<String, Int?>>()
+        val listener =
+            object : WareraCallListener {
+                override fun requestSent(
+                    procedure: String,
+                    status: Int?,
+                    permitWait: Duration,
+                    duration: Duration,
+                ) {
+                    requests += procedure to status
+                }
+            }
+        val builder = RestClient.builder().baseUrl("https://warera.test/trpc")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val client = RestWareraClient(builder.build(), retry = RestWareraClient.defaultRetry(Duration.ofMillis(1)), listener = listener)
+        server
+            .expect(
+                requestTo(
+                    "https://warera.test/trpc/user.getUserLite,user.getUserLite?batch=1&input=" +
+                        "%7B%220%22%3A%7B%22userId%22%3A%22u1%22%7D%2C%221%22%3A%7B%22userId%22%3A%22u2%22%7D%7D",
+                ),
+            ).andRespond(
+                withStatus(HttpStatus.MULTI_STATUS)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(
+                        """[{"result":{"data":{"_id":"u1","username":"Luftiger",""" +
+                            """"country":null,"militaryRank":0,"leveling":{"level":0}}}},""" +
+                            """{"error":{"data":{"httpStatus":404}}}]""",
+                    ),
+            )
+
+        val users = client.getUsers(listOf("u1", "u2"))
+
+        assertTrue(users.getValue("u1").isSuccess)
+        assertEquals(listOf<Pair<String, Int?>>("user.getUserLite" to 207), requests)
+        server.verify()
+    }
 }

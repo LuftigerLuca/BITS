@@ -1,6 +1,9 @@
 package eu.luftiger.bits.bot.backend
 
+import eu.luftiger.bits.bot.status.BackendCallCounter
+import eu.luftiger.bits.bot.status.BackendCallCounter.Outcome
 import eu.luftiger.bits.shared.BitsJson
+import eu.luftiger.bits.shared.BotHeartbeat
 import eu.luftiger.bits.shared.BotPresence
 import eu.luftiger.bits.shared.CastVoteRequest
 import eu.luftiger.bits.shared.CastVoteResponse
@@ -52,9 +55,13 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.ServerResponseException
+import io.ktor.client.plugins.api.Send
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.bearerAuth
@@ -65,26 +72,32 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.encodedPath
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import java.time.Duration
 
-/** [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend] and [PresenceBackend] that authenticate with the
- * service token of the bot.
+/**
+ * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [PresenceBackend] and [HeartbeatBackend] that
+ * authenticate with the service token of the bot. [calls] counts every request and how it ended.
  */
 class KtorBackendClient(
     baseUrl: String,
     serviceToken: String,
     engine: HttpClientEngine = CIO.create(),
     requestTimeout: Duration = REQUEST_TIMEOUT,
+    private val calls: BackendCallCounter = BackendCallCounter(),
 ) : BackendClient,
     VoteBackend,
     EmbassyBackend,
     FeatureBackend,
     PresenceBackend,
+    HeartbeatBackend,
     AutoCloseable {
     private val http =
         HttpClient(engine) {
             expectSuccess = true
+            install(callCounting(calls))
             install(HttpTimeout) {
                 connectTimeoutMillis = CONNECT_TIMEOUT.toMillis()
                 requestTimeoutMillis = requestTimeout.toMillis()
@@ -220,6 +233,13 @@ class KtorBackendClient(
 
     override suspend fun botPresence(): BotPresence = http.get("api/bot-presence").body()
 
+    override suspend fun heartbeat(heartbeat: BotHeartbeat) {
+        http.post("api/bot-heartbeat") {
+            contentType(ContentType.Application.Json)
+            setBody(heartbeat)
+        }
+    }
+
     override suspend fun startVote(request: StartVoteRequest): StartVoteResponse = post("api/votes", request)
 
     override suspend fun openVotes(): List<OpenVote> = http.get("api/votes/open").body<OpenVotesResponse>().votes
@@ -300,3 +320,24 @@ class KtorBackendClient(
         val REQUEST_TIMEOUT: Duration = Duration.ofMinutes(1)
     }
 }
+
+/** Counts every request to the backend in [calls], with how it ended. */
+private fun callCounting(calls: BackendCallCounter) =
+    createClientPlugin("BackendCallCounting") {
+        on(Send) { request ->
+            val method = request.method.value
+            val path = request.url.encodedPath
+            try {
+                proceed(request).also { call ->
+                    val outcome = if (call.response.status.value >= 400) Outcome.FAILED else Outcome.SUCCEEDED
+                    calls.record(method, path, outcome)
+                }
+            } catch (e: Throwable) {
+                // HttpTimeout cancels the request and only outside of this hook turns that into its own exception.
+                // A request cancelled on shutdown counts as well, but no heartbeat reports it any more.
+                val timedOut = e is CancellationException || e is ConnectTimeoutException || e is SocketTimeoutException
+                calls.record(method, path, if (timedOut) Outcome.TIMED_OUT else Outcome.UNREACHABLE)
+                throw e
+            }
+        }
+    }

@@ -11,6 +11,8 @@ import eu.luftiger.bits.backend.rolesync.internal.RoleSyncService.FormerAccount
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundJob
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundWork
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.modulith.events.ApplicationModuleListener
@@ -51,6 +53,7 @@ class RoleSyncTrigger(
     private val systemLog: SystemLog,
     private val features: FeatureToggles,
     private val statusRoles: StatusRoleLookup,
+    private val work: BackgroundWork,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val syncs = Executors.newSingleThreadExecutor { Thread(it, "role-sync") }
@@ -144,7 +147,7 @@ class RoleSyncTrigger(
         val withWareraData = WARERA_FEATURES.any(features::isEnabled)
         refreshes.execute {
             try {
-                if (withWareraData) syncService.refreshUsers()
+                if (withWareraData) work.run(BackgroundJob.ROLE_SYNC_REFRESH) { syncService.refreshUsers() }
                 syncAllWithCachedData()
             } catch (e: Exception) {
                 log.error("Role sync refresh failed", e)
@@ -234,7 +237,7 @@ class RoleSyncTrigger(
         sync: () -> Unit,
     ) {
         try {
-            sync()
+            work.run(BackgroundJob.ROLE_SYNC, trigger.name, sync)
         } catch (e: Exception) {
             log.error("Role sync failed", e)
             try {

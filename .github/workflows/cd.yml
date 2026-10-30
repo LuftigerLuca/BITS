@@ -48,8 +48,8 @@ jobs:
       # deployment leaves the previous images untouched.
       - name: Build the images
         run: |
-          docker build -t "$IMAGE_PREFIX-backend:$GITHUB_SHA" -f backend/Dockerfile .
-          docker build -t "$IMAGE_PREFIX-bot:$GITHUB_SHA" -f bot/Dockerfile .
+          docker build -t "$IMAGE_PREFIX-backend:$GITHUB_SHA" --build-arg BITS_VERSION="$GITHUB_SHA" -f backend/Dockerfile .
+          docker build -t "$IMAGE_PREFIX-bot:$GITHUB_SHA" --build-arg BITS_VERSION="$GITHUB_SHA" -f bot/Dockerfile .
           docker build -t "$IMAGE_PREFIX-frontend:$GITHUB_SHA" frontend
 
       # Flyway migrates on startup, and rolling back the images does not undo a migration, so the database as it was

@@ -20,8 +20,8 @@ export function UnavailablePage() {
         <CardHeader>
           <CardTitle as="h1">Dashboard gerade nicht erreichbar</CardTitle>
           <CardDescription>
-            BITS antwortet gerade nicht, zum Beispiel während eines Updates. Versuche es in ein paar Sekunden noch
-            einmal.
+            BITS antwortet gerade nicht, zum Beispiel während eines Updates. Ist es länger so, sind das Backend oder
+            Redis nicht erreichbar, ohne die das Dashboard nicht arbeitet. Versuche es in ein paar Sekunden noch einmal.
           </CardDescription>
         </CardHeader>
         <CardFooter>

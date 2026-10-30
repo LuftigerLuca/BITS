@@ -25,6 +25,9 @@ import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.presence.PresenceUpdater
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
+import eu.luftiger.bits.bot.status.BackendCallCounter
+import eu.luftiger.bits.bot.status.DiscordRequestCounter
+import eu.luftiger.bits.bot.status.HeartbeatReporter
 import eu.luftiger.bits.bot.systemlog.SystemLogReporter
 import eu.luftiger.bits.bot.votes.VoteButtons
 import eu.luftiger.bits.bot.votes.VoteCommand
@@ -54,6 +57,7 @@ import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.requests.GatewayIntent
 import net.dv8tion.jda.api.utils.ChunkingFilter
 import net.dv8tion.jda.api.utils.MemberCachePolicy
+import net.dv8tion.jda.internal.utils.IOUtil
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -70,7 +74,9 @@ fun main() {
     val config = BotConfig.fromEnv()
     val job = SupervisorJob()
     val scope = CoroutineScope(job + Dispatchers.IO)
-    val backend = KtorBackendClient(config.backendUrl, config.serviceToken)
+    val backendCalls = BackendCallCounter()
+    val discordRequests = DiscordRequestCounter()
+    val backend = KtorBackendClient(config.backendUrl, config.serviceToken, calls = backendCalls)
     val redis = RedisClient.create(config.redisUrl)
     val roleReporter = RoleReporter(config.guildId, backend, scope)
     val memberReporter = MemberReporter(config.guildId, backend, scope)
@@ -87,6 +93,8 @@ fun main() {
             .enableIntents(GatewayIntent.GUILD_MEMBERS)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .setChunkingFilter(ChunkingFilter.ALL)
+            // The builder JDA would take itself, so its timeouts and pools stay, with the requests counted.
+            .setHttpClientBuilder(IOUtil.newHttpClientBuilder().addInterceptor(discordRequests))
             .addEventListeners(
                 PingCommand(backend, scope),
                 // Commands of a feature an admin switched off answer with a hint. Votes that are open run to their end,
@@ -136,6 +144,7 @@ fun main() {
     threadReporter.reportPeriodically(guild)
     val presence = PresenceUpdater(jda, backend, scope)
     presence.loadOnStart()
+    HeartbeatReporter(jda, config.guildId, backend, backendCalls, discordRequests, config.version, scope).reportPeriodically()
 
     val logging = LoggingEventHandler()
     val systemLog = SystemLogReporter(backend, scope, backend)

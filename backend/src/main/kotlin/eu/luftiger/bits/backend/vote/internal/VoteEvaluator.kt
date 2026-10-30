@@ -5,6 +5,8 @@ import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.rolesync.api.MemberCountries
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundJob
+import eu.luftiger.bits.backend.systemstatus.api.BackgroundWork
 import eu.luftiger.bits.backend.vote.domain.Ballot
 import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Elector
@@ -56,6 +58,7 @@ class VoteEvaluator(
     private val transactionTemplate: TransactionTemplate,
     private val properties: VoteProperties,
     private val clock: Clock,
+    private val work: BackgroundWork,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "vote-evaluation") }
@@ -67,7 +70,7 @@ class VoteEvaluator(
         if (!queued.add(voteId)) return
         executor.execute {
             try {
-                evaluate(voteId)
+                work.run(BackgroundJob.VOTE_EVALUATION) { evaluate(voteId) }
             } catch (e: Exception) {
                 log.error("Evaluation of vote {} failed", voteId, e)
             } finally {

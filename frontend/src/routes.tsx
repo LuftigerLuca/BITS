@@ -67,6 +67,10 @@ export const routes: RouteObject[] = [
                 path: 'admin/system-log',
                 lazy: async () => ({ Component: (await import('./pages/SystemLogPage.tsx')).SystemLogPage }),
               },
+              {
+                path: 'admin/system-status',
+                lazy: async () => ({ Component: (await import('./pages/SystemStatusPage.tsx')).SystemStatusPage }),
+              },
             ],
           },
         ],
