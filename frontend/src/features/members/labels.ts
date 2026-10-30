@@ -1,4 +1,6 @@
-import { ApiError, type LogEntryType, type MemberLogEvent } from '@/lib/api'
+import { type MemberLogEvent } from './api'
+import { type LogEntryType } from '@/features/system-log/api'
+import { ApiError } from '@/lib/api'
 import { OUTCOMES, TRIGGERS } from '@/features/system-log/labels'
 
 /** Short names of the entries that are no sync, for the events of one member. */

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMember, getMemberRoles, searchMembers, syncMember, unlinkMember } from '@/lib/api'
+import { getMember, getMemberRoles, searchMembers, syncMember, unlinkMember } from './api'
 import { notify } from '@/lib/notify'
 import { UNLINK_ERROR, syncErrorMessage } from './labels'
 

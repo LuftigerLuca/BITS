@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
-import type { CountryOverview } from '@/lib/api'
+import type { CountryOverview } from './api'
 import { ERROR_MESSAGE, formatCount } from './labels'
 import { useOverview } from './queries'
 

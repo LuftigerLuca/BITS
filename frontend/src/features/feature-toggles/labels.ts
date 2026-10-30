@@ -1,4 +1,4 @@
-import type { Feature } from '@/lib/api'
+import type { Feature } from './api'
 
 /** In the order of the card; the backend names them the same in the audit log. */
 export const FEATURES: Record<Feature, { label: string; description: string }> = {

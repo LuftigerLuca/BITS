@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { Embassies, EmbassyCreation, EmbassyThread } from '@/lib/api'
+import type { Embassies, EmbassyCreation, EmbassyThread } from './api'
 import { useCountries } from '@/lib/countries'
 import { errorMessage, MAX_THREAD_NAME_LENGTH, threadName } from './labels'
 import {

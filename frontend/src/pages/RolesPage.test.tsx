@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { json, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectNoAxeViolations } from '@/test/axe'
-import type { DiscordRole, Me, RoleRule } from '@/lib/api'
+import type { DiscordRole, RoleRule } from '@/features/role-sync/api'
+import type { Me } from '@/lib/api'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 

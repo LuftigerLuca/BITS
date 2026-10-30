@@ -1,4 +1,5 @@
-import { ApiError, type AccountRoleOutcome } from '@/lib/api'
+import { type AccountRoleOutcome } from './api'
+import { ApiError } from '@/lib/api'
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getBotPresence, setBotPresence, type BotPresence } from '@/lib/api'
+import { getBotPresence, setBotPresence, type BotPresence } from './api'
 import { notify } from '@/lib/notify'
 import { saveErrorMessage } from './labels'
 

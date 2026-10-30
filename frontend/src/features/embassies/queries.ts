@@ -11,7 +11,7 @@ import {
   setEmbassySettings,
   unassignEmbassyThread,
   type EmbassySettings,
-} from '@/lib/api'
+} from './api'
 import { notify } from '@/lib/notify'
 import { CANNOT_VIEW, errorMessage } from './labels'
 

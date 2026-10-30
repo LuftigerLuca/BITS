@@ -201,7 +201,8 @@ What these flows show:
   `pages/` holds only what a route renders, `features/<feature>/` the components, queries and texts of one feature
   (e.g. `features/role-sync/`), `components/` what several features share, and `components/ui` the shadcn
   components. UI building blocks come from shadcn/ui. If one is missing, add it with the shadcn CLI instead of
-  building it yourself; custom markup is limited to layout. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
+  building it yourself; custom markup is limited to layout. Requests and their types live in the feature's `api.ts`;
+  `lib/api.ts` holds only what all features need (`request`, `ApiError`, login). Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
   mutation invalidates what it changes instead of reloading by hand. Coming back to the window reloads nothing, as many
   requests make the backend ask WarEra; a card with WarEra data offers a `RefreshButton`, and a query that reads the
   database only may set `refetchOnWindowFocus: true`. While data loads or after it failed, show

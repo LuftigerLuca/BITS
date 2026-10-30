@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { getCountries } from '@/lib/api'
+import { request, type Option } from '@/lib/api'
+
+const ROLE_SYNC = '/web/admin/role-sync'
+
+export async function getCountries(): Promise<Option[]> {
+  return (await request(`${ROLE_SYNC}/countries`)).json()
+}
 
 /**
  * The countries of WarEra hardly ever change, so they are loaded once per visit, and only when needed. Shared by the

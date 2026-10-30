@@ -1,4 +1,5 @@
-import { ApiError, type BotActivityType, type BotStatus } from '@/lib/api'
+import { type BotActivityType, type BotStatus } from './api'
+import { ApiError } from '@/lib/api'
 
 export const STATUS: Record<BotStatus, string> = {
   ONLINE: 'Online',

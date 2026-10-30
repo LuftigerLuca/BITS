@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldGroup, FieldLabel, FieldLegend, FieldSet, Field } from '@/components/ui/field'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { VoteOptions } from '@/lib/api'
+import type { VoteOptions } from './api'
 import { errorMessage } from './labels'
 import { useSetVoteManagerRoles, useVoteManagerRoles, useVoteOptions } from './queries'
 

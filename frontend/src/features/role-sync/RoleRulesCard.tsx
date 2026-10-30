@@ -16,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { RoleRule } from '@/lib/api'
+import type { RoleRule } from './api'
 import { STATUS, errorMessage } from './labels'
 import { RulePreview } from './RulePreview'
 import { useDeleteRoleRule, useDeletionPreview, useRoleRules } from './queries'

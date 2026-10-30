@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { ThresholdChoice } from '@/lib/api'
+import type { ThresholdChoice } from './api'
 import { DEFAULT_DURATION_MILLIS, THRESHOLD_CHOICE, errorMessage, toLocalInput } from './labels'
 import { useCreateVote, useVoteOptions } from './queries'
 

@@ -1,7 +1,7 @@
 import { CirclePauseIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import type { Feature } from '@/lib/api'
+import type { Feature } from './api'
 import { useFeatureEnabled } from './queries'
 
 /**

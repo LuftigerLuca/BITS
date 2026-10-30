@@ -25,7 +25,7 @@ import {
   type CreateRoleRule,
   type DiscordRole,
   type RoleRule,
-} from '@/lib/api'
+} from './api'
 import { ConditionFields } from './ConditionFields'
 import { blocksOf, draftsOf, needsCountry, newDraft, toCondition, type ConditionDraft } from './conditionDraft'
 import { errorMessage } from './labels'

@@ -1,7 +1,7 @@
 import { DownloadIcon } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ACCOUNT_EXPORT_URL } from '@/lib/api'
+import { ACCOUNT_EXPORT_URL } from './api'
 
 /** The member's own data request, without asking an admin. */
 export function DataCard() {

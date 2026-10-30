@@ -5,7 +5,7 @@ import { RoleName } from '@/components/RoleName'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { AccountRole } from '@/lib/api'
+import type { AccountRole } from './api'
 import { OUTCOMES, rolesErrorMessage } from './labels'
 import { useAccountRoles } from './queries'
 

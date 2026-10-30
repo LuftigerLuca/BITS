@@ -4,7 +4,7 @@ import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import type { PreviewMember, RulePreview as RulePreviewData } from '@/lib/api'
+import type { PreviewMember, RulePreview as RulePreviewData } from './api'
 import { errorMessage } from './labels'
 
 /** Whom a rule change gives the role and from whom it takes it, shown before the admin confirms it. */

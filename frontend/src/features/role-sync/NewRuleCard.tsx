@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { RoleRule } from '@/lib/api'
+import type { RoleRule } from './api'
 import { NewRuleForm } from './NewRuleForm'
 import { errorMessage } from './labels'
 import { useRoleRules, useRoles } from './queries'

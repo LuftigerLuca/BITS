@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getOverview, getOverviewHistory, setOverviewCountry } from '@/lib/api'
+import { getOverview, getOverviewHistory, setOverviewCountry } from './api'
 import { notify } from '@/lib/notify'
 import { RESULT_IMAGE } from '@/features/votes/queries'
 import { countryErrorMessage } from './labels'

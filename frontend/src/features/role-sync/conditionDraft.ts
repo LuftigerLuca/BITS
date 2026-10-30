@@ -1,4 +1,4 @@
-import type { ConditionType, CreateCondition, GovernmentOffice, MuRole, RuleCondition } from '@/lib/api'
+import type { ConditionType, CreateCondition, GovernmentOffice, MuRole, RuleCondition } from './api'
 import { OFFICES } from './labels'
 
 /** A condition as entered so far; `toCondition` tells whether it is complete. */

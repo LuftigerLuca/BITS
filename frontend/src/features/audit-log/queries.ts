@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { getAuditActors, getAuditLog, type AuditLogFilter } from '@/lib/api'
+import { getAuditActors, getAuditLog, type AuditLogFilter } from './api'
 
 const AUDIT_LOG = ['audit-log'] as const
 

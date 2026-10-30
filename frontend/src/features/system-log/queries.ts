@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { getSystemLog, getSystemLogItems, getSystemLogRoles, type SystemLogFilter } from '@/lib/api'
+import { getSystemLog, getSystemLogItems, getSystemLogRoles, type SystemLogFilter } from './api'
 
 const SYSTEM_LOG = ['system-log'] as const
 

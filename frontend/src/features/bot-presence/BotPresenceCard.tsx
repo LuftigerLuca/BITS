@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MAX_ACTIVITY_TEXT_LENGTH, type BotActivityType, type BotPresence, type BotStatus } from '@/lib/api'
+import { MAX_ACTIVITY_TEXT_LENGTH, type BotActivityType, type BotPresence, type BotStatus } from './api'
 import { ACTIVITY, LOAD_ERROR, STATUS } from './labels'
 import { useBotPresence, useSetBotPresence } from './queries'
 

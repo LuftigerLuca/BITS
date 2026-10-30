@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatTime } from '@/features/system-log/labels'
-import type { ComponentStatus, LatencyStats, StatusComponent, SystemStatus } from '@/lib/api'
+import type { ComponentStatus, LatencyStats, StatusComponent, SystemStatus } from './api'
 import { cn } from '@/lib/utils'
 import {
   CALLERS,

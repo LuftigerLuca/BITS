@@ -13,7 +13,7 @@ import {
   setVoteManagerRoles,
   uploadResultBackground,
   type CreateVote,
-} from '@/lib/api'
+} from './api'
 import { notify } from '@/lib/notify'
 import { backgroundErrorMessage, errorMessage, partyColorsErrorMessage } from './labels'
 

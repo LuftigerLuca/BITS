@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { OFFICES } from '@/features/role-sync/labels'
-import type { Embassies, EmbassySettings, GovernmentOffice } from '@/lib/api'
+import type { Embassies, EmbassySettings } from './api'
+import type { GovernmentOffice } from '@/features/role-sync/api'
 import { CANNOT_VIEW, MAX_THREAD_NAME_LENGTH, PLACEHOLDER, templateError } from './labels'
 import { useSetEmbassySettings } from './queries'
 

@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import type { Dsk, MilitaryUnits } from '@/lib/api'
+import type { Dsk, MilitaryUnits } from './api'
 import { errorMessage } from './labels'
 import {
   useAddMilitaryUnit,

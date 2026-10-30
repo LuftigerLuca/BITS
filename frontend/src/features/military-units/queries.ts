@@ -8,7 +8,7 @@ import {
   searchDskMilitaryUnits,
   updateDsk,
   type DskRequest,
-} from '@/lib/api'
+} from './api'
 import { notify } from '@/lib/notify'
 import { errorMessage } from './labels'
 
