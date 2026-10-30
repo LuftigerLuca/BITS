@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
+import { IconAction } from '@/components/IconAction'
 import { PencilIcon, Trash2Icon } from 'lucide-react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
 import {
   AlertDialog,
@@ -13,7 +14,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { RoleRule } from '@/lib/api'
@@ -32,8 +32,8 @@ export function RoleRulesCard({ onEdit = () => {} }: { onEdit?: (rule: RoleRule)
       <CardHeader>
         <CardTitle>Automatische Rollen</CardTitle>
         <CardDescription>
-          BITS vergibt diese Rollen anhand der WarEra-Daten verknüpfter Accounts und entzieht sie allen, die keine
-          ihrer Regel erfüllen. Von den Blöcken einer Regel genügt einer, die Bedingungen eines Blocks müssen alle erfüllt
+          BITS vergibt diese Rollen anhand der WarEra-Daten verknüpfter Accounts und entzieht sie allen, die keine ihrer
+          Regel erfüllen. Von den Blöcken einer Regel genügt einer, die Bedingungen eines Blocks müssen alle erfüllt
           sein.
         </CardDescription>
       </CardHeader>
@@ -43,7 +43,7 @@ export function RoleRulesCard({ onEdit = () => {} }: { onEdit?: (rule: RoleRule)
         ) : rules.isError ? (
           <ErrorState message={errorMessage(rules.error)} onRetry={() => rules.refetch()} />
         ) : rules.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Regeln angelegt.</p>
+          <EmptyState title="Noch keine Regeln angelegt" description="Lege unter „Neue Regel“ die erste an." />
         ) : (
           <Table>
             <TableHeader>
@@ -74,24 +74,17 @@ export function RoleRulesCard({ onEdit = () => {} }: { onEdit?: (rule: RoleRule)
                     <div className="flex">
                       {/* Orphaned and unassignable roles cannot get a new rule, only lose theirs. */}
                       {rule.status === 'ACTIVE' && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Regel „${rule.label}“ bearbeiten`}
-                          onClick={() => onEdit(rule)}
-                        >
+                        <IconAction label={`Regel „${rule.label}“ bearbeiten`} onClick={() => onEdit(rule)}>
                           <PencilIcon />
-                        </Button>
+                        </IconAction>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Regel „${rule.label}“ löschen`}
+                      <IconAction
+                        label={`Regel „${rule.label}“ löschen`}
                         disabled={deleteRule.isPending && deleteRule.variables === rule.roleId}
                         onClick={() => setRuleToDelete(rule)}
                       >
                         <Trash2Icon />
-                      </Button>
+                      </IconAction>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -157,11 +150,7 @@ function DeleteRuleDialog({
         {rule && <RulePreview preview={preview} />}
         <AlertDialogFooter>
           <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={preview.isPending}
-            onClick={() => rule && onConfirm(rule)}
-          >
+          <AlertDialogAction variant="destructive" disabled={preview.isPending} onClick={() => rule && onConfirm(rule)}>
             Regel löschen
           </AlertDialogAction>
         </AlertDialogFooter>

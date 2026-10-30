@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,10 @@ export function OpenVotesCard() {
         ) : votes.isError ? (
           <ErrorState message={errorMessage(votes.error)} onRetry={() => votes.refetch()} />
         ) : votes.data.open.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Gerade läuft keine Abstimmung.</p>
+          <EmptyState
+            title="Gerade läuft keine Abstimmung"
+            description="Starte eine unter „Neue Abstimmung“ oder mit /abstimmung im Discord."
+          />
         ) : (
           <Table>
             <TableHeader>
@@ -84,7 +87,7 @@ export function OpenVotesCard() {
                         Beenden
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         disabled={closeVote.isPending}
                         onClick={() => setClosing({ vote, cancel: true })}
@@ -167,7 +170,7 @@ export function VoteArchiveCard() {
         ) : votes.isError ? (
           <ErrorState message={errorMessage(votes.error)} onRetry={() => votes.refetch()} />
         ) : votes.data.closed.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Abstimmung beendet.</p>
+          <EmptyState title="Noch keine Abstimmung beendet" />
         ) : (
           <ul className="flex flex-col divide-y">
             {votes.data.closed.map((vote) => (
@@ -196,8 +199,8 @@ function ArchivedVote({ vote }: { vote: Vote }) {
         <div>
           <h3 className="font-medium">{vote.question}</h3>
           <p className="text-xs text-muted-foreground">
-            {vote.roleName ?? 'Unbekannte Rolle'} in #{vote.channelName ?? 'unbekannt'} · gestartet von {vote.startedBy},{' '}
-            {formatTime(vote.startedAt)}
+            {vote.roleName ?? 'Unbekannte Rolle'} in #{vote.channelName ?? 'unbekannt'} · gestartet von {vote.startedBy}
+            , {formatTime(vote.startedAt)}
             {vote.closedAt !== null && (
               <>
                 {' '}

@@ -1,7 +1,8 @@
 import { Fragment, useState, type FormEvent } from 'react'
+import { IconAction } from '@/components/IconAction'
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -116,9 +117,7 @@ export function SystemLogCard() {
         ) : log.isError && entries.length === 0 ? (
           <ErrorState message={ERROR_MESSAGE} onRetry={() => log.refetch()} />
         ) : entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {filtered ? 'Keine Einträge für diesen Filter.' : 'Noch keine Einträge.'}
-          </p>
+          <EmptyState title={filtered ? 'Keine Einträge für diesen Filter' : 'Noch keine Einträge'} />
         ) : (
           <>
             <Table>
@@ -172,16 +171,14 @@ function EntryRow({ entry, expanded, onToggle }: { entry: SystemLogEntry; expand
     <TableRow>
       <TableCell>
         {entry.hasItems && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
+          <IconAction
+            label={expanded ? 'Details ausblenden' : 'Details anzeigen'}
             aria-expanded={expanded}
             aria-controls={`system-log-items-${entry.id}`}
-            aria-label={expanded ? 'Details ausblenden' : 'Details anzeigen'}
             onClick={onToggle}
           >
             {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-          </Button>
+          </IconAction>
         )}
       </TableCell>
       <TableCell className="text-muted-foreground">{formatTime(entry.occurredAt)}</TableCell>

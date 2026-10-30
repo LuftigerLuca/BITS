@@ -103,6 +103,9 @@ describe('military units', () => {
     renderApp('/admin/military-units')
 
     await userEvent.click(await screen.findByRole('button', { name: 'Deutsche Marine aus DSK1 entfernen' }))
+    const unitDialog = await screen.findByRole('alertdialog')
+    expect(within(unitDialog).getByText(/entzieht den Mitgliedern der MU die Rolle @DSK1/)).toBeInTheDocument()
+    await userEvent.click(within(unitDialog).getByRole('button', { name: 'Entfernen' }))
     await expect.poll(() => removed).toHaveLength(1)
 
     await userEvent.click(screen.getByRole('button', { name: 'Löschen' }))
@@ -137,6 +140,9 @@ describe('military units', () => {
     await userEvent.type(await screen.findByLabelText('Name'), 'DSK1')
     await userEvent.click(screen.getByRole('button', { name: 'DSK anlegen' }))
 
-    await expectToast('error', 'Der Name, die Rolle oder die MU ist schon vergeben, oder die Rolle hat eine Regel unter „Rollen“.')
+    await expectToast(
+      'error',
+      'Der Name, die Rolle oder die MU ist schon vergeben, oder die Rolle hat eine Regel unter „Rollen“.',
+    )
   })
 })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -77,9 +77,7 @@ export function AuditLogCard() {
         ) : log.isError && entries.length === 0 ? (
           <ErrorState message={ERROR_MESSAGE} onRetry={() => log.refetch()} />
         ) : entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {filtered ? 'Keine Einträge für diesen Filter.' : 'Noch keine Einträge.'}
-          </p>
+          <EmptyState title={filtered ? 'Keine Einträge für diesen Filter' : 'Noch keine Einträge'} />
         ) : (
           <>
             <Table>

@@ -376,7 +376,7 @@ export const MANUAL_PAGES: ManualPage[] = [
             'bietet belegte Rollen nicht an.',
           'Eine DSK ohne Rolle bewirkt nichts.',
           'Entfernst du eine MU, löschst die DSK oder nimmst ihr die Rolle, verlieren die Mitglieder die Rolle ' +
-            'beim folgenden Abgleich.',
+            'beim folgenden Abgleich. Vor dem Entfernen einer MU und dem Löschen einer DSK fragt das Dashboard nach.',
           'In /rollen und im Audit-Log von Discord steht als Grund etwa „Mitglied der MU Bundeswehr (DSK1)“.',
           'Ist der Rollen-Sync ausgeschaltet, vergibt und entzieht BITS auch die Rollen der DSKs nicht.',
         ],
@@ -453,7 +453,9 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Bis der Bot einen Thread angelegt hat, steht beim Land „Wird angelegt …“. Klappt es nicht innerhalb einer ' +
             'Minute, zeigt die Seite den Grund. BITS versucht es dann nicht von selbst erneut: Lege ihn erneut an, ' +
             'ordne einen anderen Thread zu oder verwirf den Fehler.',
-          'Hebst du eine Zuordnung auf, bleibt der Thread in Discord bestehen.',
+          'Hebst du eine Zuordnung auf, bleibt der Thread in Discord bestehen. Wer in keinem anderen Thread ist, ' +
+            'verliert die Botschafter-Rolle; deshalb fragt das Dashboard vorher nach, ebenso beim Entfernen von Hand ' +
+            'Hinzugefügter.',
           'Ändern des Thread-Namens benennt keinen Thread um. Mit „Bestehende umbenennen“ benennt der Bot alle ' +
             'zugeordneten Threads nach der Vorlage um. Archivierte überspringt er; sie sind auf der Seite mit ' +
             '„Archiviert, beim Umbenennen übersprungen“ markiert. Die neuen Namen erscheinen kurz darauf, was nicht ' +

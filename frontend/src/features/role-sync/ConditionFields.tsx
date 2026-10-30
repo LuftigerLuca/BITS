@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Trash2Icon } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
+import { Subsection } from '@/components/Subsection'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -96,22 +98,18 @@ export function ConditionFields({
           : 'Partei wählen'
 
   return (
-    // The legend floats so it sits inside the border; it must stay the first child to name the group.
-    <fieldset className="relative rounded-md border p-4">
-      <legend className="float-left mb-3 text-sm font-medium">{name}</legend>
-      {onRemove && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute top-2.5 right-2.5"
-          aria-label={`${name} entfernen`}
-          onClick={onRemove}
-        >
-          <Trash2Icon />
-        </Button>
-      )}
-      <div className="clear-left grid gap-4 sm:grid-cols-2">
+    <Subsection
+      title={name}
+      role="group"
+      actions={
+        onRemove && (
+          <IconAction label={`${name} entfernen`} onClick={onRemove}>
+            <Trash2Icon />
+          </IconAction>
+        )
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor={id('type')}>Art</FieldLabel>
           <Select
@@ -263,6 +261,6 @@ export function ConditionFields({
           </Field>
         )}
       </div>
-    </fieldset>
+    </Subsection>
   )
 }

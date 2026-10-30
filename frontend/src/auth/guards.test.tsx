@@ -41,7 +41,7 @@ describe('guards', () => {
 
     renderApp('/admin/roles')
 
-    expect(await screen.findByText('Noch keine Regeln angelegt.')).toBeInTheDocument()
+    expect(await screen.findByText('Noch keine Regeln angelegt')).toBeInTheDocument()
   })
 
   it('show a retry page while BITS does not answer, and go on once it does', async () => {

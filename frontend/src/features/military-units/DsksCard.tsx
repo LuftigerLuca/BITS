@@ -1,17 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { IconAction } from '@/components/IconAction'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { Subsection } from '@/components/Subsection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,7 +39,7 @@ export function DsksCard({ data }: { data: MilitaryUnits }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {data.dsks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine DSK angelegt.</p>
+          <EmptyState title="Noch keine DSK angelegt" description="Lege unter „DSK anlegen“ die erste an." />
         ) : (
           data.dsks.map((dsk) => <DskSection key={dsk.id} dsk={dsk} data={data} />)
         )}
@@ -97,36 +90,39 @@ function RoleSelect({
 function DskSection({ dsk, data }: { dsk: Dsk; data: MilitaryUnits }) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [unitToRemove, setUnitToRemove] = useState<Dsk['militaryUnits'][number] | null>(null)
   const deleteDsk = useDeleteDsk()
   const removeUnit = useRemoveMilitaryUnit()
   return (
-    <section aria-label={dsk.name} className="flex flex-col gap-3 rounded-lg border p-4">
-      {editing ? (
-        <EditDskForm dsk={dsk} data={data} onDone={() => setEditing(false)} />
-      ) : (
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-heading font-semibold">{dsk.name}</h3>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              {dsk.roleId === null ? (
-                <span className="text-muted-foreground">Keine Rolle, die DSK bewirkt nichts.</span>
-              ) : (
-                <RoleName name={dsk.roleName ?? `${dsk.roleId} (gelöscht)`} color={dsk.roleColor} />
-              )}
-              {dsk.roleStatus === 'ORPHANED' && <Badge variant="destructive">In Discord gelöscht</Badge>}
-              {dsk.roleStatus === 'NOT_ASSIGNABLE' && <Badge variant="destructive">Bot kann sie nicht vergeben</Badge>}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+    <Subsection
+      title={dsk.name}
+      description={
+        editing ? undefined : (
+          <span className="flex flex-wrap items-center gap-2">
+            {dsk.roleId === null ? (
+              'Keine Rolle, die DSK bewirkt nichts.'
+            ) : (
+              <RoleName name={dsk.roleName ?? `${dsk.roleId} (gelöscht)`} color={dsk.roleColor} />
+            )}
+            {dsk.roleStatus === 'ORPHANED' && <Badge variant="destructive">In Discord gelöscht</Badge>}
+            {dsk.roleStatus === 'NOT_ASSIGNABLE' && <Badge variant="destructive">Bot kann sie nicht vergeben</Badge>}
+          </span>
+        )
+      }
+      actions={
+        !editing && (
+          <>
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
               Bearbeiten
             </Button>
             <Button variant="outline" size="sm" disabled={deleteDsk.isPending} onClick={() => setDeleting(true)}>
               Löschen
             </Button>
-          </div>
-        </div>
-      )}
+          </>
+        )
+      }
+    >
+      {editing && <EditDskForm dsk={dsk} data={data} onDone={() => setEditing(false)} />}
       <div className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">Military Units</h4>
         {dsk.militaryUnits.length === 0 ? (
@@ -136,40 +132,50 @@ function DskSection({ dsk, data }: { dsk: Dsk; data: MilitaryUnits }) {
             {dsk.militaryUnits.map((mu) => (
               <li key={mu.id} className="flex items-center gap-2 text-sm">
                 <span>{mu.name}</span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`${mu.name} aus ${dsk.name} entfernen`}
+                <IconAction
+                  label={`${mu.name} aus ${dsk.name} entfernen`}
                   disabled={removeUnit.isPending}
-                  onClick={() => removeUnit.mutate({ dskId: dsk.id, muId: mu.id })}
+                  onClick={() => setUnitToRemove(mu)}
                 >
                   <Trash2Icon />
-                </Button>
+                </IconAction>
               </li>
             ))}
           </ul>
         )}
         <MilitaryUnitSearch dsk={dsk} />
       </div>
-      <AlertDialog open={deleting} onOpenChange={setDeleting}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{dsk.name} löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {dsk.roleName
-                ? `Die Zuordnungen der MUs gehen verloren, und BITS entzieht allen die Rolle @${dsk.roleName}.`
-                : 'Die Zuordnungen der MUs gehen verloren.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => deleteDsk.mutate(dsk.id)}>
-              Löschen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </section>
+      <ConfirmDialog
+        open={deleting}
+        title={`${dsk.name} löschen?`}
+        description={
+          dsk.roleName
+            ? `Die Zuordnungen der MUs gehen verloren, und BITS entzieht allen die Rolle @${dsk.roleName}.`
+            : 'Die Zuordnungen der MUs gehen verloren.'
+        }
+        confirm="Löschen"
+        onConfirm={() => {
+          setDeleting(false)
+          deleteDsk.mutate(dsk.id)
+        }}
+        onCancel={() => setDeleting(false)}
+      />
+      <ConfirmDialog
+        open={unitToRemove !== null}
+        title={`${unitToRemove?.name ?? 'MU'} aus ${dsk.name} entfernen?`}
+        description={
+          dsk.roleName
+            ? `BITS entzieht den Mitgliedern der MU die Rolle @${dsk.roleName}, außer sie sind in einer anderen MU der DSK.`
+            : 'Die DSK hat keine Rolle, niemand verliert etwas.'
+        }
+        confirm="Entfernen"
+        onConfirm={() => {
+          if (unitToRemove) removeUnit.mutate({ dskId: dsk.id, muId: unitToRemove.id })
+          setUnitToRemove(null)
+        }}
+        onCancel={() => setUnitToRemove(null)}
+      />
+    </Subsection>
   )
 }
 
@@ -294,10 +300,8 @@ function MilitaryUnitSearch({ dsk }: { dsk: Dsk }) {
                 {mu.countryName && <span className="text-muted-foreground"> · {mu.countryName}</span>}
                 {mu.dskName && <span className="text-muted-foreground"> ({mu.dskName})</span>}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label={`${mu.name} zu ${dsk.name} hinzufügen`}
+              <IconAction
+                label={`${mu.name} zu ${dsk.name} hinzufügen`}
                 disabled={mu.dskName !== null || addUnit.isPending}
                 onClick={() =>
                   addUnit.mutate(
@@ -312,8 +316,7 @@ function MilitaryUnitSearch({ dsk }: { dsk: Dsk }) {
                 }
               >
                 <PlusIcon />
-                Hinzufügen
-              </Button>
+              </IconAction>
             </li>
           ))}
         </ul>

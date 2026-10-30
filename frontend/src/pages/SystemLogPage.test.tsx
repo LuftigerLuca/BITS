@@ -114,7 +114,7 @@ describe('system log page', () => {
   it('asks the backend for the chosen type, role and member', async () => {
     stubLog([])
     renderApp('/admin/system-log')
-    expect(await screen.findByText('Noch keine Einträge.')).toBeInTheDocument()
+    expect(await screen.findByText('Noch keine Einträge')).toBeInTheDocument()
 
     await userEvent.click(screen.getByLabelText('Typ'))
     await userEvent.click(await screen.findByRole('option', { name: 'Fehler' }))
@@ -123,7 +123,7 @@ describe('system log page', () => {
     await userEvent.type(screen.getByLabelText('Mitglied'), 'Luca')
     await userEvent.click(screen.getByRole('button', { name: 'Suchen' }))
 
-    expect(await screen.findByText('Keine Einträge für diesen Filter.')).toBeInTheDocument()
+    expect(await screen.findByText('Keine Einträge für diesen Filter')).toBeInTheDocument()
     expect(systemLogCalls().at(-1)).toBe('category=ERROR&member=Luca&roleId=r-citizen')
   })
 
@@ -131,7 +131,7 @@ describe('system log page', () => {
     stubLog([])
     renderApp('/admin/system-log?member=1')
 
-    expect(await screen.findByText('Keine Einträge für diesen Filter.')).toBeInTheDocument()
+    expect(await screen.findByText('Keine Einträge für diesen Filter')).toBeInTheDocument()
     expect(screen.getByLabelText('Mitglied')).toHaveValue('1')
     expect(systemLogCalls().at(-1)).toBe('member=1')
   })

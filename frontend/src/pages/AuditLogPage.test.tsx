@@ -57,14 +57,14 @@ describe('audit log page', () => {
       'GET /web/admin/audit-log/actors': () => json([envAdmin, luca]),
     })
     renderApp('/admin/audit-log')
-    expect(await screen.findByText('Noch keine Einträge.')).toBeInTheDocument()
+    expect(await screen.findByText('Noch keine Einträge')).toBeInTheDocument()
 
     await userEvent.click(screen.getByLabelText('Admin'))
     await userEvent.click(await screen.findByRole('option', { name: 'Luca' }))
     await userEvent.click(screen.getByLabelText('Aktion'))
     await userEvent.click(await screen.findByRole('option', { name: 'Regel gelöscht' }))
 
-    expect(await screen.findByText('Keine Einträge für diesen Filter.')).toBeInTheDocument()
+    expect(await screen.findByText('Keine Einträge für diesen Filter')).toBeInTheDocument()
     expect(auditLogCalls().at(-1)).toBe('actor=discord%3A42&action=ROLE_RULE_DELETED')
   })
 
