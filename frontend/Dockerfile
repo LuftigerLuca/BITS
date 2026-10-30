@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build
 
 # Runs nginx as an unprivileged user, which cannot bind ports below 1024, hence 8080.
-FROM nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e
 # Fixes of Alpine packages that the pinned base image does not have yet (brotli-libs: CVE-2026-111497), then back to
 # the unprivileged user of the base image.
 USER root
