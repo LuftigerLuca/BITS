@@ -543,8 +543,8 @@ describe('rule table', () => {
     renderCard()
 
     expect(screen.getByText('Regeln werden geladen …')).toBeInTheDocument()
-    expect(screen.queryByText('Noch keine Regeln angelegt.')).not.toBeInTheDocument()
-    expect(await screen.findByText('Noch keine Regeln angelegt.')).toBeInTheDocument()
+    expect(screen.queryByText('Noch keine Regeln angelegt')).not.toBeInTheDocument()
+    expect(await screen.findByText('Noch keine Regeln angelegt')).toBeInTheDocument()
   })
 
   it('shows an error with retry when the rules cannot be loaded', async () => {
@@ -561,7 +561,7 @@ describe('rule table', () => {
     )
 
     expect(await screen.findByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument()
-    expect(screen.queryByText('Noch keine Regeln angelegt.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Noch keine Regeln angelegt')).not.toBeInTheDocument()
   })
 
   it('deletes a rule only after confirmation, and says that BITS no longer manages its role', async () => {

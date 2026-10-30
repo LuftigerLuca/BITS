@@ -41,7 +41,9 @@ const embassies: Embassies = {
       manualMembers: [{ discordUserId: '5', name: 'Guest' }],
     },
   ],
-  availableThreads: [{ id: 't-pl', name: 'botschaft-polen', channelName: 'diplomatie', archived: true, manageable: true }],
+  availableThreads: [
+    { id: 't-pl', name: 'botschaft-polen', channelName: 'diplomatie', archived: true, manageable: true },
+  ],
   creations: [],
 }
 
@@ -113,8 +115,26 @@ describe('embassies', () => {
     await expect.poll(() => added).toEqual([{ discordUserId: '7' }])
 
     await userEvent.click(screen.getByRole('button', { name: 'Guest aus France entfernen' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(within(dialog).getByText(/verliert es die Botschafter-Rolle/)).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Entfernen' }))
     await expect.poll(() => removed).toHaveLength(1)
     await expectToast('success', 'Mitglied entfernt')
+  })
+
+  it('unassigns a thread only after asking, since its ambassadors may lose their role', async () => {
+    const removed: unknown[] = []
+    stub({ 'DELETE /web/admin/embassies/threads/t-fr': bodies(removed) })
+    renderApp('/admin/embassies')
+
+    const section = await screen.findByRole('region', { name: 'Botschaft France' })
+    await userEvent.click(within(section).getByRole('button', { name: 'Zuordnung aufheben' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(within(dialog).getByText(/verliert die Botschafter-Rolle/)).toBeInTheDocument()
+    expect(removed).toHaveLength(0)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnung aufheben' }))
+    await expect.poll(() => removed).toHaveLength(1)
+    await expectToast('success', 'Zuordnung aufgehoben')
   })
 
   it('saves offices, ambassador role and host roles', async () => {
@@ -240,7 +260,9 @@ describe('embassies', () => {
     await userEvent.click(await screen.findByLabelText('Land'))
     await userEvent.click(await screen.findByRole('option', { name: 'Poland' }))
     expect(screen.getByRole('button', { name: 'Automatisch anlegen' })).toBeDisabled()
-    expect(screen.getByText('Zum automatischen Anlegen wähle unter „Einstellungen“ einen Botschafts-Kanal.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Zum automatischen Anlegen wähle unter „Einstellungen“ einen Botschafts-Kanal.'),
+    ).toBeInTheDocument()
   })
 
   it('shows threads being created and why one failed, which can be dismissed', async () => {

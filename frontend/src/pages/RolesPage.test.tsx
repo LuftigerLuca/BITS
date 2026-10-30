@@ -24,7 +24,7 @@ describe('roles page', () => {
     await userEvent.click(within(navigation).getByRole('link', { name: 'Rollen' }))
 
     expect(await screen.findByRole('heading', { name: 'Rollen' })).toBeInTheDocument()
-    expect(await screen.findByText('Noch keine Regeln angelegt.')).toBeInTheDocument()
+    expect(await screen.findByText('Noch keine Regeln angelegt')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/admin/roles')
   })
 

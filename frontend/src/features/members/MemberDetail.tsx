@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
 import { Rules } from '@/features/account/RolesCard'
 import { OUTCOMES } from '@/features/account/labels'
@@ -128,7 +128,7 @@ function RolesCard({ discordUserId }: { discordUserId: string }) {
         ) : !roles.data.linked ? (
           <p className="text-muted-foreground">Ohne verknüpften WarEra-Account vergibt BITS keine Rollen.</p>
         ) : roles.data.roles.length === 0 ? (
-          <p className="text-muted-foreground">BITS verwaltet noch keine Rollen.</p>
+          <EmptyState title="BITS verwaltet noch keine Rollen" />
         ) : (
           <Table>
             <TableHeader>
@@ -179,7 +179,7 @@ function LogCard({ member }: { member: Member }) {
       </CardHeader>
       <CardContent className="text-sm">
         {member.recentLog.length === 0 ? (
-          <p className="text-muted-foreground">Das System-Log enthält nichts zu diesem Mitglied.</p>
+          <EmptyState title="Das System-Log enthält nichts zu diesem Mitglied" />
         ) : (
           <Table>
             <TableHeader>

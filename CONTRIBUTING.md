@@ -209,7 +209,11 @@ What these flows show:
   `h3`, so no level is skipped. Form fields are at most `sm:max-w-sm` wide. Every field sits in a `Field` with a
   `FieldLabel`; hints are `FieldDescription`, errors `FieldError` (announced to screen readers), linked to the input
   with `aria-describedby` and `aria-invalid`. Checkboxes are the shadcn `Checkbox` in a horizontal `Field`, a group
-  of them a `FieldSet` with a `FieldLegend`.
+  of them a `FieldSet` with a `FieldLegend`. A block inside a card (one DSK, one embassy, one condition of a rule) is a
+  `Subsection`, never a box built from `border` and `rounded-*`. Actions of a row are an `IconAction` (ghost icon
+  button with tooltip), actions of a section or subsection outline text buttons of size `sm`. Whatever takes roles
+  from members asks first with `ConfirmDialog`. An empty list shows `EmptyState` from `components/QueryState.tsx`,
+  naming the action that adds something if there is one; short hints inside a row or a subsection stay text.
 - `.editorconfig` defines indentation and line endings.
 - **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (Discord messages,
   dashboard) is in German.

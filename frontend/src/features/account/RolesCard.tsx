@@ -1,5 +1,5 @@
 import { CheckIcon, CircleHelpIcon, XIcon } from 'lucide-react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { RoleName } from '@/components/RoleName'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,8 +17,8 @@ export function RolesCard() {
       <CardHeader>
         <CardTitle>Rollen</CardTitle>
         <CardDescription>
-          Die Rollen, die BITS nach deinen aktuellen WarEra-Daten vergibt. Eine erfüllte Regel reicht für die Rolle;
-          auf dem Server ändert sich deine Rolle beim nächsten Abgleich.
+          Die Rollen, die BITS nach deinen aktuellen WarEra-Daten vergibt. Eine erfüllte Regel reicht für die Rolle; auf
+          dem Server ändert sich deine Rolle beim nächsten Abgleich.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-sm">
@@ -28,11 +28,11 @@ export function RolesCard() {
           <ErrorState message={rolesErrorMessage(roles.error)} onRetry={() => roles.refetch()} />
         ) : !roles.data.linked ? (
           <p className="text-muted-foreground">
-            Ohne verknüpften WarEra-Account vergibt BITS dir keine Rollen. Mit <code>/verify</code> im Discord kannst
-            du ihn verknüpfen.
+            Ohne verknüpften WarEra-Account vergibt BITS dir keine Rollen. Mit <code>/verify</code> im Discord kannst du
+            ihn verknüpfen.
           </p>
         ) : roles.data.roles.length === 0 ? (
-          <p className="text-muted-foreground">BITS verwaltet noch keine Rollen.</p>
+          <EmptyState title="BITS verwaltet noch keine Rollen" />
         ) : (
           <Table>
             <TableHeader>

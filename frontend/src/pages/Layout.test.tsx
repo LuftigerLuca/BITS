@@ -245,7 +245,7 @@ describe('layout', () => {
       'GET /web/admin/audit-log/actors': () => json([]),
     })
     renderApp('/admin/audit-log')
-    await screen.findByText('Noch keine Einträge.')
+    await screen.findByText('Noch keine Einträge')
 
     // jsdom does not lay out the page, so contrast is left to the browser.
     const results = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -46,7 +46,7 @@ export function MemberSearchCard() {
         ) : results.isError ? (
           <ErrorState message={SEARCH_ERROR} onRetry={() => results.refetch()} />
         ) : results.data.length === 0 ? (
-          <p className="text-muted-foreground">Kein Mitglied gefunden.</p>
+          <EmptyState title="Kein Mitglied gefunden" />
         ) : (
           <Table>
             <TableHeader>

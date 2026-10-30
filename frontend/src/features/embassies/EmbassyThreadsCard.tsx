@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { PencilLineIcon, SparklesIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { IconAction } from '@/components/IconAction'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
+import { Subsection } from '@/components/Subsection'
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -50,7 +53,10 @@ export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
           <CreationSection key={creation.id} creation={creation} />
         ))}
         {embassies.threads.length === 0 && embassies.creations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keinem Land ist ein Thread zugeordnet.</p>
+          <EmptyState
+            title="Noch keinem Land ist ein Thread zugeordnet"
+            description="Ordne unten einen Thread zu oder lass ihn vom Bot anlegen."
+          />
         ) : (
           embassies.threads.map((thread) => <ThreadSection key={thread.threadId} thread={thread} />)
         )}
@@ -99,26 +105,31 @@ function CreationSection({ creation }: { creation: EmbassyCreation }) {
   const dismiss = useDismissCreation()
   const [retrying, setRetrying] = useState(false)
   return (
-    <section aria-label={`Botschaft ${creation.countryName}`} className="flex flex-col gap-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="font-heading font-semibold">{creation.countryName}</h3>
-          <p className="text-sm text-muted-foreground">{creation.threadName}</p>
-        </div>
-        {creation.failure === null ? (
+    <Subsection
+      title={creation.countryName}
+      label={`Botschaft ${creation.countryName}`}
+      description={creation.threadName}
+      actions={
+        creation.failure === null ? (
           <Badge variant="secondary">Wird angelegt …</Badge>
         ) : (
-          <div className="flex items-center gap-2">
+          <>
             <Badge variant="destructive">Anlegen fehlgeschlagen</Badge>
             <Button variant="outline" size="sm" onClick={() => setRetrying(true)}>
               Automatisch anlegen
             </Button>
-            <Button variant="ghost" size="sm" disabled={dismiss.isPending} onClick={() => dismiss.mutate(creation.id)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={dismiss.isPending}
+              onClick={() => dismiss.mutate(creation.id)}
+            >
               Verwerfen
             </Button>
-          </div>
-        )}
-      </div>
+          </>
+        )
+      }
+    >
       {creation.failure !== null && <p className="text-sm text-destructive">{creation.failure}</p>}
       {retrying && (
         <CreateDialog
@@ -128,7 +139,7 @@ function CreationSection({ creation }: { creation: EmbassyCreation }) {
           onClose={() => setRetrying(false)}
         />
       )}
-    </section>
+    </Subsection>
   )
 }
 
@@ -197,29 +208,23 @@ function CreateDialog({
 function ThreadSection({ thread }: { thread: EmbassyThread }) {
   const unassign = useUnassignThread()
   const removeMember = useRemoveMember()
+  const [unassigning, setUnassigning] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<EmbassyThread['manualMembers'][number] | null>(null)
   return (
-    <section aria-label={`Botschaft ${thread.countryName}`} className="flex flex-col gap-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="font-heading font-semibold">{thread.countryName}</h3>
-          <p className="text-sm text-muted-foreground">
-            {thread.channelName ? `#${thread.channelName} › ` : ''}
-            {thread.threadName}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <Subsection
+      title={thread.countryName}
+      label={`Botschaft ${thread.countryName}`}
+      description={`${thread.channelName ? `#${thread.channelName} › ` : ''}${thread.threadName}`}
+      actions={
+        <>
           {thread.missing && <Badge variant="destructive">Fehlt in Discord</Badge>}
           {thread.renameSkipped && <Badge variant="outline">Archiviert, beim Umbenennen übersprungen</Badge>}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={unassign.isPending}
-            onClick={() => unassign.mutate(thread.threadId)}
-          >
+          <Button variant="outline" size="sm" disabled={unassign.isPending} onClick={() => setUnassigning(true)}>
             Zuordnung aufheben
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {thread.members.length === 0 ? (
         <p className="text-sm text-muted-foreground">Der Bot hat noch keine Mitglieder gemeldet.</p>
       ) : (
@@ -251,17 +256,13 @@ function ThreadSection({ thread }: { thread: EmbassyThread }) {
               return (
                 <li key={member.discordUserId} className="flex items-center gap-2 text-sm">
                   <span>{name}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`${name} aus ${thread.countryName} entfernen`}
+                  <IconAction
+                    label={`${name} aus ${thread.countryName} entfernen`}
                     disabled={removeMember.isPending}
-                    onClick={() =>
-                      removeMember.mutate({ threadId: thread.threadId, discordUserId: member.discordUserId })
-                    }
+                    onClick={() => setMemberToRemove(member)}
                   >
                     <Trash2Icon />
-                  </Button>
+                  </IconAction>
                 </li>
               )
             })}
@@ -269,7 +270,30 @@ function ThreadSection({ thread }: { thread: EmbassyThread }) {
         )}
         <MemberSearch thread={thread} />
       </div>
-    </section>
+      <ConfirmDialog
+        open={unassigning}
+        title={`Zuordnung von ${thread.countryName} aufheben?`}
+        description="Der Thread bleibt in Discord bestehen, BITS verwaltet ihn aber nicht mehr. Wer in keinem anderen Thread ist, verliert die Botschafter-Rolle."
+        confirm="Zuordnung aufheben"
+        onConfirm={() => {
+          setUnassigning(false)
+          unassign.mutate(thread.threadId)
+        }}
+        onCancel={() => setUnassigning(false)}
+      />
+      <ConfirmDialog
+        open={memberToRemove !== null}
+        title={`${memberToRemove?.name ?? memberToRemove?.discordUserId ?? 'Mitglied'} aus ${thread.countryName} entfernen?`}
+        description="BITS entfernt das Mitglied aus dem Thread. Ist es in keinem anderen Thread, verliert es die Botschafter-Rolle."
+        confirm="Entfernen"
+        onConfirm={() => {
+          if (memberToRemove)
+            removeMember.mutate({ threadId: thread.threadId, discordUserId: memberToRemove.discordUserId })
+          setMemberToRemove(null)
+        }}
+        onCancel={() => setMemberToRemove(null)}
+      />
+    </Subsection>
   )
 }
 
@@ -294,10 +318,8 @@ function MemberSearch({ thread }: { thread: EmbassyThread }) {
             return (
               <li key={member.discordUserId} className="flex items-center gap-2 text-sm">
                 <span className="flex-1 truncate">{name}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={`${name} zu ${thread.countryName} hinzufügen`}
+                <IconAction
+                  label={`${name} zu ${thread.countryName} hinzufügen`}
                   disabled={added.has(member.discordUserId) || addMember.isPending}
                   onClick={() =>
                     addMember.mutate(
@@ -307,8 +329,7 @@ function MemberSearch({ thread }: { thread: EmbassyThread }) {
                   }
                 >
                   <UserPlusIcon />
-                  Hinzufügen
-                </Button>
+                </IconAction>
               </li>
             )
           })}

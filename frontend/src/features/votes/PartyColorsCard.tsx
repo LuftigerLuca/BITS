@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ErrorState, LoadingState } from '@/components/QueryState'
+import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -82,9 +82,7 @@ function PartyColorsForm({ saved }: { saved: PartyColors }) {
       }}
     >
       <p className="text-sm">Parteien in {saved.countryName}</p>
-      {saved.parties.length === 0 && (
-        <p className="text-sm text-muted-foreground">WarEra kennt in diesem Land keine Parteien.</p>
-      )}
+      {saved.parties.length === 0 && <EmptyState title="WarEra kennt in diesem Land keine Parteien" />}
       <ul className="flex flex-col divide-y">
         {rows.map((row) => {
           const color = colors[row.id] ?? null
