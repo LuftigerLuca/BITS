@@ -162,13 +162,38 @@ describe('system status page', () => {
     renderApp('/admin/system-status')
 
     expect(await screen.findByText('GET (abgewiesen, z. B. ohne Token)')).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: 'Consumer-Groups des Bots' })).toHaveTextContent('bot02')
+    expect(screen.getByRole('table', { name: 'Consumer-Groups des Bots' })).toHaveTextContent('bot0(auffällig)2')
     const jobs = screen.getByRole('table', { name: 'Hintergrund-Jobs' })
     expect(within(jobs).getByText('(stündlich)')).toBeInTheDocument()
     expect(within(jobs).getByText('Discord nicht erreichbar')).toBeInTheDocument()
     expect(screen.getByText('Stündlicher Rollen-Sync')).toBeInTheDocument()
     expect(screen.getByText(/verschiedenen Versionen/)).toBeInTheDocument()
     expect(screen.getByText('2 MB, ohne Limit')).toBeInTheDocument()
+  })
+
+  it('says on top which components are down', async () => {
+    stub()
+    renderApp('/admin/system-status')
+
+    expect(await screen.findByText('Gestört: WarEra-API')).toBeInTheDocument()
+  })
+
+  it('says on top when all components are up', async () => {
+    stub({ ...status, components: status.components.map((c) => ({ ...c, up: true })) })
+    renderApp('/admin/system-status')
+
+    expect(await screen.findByText('Alle Komponenten erreichbar')).toBeInTheDocument()
+  })
+
+  it('marks the counts worth a look by how bad they are', async () => {
+    stub()
+    renderApp('/admin/system-status')
+
+    const procedures = await screen.findByRole('table', { name: 'WarEra-Aufrufe nach Prozedur' })
+    const row = within(procedures).getByText('user.getUserLite').closest('tr')!
+    // Failures are broken, 429 and retries worth a look; the throttled count of zero stays plain.
+    expect(row).toHaveTextContent('(gestört)4(auffällig)2(auffällig)30')
+    expect(within(screen.getByRole('region', { name: 'Discord' })).getAllByText('(auffällig)')).toHaveLength(2)
   })
 
   it('says so before the first heartbeat of the bot', async () => {
