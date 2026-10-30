@@ -115,6 +115,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Rollen von Hand zu vergeben hilft nicht: Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie.',
           '/verify, /profil, /rollen und die Rollen unter „Mein Account“ fragen jedes Mal WarEra. Zusammen geht das ' +
             'sechsmal pro Minute; danach sagt BITS dir, wie lange du warten musst. So bleibt WarEra für alle erreichbar.',
+          'Beim Zurückkehren in den Browser-Tab lädt das Dashboard nichts neu. Aktuelle Daten holst du mit „Aktualisieren“ ' +
+            'bei den Rollen.',
         ],
       },
       {

@@ -201,8 +201,11 @@ What these flows show:
   `pages/` holds only what a route renders, `features/<feature>/` the components, queries and texts of one feature
   (e.g. `features/role-sync/`), `components/` what several features share, and `components/ui` the shadcn
   components. UI building blocks come from shadcn/ui. If one is missing, add it with the shadcn CLI instead of
-  building it yourself; custom markup is limited to layout. Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
-  mutation invalidates what it changes instead of reloading by hand. While data loads or after it failed, show
+  building it yourself; custom markup is limited to layout. Requests and their types live in the feature's `api.ts`;
+  `lib/api.ts` holds only what all features need (`request`, `ApiError`, login). Data is loaded with TanStack Query: one hook per request in the feature's `queries.ts`, and a
+  mutation invalidates what it changes instead of reloading by hand. Coming back to the window reloads nothing, as many
+  requests make the backend ask WarEra; a card with WarEra data offers a `RefreshButton`, and a query that reads the
+  database only may set `refetchOnWindowFocus: true`. While data loads or after it failed, show
   `LoadingState` or `ErrorState` from `components/QueryState.tsx`, never the empty state. Every page starts with
   `PageHeader`, which renders its `h1` and names the browser tab; a page without one (login, start page) calls
   `useDocumentTitle` and marks its title as `h1` itself. `CardTitle` is an `h2`, headings inside a card start at

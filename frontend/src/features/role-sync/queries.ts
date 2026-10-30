@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { notify } from '@/lib/notify'
 import {
   createRoleRule,
   deleteRoleRule,
@@ -13,8 +14,7 @@ import {
   setStatusRoles,
   updateRoleRule,
   type CreateRoleRule,
-} from '@/lib/api'
-import { notify } from '@/lib/notify'
+} from './api'
 import { errorMessage } from './labels'
 
 /** Everything below changes together: a new, edited or deleted rule changes which roles are managed. */

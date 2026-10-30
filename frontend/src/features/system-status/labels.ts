@@ -1,5 +1,6 @@
 import { TRIGGERS } from '@/features/system-log/labels'
-import type { BackgroundJob, StatusComponent, SyncTrigger, WareraCaller } from '@/lib/api'
+import type { SyncTrigger } from '@/features/system-log/api'
+import type { BackgroundJob, StatusComponent, WareraCaller } from './api'
 
 export const COMPONENTS: Record<StatusComponent, string> = {
   POSTGRES: 'Datenbank (Postgres)',

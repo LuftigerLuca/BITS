@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { getSystemLog, getSystemLogItems, getSystemLogRoles, type SystemLogFilter } from '@/lib/api'
+import { getSystemLog, getSystemLogItems, getSystemLogRoles, type SystemLogFilter } from './api'
 
 const SYSTEM_LOG = ['system-log'] as const
 
 /**
  * Pages of the system log for [filter], loaded one after the other. BITS adds entries all the time, so the log is
- * loaded anew every time the page is opened instead of after the usual 30 seconds.
+ * loaded anew every time the page is opened instead of after the usual 30 seconds, and when the window gets focus
+ * again, as it reads the database only.
  */
 export function useSystemLog(filter: SystemLogFilter) {
   return useInfiniteQuery({
@@ -14,6 +15,7 @@ export function useSystemLog(filter: SystemLogFilter) {
     initialPageParam: null as number | null,
     getNextPageParam: (page) => page.nextBefore,
     staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 

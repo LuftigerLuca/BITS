@@ -1,10 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import type { Feature, Me } from '@/lib/api'
+import type { Me } from '@/lib/api'
 import { features, json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import type { Feature } from './api'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 

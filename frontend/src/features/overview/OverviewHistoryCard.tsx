@@ -4,7 +4,7 @@ import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import type { OverviewHistory, OverviewHistoryDay } from '@/lib/api'
+import type { OverviewHistory, OverviewHistoryDay } from './api'
 import { formatCount } from './labels'
 import { useOverviewHistory } from './queries'
 

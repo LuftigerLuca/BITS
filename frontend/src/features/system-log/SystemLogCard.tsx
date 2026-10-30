@@ -11,7 +11,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { LogCategory, SystemLogEntry, SystemLogFilter } from '@/lib/api'
+import type { LogCategory, SystemLogEntry, SystemLogFilter } from './api'
 import { CATEGORIES, CATEGORY_BADGES, ERROR_MESSAGE, OUTCOMES, STATUS, describe, formatTime, name } from './labels'
 import { useSystemLog, useSystemLogItems, useSystemLogRoles } from './queries'
 

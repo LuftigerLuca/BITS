@@ -1,4 +1,4 @@
-import type { AuditAction } from '@/lib/api'
+import type { AuditAction } from './api'
 
 export const ACTIONS: Record<AuditAction, string> = {
   ROLE_RULE_CREATED: 'Regel angelegt',

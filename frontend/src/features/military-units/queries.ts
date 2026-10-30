@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { notify } from '@/lib/notify'
 import {
   addDskMilitaryUnit,
   createDsk,
@@ -8,8 +9,7 @@ import {
   searchDskMilitaryUnits,
   updateDsk,
   type DskRequest,
-} from '@/lib/api'
-import { notify } from '@/lib/notify'
+} from './api'
 import { errorMessage } from './labels'
 
 const MILITARY_UNITS = ['military-units'] as const

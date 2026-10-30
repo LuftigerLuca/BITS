@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { notify } from '@/lib/notify'
 import {
   addEmbassyMember,
   assignEmbassyThread,
@@ -11,8 +12,7 @@ import {
   setEmbassySettings,
   unassignEmbassyThread,
   type EmbassySettings,
-} from '@/lib/api'
-import { notify } from '@/lib/notify'
+} from './api'
 import { CANNOT_VIEW, errorMessage } from './labels'
 
 const EMBASSIES = ['embassies'] as const

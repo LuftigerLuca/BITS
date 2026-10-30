@@ -1,4 +1,4 @@
-import type { ItemOutcome, LogCategory, NamedRef, SyncRunStatus, SyncTrigger, SystemLogEntry } from '@/lib/api'
+import type { ItemOutcome, LogCategory, NamedRef, SyncRunStatus, SyncTrigger, SystemLogEntry } from './api'
 
 export const CATEGORIES: Record<LogCategory, string> = {
   SYNC: 'Sync-Läufe',

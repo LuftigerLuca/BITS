@@ -8,7 +8,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { AuditAction, AuditActor } from '@/lib/api'
+import type { AuditAction, AuditActor } from './api'
 import { ACTIONS, ERROR_MESSAGE, formatTime } from './labels'
 import { useAuditActors, useAuditLog } from './queries'
 

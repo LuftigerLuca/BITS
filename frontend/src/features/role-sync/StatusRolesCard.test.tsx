@@ -3,10 +3,11 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { Toaster } from '@/components/ui/sonner'
-import type { DiscordRole, Feature, StatusRoles } from '@/lib/api'
+import type { Feature } from '@/features/feature-toggles/api'
 import { createQueryClient } from '@/lib/queryClient'
 import { features, json, status, stubFetch } from '@/test/fetch'
 import { expectToast } from '@/test/toast'
+import type { DiscordRole, StatusRoles } from './api'
 import { StatusRolesCard } from './StatusRolesCard'
 
 function role(id: string, name: string, fields: Partial<DiscordRole> = {}): DiscordRole {

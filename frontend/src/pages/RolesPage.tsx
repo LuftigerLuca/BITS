@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { RoleRule } from '@/lib/api'
+import type { RoleRule } from '@/features/role-sync/api'
 import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
 import { NewRuleCard } from '@/features/role-sync/NewRuleCard'
 import { RemovalLimitCard } from '@/features/role-sync/RemovalLimitCard'

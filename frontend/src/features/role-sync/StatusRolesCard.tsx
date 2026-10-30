@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
-import type { DiscordRole, StatusRole, StatusRoles } from '@/lib/api'
+import type { DiscordRole, StatusRole, StatusRoles } from './api'
 import { STATUS, errorMessage } from './labels'
 import { useRoles, useSetStatusRoles, useStatusRoles } from './queries'
 

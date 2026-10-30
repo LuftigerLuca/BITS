@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { Feature } from '@/lib/api'
+import type { Feature } from '@/features/feature-toggles/api'
 
 type Handler = (init?: RequestInit) => Response | Promise<Response>
 

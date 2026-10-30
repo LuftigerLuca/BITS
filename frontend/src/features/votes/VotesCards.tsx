@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { voteResultImageUrl, type Vote } from '@/lib/api'
+import { voteResultImageUrl, type Vote } from './api'
 import { STATUS, errorMessage, formatTime, participation, thresholdText } from './labels'
 import { useCloseVote, useVotes } from './queries'
 

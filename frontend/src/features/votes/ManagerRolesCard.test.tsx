@@ -1,10 +1,11 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import type { Me, VoteOptions } from '@/lib/api'
+import type { Me } from '@/lib/api'
 import { json, status, stubFetch } from '@/test/fetch'
 import { renderApp } from '@/test/renderApp'
 import { expectToast } from '@/test/toast'
+import type { VoteOptions } from './api'
 
 const admin: Me = { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true }
 

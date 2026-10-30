@@ -1,4 +1,5 @@
-import { ApiError, type ThresholdChoice, type VoteStatus, type VoteThreshold } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { type ThresholdChoice, type VoteStatus, type VoteThreshold } from './api'
 
 export const STATUS: Record<VoteStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
   OPEN: { label: 'Läuft', variant: 'secondary' },

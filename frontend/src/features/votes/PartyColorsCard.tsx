@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { PartyColors } from '@/lib/api'
+import type { PartyColors } from './api'
 import { partyColorsErrorMessage } from './labels'
 import { usePartyColors, useSetPartyColors } from './queries'
 
