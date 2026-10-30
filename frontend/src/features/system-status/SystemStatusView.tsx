@@ -1,4 +1,21 @@
-import { CircleCheckIcon, CircleHelpIcon, CircleXIcon, LoaderIcon, TriangleAlertIcon } from 'lucide-react'
+import {
+  ArrowLeftRightIcon,
+  BotIcon,
+  CalendarClockIcon,
+  CircleCheckIcon,
+  CircleHelpIcon,
+  CircleXIcon,
+  ClockIcon,
+  DatabaseIcon,
+  GlobeIcon,
+  LoaderIcon,
+  type LucideIcon,
+  MessagesSquareIcon,
+  ServerIcon,
+  TimerIcon,
+  TriangleAlertIcon,
+  ZapIcon,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -6,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatTime } from '@/features/system-log/labels'
-import type { ComponentStatus, LatencyStats, SystemStatus } from '@/lib/api'
+import type { ComponentStatus, LatencyStats, StatusComponent, SystemStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import {
   CALLERS,
@@ -51,6 +68,13 @@ export function SystemStatusView() {
       <ResourcesCard data={data} now={now} />
     </div>
   )
+}
+
+const COMPONENT_ICONS: Record<StatusComponent, LucideIcon> = {
+  POSTGRES: DatabaseIcon,
+  REDIS: ZapIcon,
+  WARERA: GlobeIcon,
+  BOT: BotIcon,
 }
 
 /**
@@ -152,6 +176,7 @@ function ComponentCard({ status, now }: { status: ComponentStatus; now: number }
   const name = COMPONENTS[status.component]
   const contact = status.component === 'BOT' ? 'Letzter Heartbeat' : status.component === 'WARERA' ? 'Letzter Kontakt' : 'Geprüft'
   const duration = status.component === 'BOT' ? 'Gateway-Ping' : 'Antwortzeit'
+  const Icon = COMPONENT_ICONS[status.component]
   return (
     <Card
       size="sm"
@@ -167,7 +192,10 @@ function ComponentCard({ status, now }: { status: ComponentStatus; now: number }
       <CardHeader>
         {/* The badge stays out of the heading, so the heading is only the name. */}
         <div className="flex items-center justify-between gap-2">
-          <CardTitle>{name}</CardTitle>
+          <span className="flex items-center gap-2">
+            <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <CardTitle>{name}</CardTitle>
+          </span>
           <UpBadge up={status.up} />
         </div>
         <CardDescription>
@@ -180,10 +208,18 @@ function ComponentCard({ status, now }: { status: ComponentStatus; now: number }
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          {status.checkedAt !== null && <Fact label={contact}>{formatAgo(status.checkedAt, now)}</Fact>}
-          {status.durationMillis !== null && <Fact label={duration}>{formatDuration(status.durationMillis)}</Fact>}
+          {status.checkedAt !== null && (
+            <Fact label={contact} icon={ClockIcon}>
+              {formatAgo(status.checkedAt, now)}
+            </Fact>
+          )}
+          {status.durationMillis !== null && (
+            <Fact label={duration} icon={TimerIcon}>
+              {formatDuration(status.durationMillis)}
+            </Fact>
+          )}
           {status.lastProblem !== null && (
-            <Fact label="Letzte Störung">
+            <Fact label="Letzte Störung" icon={TriangleAlertIcon}>
               {status.lastFailureAt !== null && `${formatTime(status.lastFailureAt)}: `}
               {status.lastProblem}
             </Fact>
@@ -194,10 +230,13 @@ function ComponentCard({ status, now }: { status: ComponentStatus; now: number }
   )
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({ label, icon: Icon, children }: { label: string; icon?: LucideIcon; children: ReactNode }) {
   return (
     <>
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="flex items-center gap-1.5 text-muted-foreground">
+        {Icon && <Icon aria-hidden className="size-3.5 shrink-0" />}
+        {label}
+      </dt>
       <dd className="break-words">{children}</dd>
     </>
   )
@@ -278,11 +317,24 @@ function latency(stats: LatencyStats | null): string {
   return stats ? `${formatDuration(stats.p50Millis)} / ${formatDuration(stats.p95Millis)}` : '–'
 }
 
-function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+function Section({
+  title,
+  icon: Icon,
+  description,
+  children,
+}: {
+  title: string
+  icon: LucideIcon
+  description: string
+  children: ReactNode
+}) {
   return (
     <Card role="region" aria-label={title}>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <span className="flex items-center gap-2">
+          <Icon aria-hidden className="size-5 shrink-0 text-primary" />
+          <CardTitle>{title}</CardTitle>
+        </span>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">{children}</CardContent>
@@ -305,6 +357,7 @@ function WareraCard({ data }: { data: SystemStatus }) {
   return (
     <Section
       title="WarEra-API"
+      icon={GlobeIcon}
       description={`Jeder Request zählt gegen das Limit von WarEra; BITS erlaubt sich ${warera.limitPerMinute} pro Minute, Wiederholungen eingeschlossen.`}
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -396,6 +449,7 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
   return (
     <Section
       title="Bot ↔ Backend"
+      icon={ArrowLeftRightIcon}
       description="Der Bot ruft das Backend per REST auf, das Backend erreicht den Bot über Events im Redis-Stream."
     >
       <History label="Anfragen des Bots, im Backend gezählt" buckets={api.history} now={data.generatedAt} />
@@ -530,7 +584,7 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
 function DiscordCard({ data, now }: { data: SystemStatus; now: number }) {
   const bot = data.bot
   return (
-    <Section title="Discord" description="Wie der Bot mit Discord verbunden ist, aus seinem letzten Heartbeat.">
+    <Section title="Discord" icon={MessagesSquareIcon} description="Wie der Bot mit Discord verbunden ist, aus seinem letzten Heartbeat.">
       {!bot ? (
         <p className="text-sm text-muted-foreground">Seit dem Start des Backends kam noch kein Heartbeat vom Bot.</p>
       ) : (
@@ -573,7 +627,7 @@ function DiscordCard({ data, now }: { data: SystemStatus; now: number }) {
 
 function JobsCard({ data, now }: { data: SystemStatus; now: number }) {
   return (
-    <Section title="Hintergrund-Jobs" description="Was BITS von sich aus tut, seit dem Start des Backends.">
+    <Section title="Hintergrund-Jobs" icon={CalendarClockIcon} description="Was BITS von sich aus tut, seit dem Start des Backends.">
       <Table aria-label="Hintergrund-Jobs">
         <TableHeader>
           <TableRow>
@@ -671,7 +725,7 @@ function ResourcesCard({ data, now }: { data: SystemStatus; now: number }) {
   const processes = [{ name: 'Backend', process: backend }, ...(bot ? [{ name: 'Bot', process: bot.process }] : [])]
   const mismatch = bot && bot.process.version !== backend.version
   return (
-    <Section title="Versionen und Ressourcen" description="Was gerade läuft und wie viel Speicher es braucht.">
+    <Section title="Versionen und Ressourcen" icon={ServerIcon} description="Was gerade läuft und wie viel Speicher es braucht.">
       {mismatch && (
         <Alert variant="warning" role="status">
           <TriangleAlertIcon aria-hidden />
