@@ -112,10 +112,16 @@ function DskSection({ dsk, data }: { dsk: Dsk; data: MilitaryUnits }) {
       actions={
         !editing && (
           <>
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Button variant="outline" size="sm" aria-label={`${dsk.name} bearbeiten`} onClick={() => setEditing(true)}>
               Bearbeiten
             </Button>
-            <Button variant="outline" size="sm" disabled={deleteDsk.isPending} onClick={() => setDeleting(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={`${dsk.name} löschen`}
+              disabled={deleteDsk.isPending}
+              onClick={() => setDeleting(true)}
+            >
               Löschen
             </Button>
           </>

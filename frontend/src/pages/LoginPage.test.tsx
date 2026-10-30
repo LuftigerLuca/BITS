@@ -41,7 +41,7 @@ describe('login page', () => {
 
     renderApp('/login')
 
-    await screen.findByRole('button', { name: 'Mit Discord anmelden' })
+    await screen.findByRole('link', { name: 'Mit Discord anmelden' })
     expect(screen.queryByLabelText('Benutzername')).not.toBeInTheDocument()
   })
 
@@ -50,7 +50,7 @@ describe('login page', () => {
 
     renderApp('/login')
 
-    const button = await screen.findByRole('button', { name: 'Mit Discord anmelden' })
+    const button = await screen.findByRole('link', { name: 'Mit Discord anmelden' })
     expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 

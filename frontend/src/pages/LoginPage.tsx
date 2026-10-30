@@ -4,9 +4,10 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import backgroundLarge from '@/assets/login-background-1672.webp'
 import backgroundSmall from '@/assets/login-background-1280.webp'
 import { useAuth } from '@/auth/context'
+import { cn } from 'cn'
 import { DiscordIcon } from '@/components/DiscordIcon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
@@ -68,10 +69,11 @@ export function LoginPage() {
               <AlertDescription>{discordError}</AlertDescription>
             </Alert>
           )}
-          <Button variant="discord" className="w-full" onClick={() => window.location.assign(DISCORD_LOGIN_URL)}>
+          {/* A link, so that opening it in a new tab or copying it works as well. */}
+          <a href={DISCORD_LOGIN_URL} className={cn(buttonVariants({ variant: 'discord' }), 'w-full')}>
             <DiscordIcon data-icon="inline-start" />
             Mit Discord anmelden
-          </Button>
+          </a>
           <Link
             to="/docs"
             className="inline-flex items-center gap-1.5 self-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"

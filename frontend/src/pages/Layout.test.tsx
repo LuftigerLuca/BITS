@@ -198,7 +198,7 @@ describe('layout', () => {
     await openUserMenu()
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Abmelden' }))
 
-    expect(await screen.findByRole('button', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 

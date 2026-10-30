@@ -108,7 +108,7 @@ describe('military units', () => {
     await userEvent.click(within(unitDialog).getByRole('button', { name: 'Entfernen' }))
     await expect.poll(() => removed).toHaveLength(1)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'DSK1 löschen' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText(/entzieht allen die Rolle @DSK1/)).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }))
@@ -121,7 +121,7 @@ describe('military units', () => {
     stub({ 'PUT /web/admin/military-units/dsks/1': bodies(updated) })
     renderApp('/admin/military-units')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'DSK1 bearbeiten' }))
     const section = screen.getByRole('region', { name: 'DSK1' })
     const name = within(section).getByLabelText('Name')
     await userEvent.clear(name)

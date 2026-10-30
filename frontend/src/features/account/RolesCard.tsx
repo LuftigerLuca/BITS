@@ -70,14 +70,18 @@ export function Rules({ rules }: { rules: AccountRole['rules'] }) {
     <ul className="flex flex-col gap-1">
       {rules.map((rule) => (
         <li key={rule.label} className="flex items-start gap-2">
+          {/* Many screen readers skip the label of an SVG, so the state is read from hidden text instead. */}
           {rule.met === true ? (
-            <CheckIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-label="erfüllt" />
+            <CheckIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
           ) : rule.met === false ? (
-            <XIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="nicht erfüllt" />
+            <XIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
           ) : (
-            <CircleHelpIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="offen" />
+            <CircleHelpIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
           )}
           <span>
+            <span className="sr-only">
+              {rule.met === true ? 'Erfüllt: ' : rule.met === false ? 'Nicht erfüllt: ' : 'Offen: '}
+            </span>
             {rule.label}
             {rule.detail && <span className="text-muted-foreground"> ({rule.detail})</span>}
           </span>

@@ -112,7 +112,7 @@ describe('members page', () => {
     ])
     await screen.findByText('Bürger Deutschland')
     const [, rolesTable, logTable] = screen.getAllByRole('table')
-    expect(rows(rolesTable)).toEqual([['Bürger Deutschland', 'Erfüllt', 'hat sie nicht', 'Staatsbürgerschaft Germany']])
+    expect(rows(rolesTable)).toEqual([['Bürger Deutschland', 'Erfüllt', 'hat sie nicht', 'Erfüllt: Staatsbürgerschaft Germany']])
     expect(rows(logTable)).toEqual([
       ['01.01.2026, 11:00', 'Sync auf Anfrage eines Admins: Veteran vergeben (BITS: Level 30)'],
       ['24.12.2025, 18:00', 'WarEra-Account Luftiger verknüpft'],

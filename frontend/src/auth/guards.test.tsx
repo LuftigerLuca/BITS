@@ -15,7 +15,7 @@ describe('guards', () => {
 
     const router = renderApp('/')
 
-    expect(await screen.findByRole('button', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
     expect(screen.queryByText(/Sitzung ist abgelaufen/)).not.toBeInTheDocument()
   })
@@ -53,7 +53,7 @@ describe('guards', () => {
     expect(await screen.findByText('Dashboard gerade nicht erreichbar')).toBeInTheDocument()
     answer = () => status(401)
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
-    expect(await screen.findByRole('button', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mit Discord anmelden' })).toBeInTheDocument()
   })
 
   it('keep a logged-in user when the check after returning to the tab gets no answer', async () => {

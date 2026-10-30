@@ -67,8 +67,8 @@ describe('account page', () => {
     await screen.findByText('Bürger Deutschland')
     expect(screen.getByText('Rollen', { selector: '[data-slot=card-title]' })).toBeInTheDocument()
     expect(rows()).toEqual([
-      ['Bürger Deutschland', 'Erfüllt', 'Staatsbürgerschaft Germany'],
-      ['Veteran', 'Nicht erfüllt', 'Level ab 50 (Level 30 von 50)'],
+      ['Bürger Deutschland', 'Erfüllt', 'Erfüllt: Staatsbürgerschaft Germany'],
+      ['Veteran', 'Nicht erfüllt', 'Nicht erfüllt: Level ab 50 (Level 30 von 50)'],
     ])
     expect(screen.getByRole('link', { name: 'Daten herunterladen' })).toHaveAttribute('href', '/web/account/export')
   })
