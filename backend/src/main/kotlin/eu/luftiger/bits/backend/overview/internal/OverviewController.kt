@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 
 /**
  * Key figures of the start page and the country they count. Only for admins, see the security config of
@@ -26,11 +28,23 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/web/admin/overview")
 class OverviewController(
     private val overviewService: OverviewService,
+    private val historyService: OverviewHistoryService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     @GetMapping
     fun overview(): OverviewResponse = overviewService.overview()
+
+    /** The last [days] days, 30 on the start page by default, a year at most. */
+    @GetMapping("/history")
+    fun history(
+        @RequestParam(defaultValue = "30") days: Int,
+    ): OverviewHistoryResponse {
+        if (days !in 1..OverviewHistoryService.MAX_DAYS) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "days must be between 1 and ${OverviewHistoryService.MAX_DAYS}")
+        }
+        return historyService.history(days)
+    }
 
     @PutMapping("/country")
     fun setCountry(
@@ -67,6 +81,27 @@ data class CountryOverview(
     val name: String,
     /** Whether WarEra could be reached; if not, the counts are `null`. */
     val available: Boolean,
+    val citizens: Int?,
+    val activeCitizens: Int?,
+)
+
+@Serializable
+data class OverviewHistoryResponse(
+    /** First day of the range, ISO date in Europe/Berlin. */
+    val from: String,
+    /** Last day of the range, today. */
+    val to: String,
+    /** The days with figures, oldest first; a day that is missing or a `null` figure is a gap, not 0. */
+    val days: List<OverviewHistoryDay>,
+)
+
+@Serializable
+data class OverviewHistoryDay(
+    /** ISO date. */
+    val day: String,
+    val members: Int?,
+    val verifiedMembers: Int?,
+    /** Of the country set now; `null` on days that counted another one. */
     val citizens: Int?,
     val activeCitizens: Int?,
 )

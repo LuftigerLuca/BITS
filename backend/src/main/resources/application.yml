@@ -45,6 +45,9 @@ bits:
     cron: "0 10 * * * *"
     # Gives up on embassy threads the bot has not created within a minute.
     creation-cron: "*/10 * * * * *"
+  overview:
+    # Hourly, so a day whose first run had no figures yet still gets them; a row per day either way.
+    snapshot-cron: "0 5 * * * *"
   vote:
     # Ends votes within a minute of their end and tries stuck results again.
     cron: "0 * * * * *"

@@ -239,8 +239,13 @@ export const MANUAL_PAGES: ManualPage[] = [
         points: [
           'wie viele Mitglieder der Server ohne Bots hat und wie viele davon verifiziert sind',
           'wie viele Bürger, gesamt und aktiv, das Land hat, das du unter „Verwaltung“ einstellst',
+          'unter „Verlauf“, wie sich Mitglieder, Verifizierte und Bürger Tag für Tag entwickelt haben, über 30 Tage ' +
+            'oder ein Jahr',
         ],
         tips: [
+          'BITS hält die Kennzahlen einmal am Tag fest, ab dem Tag, an dem der Verlauf eingeführt wurde. Konnte BITS ' +
+            'einen Wert den ganzen Tag nicht lesen, etwa weil WarEra nicht erreichbar war, bleibt im Verlauf eine ' +
+            'Lücke. Nach einem Wechsel des Landes zeigt er die Bürger erst ab dem Wechsel.',
           'Das Land unter „Verwaltung“ bekommt auch keinen Botschafts-Thread.',
           'Lange Auswahllisten wie Rollen, Kanäle, Länder und Parteien haben oben ein Suchfeld: Tippe einen Teil des ' +
             'Namens, Groß- und Kleinschreibung und Akzente spielen keine Rolle.',

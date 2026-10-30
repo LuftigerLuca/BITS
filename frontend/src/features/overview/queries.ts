@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getOverview, setOverviewCountry } from '@/lib/api'
+import { getOverview, getOverviewHistory, setOverviewCountry } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { RESULT_IMAGE } from '@/features/votes/queries'
 import { countryErrorMessage } from './labels'
@@ -8,6 +8,10 @@ const OVERVIEW = ['overview'] as const
 
 export function useOverview() {
   return useQuery({ queryKey: OVERVIEW, queryFn: getOverview })
+}
+
+export function useOverviewHistory(days: number) {
+  return useQuery({ queryKey: [...OVERVIEW, 'history', days], queryFn: () => getOverviewHistory(days) })
 }
 
 export function useSetOverviewCountry() {

@@ -1,8 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { useAuth } from '@/auth/context'
+import { LoadingState } from '@/components/QueryState'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { OverviewTiles } from '@/features/overview/OverviewTiles'
+
+// Only admins see the chart, so the others do not load the chart library.
+const OverviewHistoryCard = lazy(() =>
+  import('@/features/overview/OverviewHistoryCard').then((module) => ({ default: module.OverviewHistoryCard })),
+)
 
 export function HomePage() {
   const { user } = useAuth()
@@ -34,7 +41,14 @@ export function HomePage() {
           )}
         </CardContent>
       </Card>
-      {user.role === 'ADMIN' && <OverviewTiles />}
+      {user.role === 'ADMIN' && (
+        <>
+          <OverviewTiles />
+          <Suspense fallback={<LoadingState label="Verlauf wird geladen …" />}>
+            <OverviewHistoryCard />
+          </Suspense>
+        </>
+      )}
     </div>
   )
 }
