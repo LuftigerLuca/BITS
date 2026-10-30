@@ -497,6 +497,9 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Oben stehen Datenbank, Redis, WarEra und der Bot, jeweils mit „Erreichbar“ oder „Gestört“, seit wann und ' +
             'der letzten Störung. Datenbank und Redis prüft BITS alle 15 Sekunden. Der Bot meldet sich alle 30 ' +
             'Sekunden; bleibt er 90 Sekunden still, gilt er als gestört.',
+          'Ganz oben steht in einer Zeile, ob alles erreichbar ist. Grün heißt in Ordnung, Gelb mit Warndreieck ' +
+            'auffällig, etwa Fehler, Wiederholungen, wartende Events oder das WarEra-Limit zu 80 % ausgeschöpft, Rot ' +
+            'mit Kreuz gestört. Zahlen, die bei null bleiben sollten, färbt BITS erst, wenn sie darüber liegen.',
           'WarEra fragt BITS dafür nicht eigens, denn jeder Aufruf zählt gegen das Limit. Der Status folgt aus den ' +
             'letzten echten Aufrufen; ohne Aufruf steht dort, wann der letzte Kontakt war.',
           '„WarEra-API“: wie viele Requests BITS an WarEra schickt, gemessen an den 90 pro Minute, die es sich erlaubt, ' +

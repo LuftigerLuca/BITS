@@ -1,11 +1,13 @@
-import { CircleCheckIcon, CircleHelpIcon, CircleXIcon } from 'lucide-react'
+import { CircleCheckIcon, CircleHelpIcon, CircleXIcon, LoaderIcon, TriangleAlertIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ErrorState, LoadingState } from '@/components/QueryState'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatTime } from '@/features/system-log/labels'
 import type { ComponentStatus, LatencyStats, SystemStatus } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import {
   CALLERS,
   COMPONENTS,
@@ -36,6 +38,7 @@ export function SystemStatusView() {
         Stand {formatTime(now)}, aktualisiert sich alle 15 Sekunden. Zähler seit dem Start des Backends{' '}
         {formatTime(data.backend.startedAt)}, Verläufe über die letzten 24 Stunden.
       </p>
+      <Summary components={data.components} />
       <section aria-label="Komponenten" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {data.components.map((component) => (
           <ComponentCard key={component.component} status={component} now={now} />
@@ -50,6 +53,79 @@ export function SystemStatusView() {
   )
 }
 
+/**
+ * How a value stands: fine, worth a look, or broken. The colour always comes with an icon and, for screen readers, a
+ * word, so it never carries the meaning alone.
+ */
+type Tone = 'good' | 'warning' | 'critical'
+
+const TONE_TEXT: Record<Tone, string> = { good: 'text-success', warning: 'text-warning', critical: 'text-destructive' }
+const TONE_BAR: Record<Tone, string> = { good: 'bg-success', warning: 'bg-warning', critical: 'bg-destructive' }
+const TONE_ICON = { good: CircleCheckIcon, warning: TriangleAlertIcon, critical: CircleXIcon }
+const TONE_LABEL: Record<Tone, string> = { good: 'in Ordnung', warning: 'auffällig', critical: 'gestört' }
+
+/** [warning] when [value] is above zero; counts that should stay at zero. */
+function nonZero(value: number | null, tone: Tone = 'warning'): Tone | undefined {
+  return value !== null && value > 0 ? tone : undefined
+}
+
+/** [warning] from [warnAt] of a limit on. */
+function share(used: number | null, limit: number | null, warnAt: number): Tone | undefined {
+  return used !== null && limit !== null && limit > 0 && used / limit >= warnAt ? 'warning' : undefined
+}
+
+function ToneIcon({ tone }: { tone: Tone }) {
+  const Icon = TONE_ICON[tone]
+  return (
+    <>
+      <Icon aria-hidden className={cn('size-4 shrink-0', TONE_TEXT[tone])} />
+      <span className="sr-only">({TONE_LABEL[tone]})</span>
+    </>
+  )
+}
+
+/** A number in a table, coloured with its icon when it is worth a look. */
+function Count({ value, tone }: { value: number; tone?: Tone }) {
+  return (
+    <TableCell className={cn('text-right tabular-nums', tone && cn('font-medium', TONE_TEXT[tone]))}>
+      <span className="inline-flex items-center justify-end gap-1">
+        {tone && <ToneIcon tone={tone} />}
+        <span>{formatCount(value)}</span>
+      </span>
+    </TableCell>
+  )
+}
+
+/** One line on top that says whether everything is reachable, so the page answers that before any detail. */
+function Summary({ components }: { components: ComponentStatus[] }) {
+  const down = components.filter((component) => component.up === false)
+  const unknown = components.filter((component) => component.up === null)
+  if (down.length > 0) {
+    return (
+      <Alert variant="destructive" role="status" className="border-destructive/40 bg-destructive/10">
+        <CircleXIcon aria-hidden />
+        <AlertTitle>Gestört: {down.map((component) => COMPONENTS[component.component]).join(', ')}</AlertTitle>
+        <AlertDescription>Die Karten darunter zeigen, seit wann und was zuletzt schiefging.</AlertDescription>
+      </Alert>
+    )
+  }
+  if (unknown.length > 0) {
+    return (
+      <Alert variant="warning" role="status">
+        <CircleHelpIcon aria-hidden />
+        <AlertTitle>Noch ohne Rückmeldung: {unknown.map((component) => COMPONENTS[component.component]).join(', ')}</AlertTitle>
+        <AlertDescription>Alle anderen Komponenten sind erreichbar.</AlertDescription>
+      </Alert>
+    )
+  }
+  return (
+    <Alert variant="success" role="status">
+      <CircleCheckIcon aria-hidden />
+      <AlertTitle>Alle Komponenten erreichbar</AlertTitle>
+    </Alert>
+  )
+}
+
 function UpBadge({ up }: { up: boolean | null }) {
   if (up === null) {
     return (
@@ -60,7 +136,7 @@ function UpBadge({ up }: { up: boolean | null }) {
     )
   }
   return up ? (
-    <Badge variant="secondary">
+    <Badge variant="success">
       <CircleCheckIcon aria-hidden />
       Erreichbar
     </Badge>
@@ -77,7 +153,17 @@ function ComponentCard({ status, now }: { status: ComponentStatus; now: number }
   const contact = status.component === 'BOT' ? 'Letzter Heartbeat' : status.component === 'WARERA' ? 'Letzter Kontakt' : 'Geprüft'
   const duration = status.component === 'BOT' ? 'Gateway-Ping' : 'Antwortzeit'
   return (
-    <Card size="sm" role="group" aria-label={name}>
+    <Card
+      size="sm"
+      role="group"
+      aria-label={name}
+      className={cn(
+        'border-l-4',
+        status.up === true && 'border-l-success',
+        status.up === false && 'border-l-destructive bg-destructive/5',
+        status.up === null && 'border-l-border',
+      )}
+    >
       <CardHeader>
         {/* The badge stays out of the heading, so the heading is only the name. */}
         <div className="flex items-center justify-between gap-2">
@@ -117,24 +203,45 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+/**
+ * A key figure. With [tone] it shows its state in colour and icon; with [meter] (0 to 1) a bar shows how much of a
+ * limit it uses.
+ */
+function Stat({ label, value, note, tone, meter }: { label: string; value: string; note?: string; tone?: Tone; meter?: number }) {
   return (
     <div className="flex flex-col">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="font-heading text-2xl font-semibold tabular-nums">{value}</span>
+      <span className={cn('flex items-center gap-1.5', tone && TONE_TEXT[tone])}>
+        {tone && <ToneIcon tone={tone} />}
+        <span className="font-heading text-2xl font-semibold tabular-nums">{value}</span>
+      </span>
+      {meter !== undefined && (
+        <span className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+          <span
+            className={cn('block h-full rounded-full', tone ? TONE_BAR[tone] : 'bg-primary')}
+            style={{ width: `${Math.min(100, Math.max(0, meter * 100))}%` }}
+          />
+        </span>
+      )}
       {note && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   )
 }
 
 const BUCKET_MILLIS = 15 * 60_000
+/** From this share of the WarEra limit on, requests start to wait for each other. */
+const LIMIT_WARNING = 0.8
+const HEAP_WARNING = 0.85
+const SLOW_MILLIS = 1_000
+/** The outbox resubmits after a minute; an event older than that did not reach Redis on the first try. */
+const OUTBOX_STUCK_MILLIS = 60_000
 const TIME_OF_DAY = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
 /**
  * Counts per 15 minutes over the last 24 hours as bars, the newest on the right; each bar names its time and count
  * on hover. The tables next to it carry the same data in numbers.
  */
-function History({ label, buckets, now }: { label: string; buckets: number[]; now: number }) {
+function History({ label, buckets, now, tone }: { label: string; buckets: number[]; now: number; tone?: Tone }) {
   const max = Math.max(...buckets, 0)
   const total = buckets.reduce((sum, count) => sum + count, 0)
   return (
@@ -152,7 +259,7 @@ function History({ label, buckets, now }: { label: string; buckets: number[]; no
               className="flex h-full flex-1 items-end hover:bg-muted"
             >
               <div
-                className="w-full rounded-t-[2px] bg-primary"
+                className={cn('w-full rounded-t-[2px]', tone ? TONE_BAR[tone] : 'bg-primary')}
                 style={{ height: count === 0 || max === 0 ? 0 : `${Math.max(4, (count / max) * 100)}%` }}
               />
             </div>
@@ -201,13 +308,25 @@ function WareraCard({ data }: { data: SystemStatus }) {
       description={`Jeder Request zählt gegen das Limit von WarEra; BITS erlaubt sich ${warera.limitPerMinute} pro Minute, Wiederholungen eingeschlossen.`}
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Letzte Minute" value={`${formatCount(warera.lastMinute)} / ${warera.limitPerMinute}`} />
-        <Stat label="Höchstens pro Minute" value={formatCount(warera.peakPerMinute)} note="in den letzten 24 Stunden" />
+        <Stat
+          label="Letzte Minute"
+          value={`${formatCount(warera.lastMinute)} / ${warera.limitPerMinute}`}
+          tone={share(warera.lastMinute, warera.limitPerMinute, LIMIT_WARNING)}
+          meter={warera.lastMinute / warera.limitPerMinute}
+        />
+        <Stat
+          label="Höchstens pro Minute"
+          value={formatCount(warera.peakPerMinute)}
+          note="in den letzten 24 Stunden"
+          tone={share(warera.peakPerMinute, warera.limitPerMinute, LIMIT_WARNING)}
+          meter={warera.peakPerMinute / warera.limitPerMinute}
+        />
         <Stat label="Letzte Stunde" value={formatCount(warera.lastHour)} />
         <Stat
           label="Wartezeit auf das Limit"
           value={warera.permitWait ? formatDuration(warera.permitWait.p95Millis) : '–'}
           note="95 % der Requests warteten höchstens so lange"
+          tone={warera.permitWait && warera.permitWait.p95Millis >= SLOW_MILLIS ? 'warning' : undefined}
         />
       </div>
       <History label="Requests an WarEra" buckets={warera.history} now={data.generatedAt} />
@@ -234,10 +353,10 @@ function WareraCard({ data }: { data: SystemStatus }) {
                 <TableCell className="font-mono text-xs">{procedure.procedure}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCount(procedure.total)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCount(procedure.lastHour)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(procedure.failures)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(procedure.rateLimited)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(procedure.retries)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(procedure.throttled)}</TableCell>
+                <Count value={procedure.failures} tone={nonZero(procedure.failures, 'critical')} />
+                <Count value={procedure.rateLimited} tone={nonZero(procedure.rateLimited)} />
+                <Count value={procedure.retries} tone={nonZero(procedure.retries)} />
+                <Count value={procedure.throttled} tone={nonZero(procedure.throttled)} />
                 <TableCell className="text-right tabular-nums">
                   {lookups === 0
                     ? '–'
@@ -298,8 +417,8 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
               <TableCell className="font-mono text-xs">{endpointName(endpoint.endpoint)}</TableCell>
               <TableCell className="text-right tabular-nums">{formatCount(endpoint.total)}</TableCell>
               <TableCell className="text-right tabular-nums">{formatCount(endpoint.lastHour)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatCount(endpoint.clientErrors)}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatCount(endpoint.serverErrors)}</TableCell>
+              <Count value={endpoint.clientErrors} tone={nonZero(endpoint.clientErrors)} />
+              <Count value={endpoint.serverErrors} tone={nonZero(endpoint.serverErrors, 'critical')} />
               <TableCell className="text-right tabular-nums">{latency(endpoint.latency)}</TableCell>
             </TableRow>
           ))}
@@ -307,7 +426,12 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
       </Table>
       {bot && (
         <>
-          <History label="Fehlgeschlagene Anfragen aus Sicht des Bots" buckets={bot.failureHistory} now={data.generatedAt} />
+          <History
+            label="Fehlgeschlagene Anfragen aus Sicht des Bots"
+            buckets={bot.failureHistory}
+            now={data.generatedAt}
+            tone="critical"
+          />
           <Table aria-label="Anfragen aus Sicht des Bots">
             <TableHeader>
               <TableRow>
@@ -324,9 +448,9 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
                 <TableRow key={calls.endpoint}>
                   <TableCell className="font-mono text-xs">{calls.endpoint}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatCount(calls.succeeded)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatCount(calls.failed)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatCount(calls.timedOut)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatCount(calls.unreachable)}</TableCell>
+                  <Count value={calls.failed} tone={nonZero(calls.failed, 'critical')} />
+                  <Count value={calls.timedOut} tone={nonZero(calls.timedOut)} />
+                  <Count value={calls.unreachable} tone={nonZero(calls.unreachable, 'critical')} />
                 </TableRow>
               ))}
             </TableBody>
@@ -338,6 +462,7 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
           label="In der Outbox"
           value={events.outboxPending === null ? 'unbekannt' : formatCount(events.outboxPending)}
           note={events.outboxOldestAt === null ? 'Events, die noch nicht in Redis sind' : `ältestes von ${formatTime(events.outboxOldestAt)}`}
+          tone={events.outboxOldestAt !== null && data.generatedAt - events.outboxOldestAt >= OUTBOX_STUCK_MILLIS ? 'warning' : undefined}
         />
         <Stat
           label="Im Stream"
@@ -348,6 +473,7 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
           label="Aufgegeben"
           value={events.deadLetters === null ? 'unbekannt' : formatCount(events.deadLetters)}
           note="Events, die der Bot nicht verarbeiten konnte"
+          tone={nonZero(events.deadLetters)}
         />
         <Stat label="Veröffentlicht" value={formatCount(events.published.reduce((sum, type) => sum + type.total, 0))} note="seit dem Start" />
       </div>
@@ -387,7 +513,11 @@ function BotBackendCard({ data }: { data: SystemStatus }) {
               <TableRow key={group.name}>
                 <TableCell className="font-mono text-xs">{group.name}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCount(group.pending)}</TableCell>
-                <TableCell className="text-right tabular-nums">{group.lag === null ? 'unbekannt' : formatCount(group.lag)}</TableCell>
+                {group.lag === null ? (
+                  <TableCell className="text-right">unbekannt</TableCell>
+                ) : (
+                  <Count value={group.lag} tone={nonZero(group.lag)} />
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -406,8 +536,12 @@ function DiscordCard({ data, now }: { data: SystemStatus; now: number }) {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Gateway" value={bot.gatewayStatus} />
-            <Stat label="Gateway-Ping" value={bot.gatewayPingMillis < 0 ? 'unbekannt' : formatDuration(bot.gatewayPingMillis)} />
+            <Stat label="Gateway" value={bot.gatewayStatus} tone={bot.gatewayStatus === 'CONNECTED' ? 'good' : 'critical'} />
+            <Stat
+              label="Gateway-Ping"
+              value={bot.gatewayPingMillis < 0 ? 'unbekannt' : formatDuration(bot.gatewayPingMillis)}
+              tone={bot.gatewayPingMillis >= SLOW_MILLIS ? 'warning' : undefined}
+            />
             <Stat label="Mitglieder" value={bot.guildMembers === null ? 'unbekannt' : formatCount(bot.guildMembers)} />
             <Stat
               label="REST-Anfragen an Discord"
@@ -416,9 +550,19 @@ function DiscordCard({ data, now }: { data: SystemStatus; now: number }) {
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Stat label="Rate-Limit (429)" value={formatCount(bot.discord.rateLimited)} note="Discord ließ den Bot warten" />
-            <Stat label="Abgelehnt" value={formatCount(bot.discord.refused)} note="z. B. fehlende Rechte für eine Rolle" />
-            <Stat label="Serverfehler" value={formatCount(bot.discord.serverErrors)} />
+            <Stat
+              label="Rate-Limit (429)"
+              value={formatCount(bot.discord.rateLimited)}
+              note="Discord ließ den Bot warten"
+              tone={nonZero(bot.discord.rateLimited)}
+            />
+            <Stat
+              label="Abgelehnt"
+              value={formatCount(bot.discord.refused)}
+              note="z. B. fehlende Rechte für eine Rolle"
+              tone={nonZero(bot.discord.refused)}
+            />
+            <Stat label="Serverfehler" value={formatCount(bot.discord.serverErrors)} tone={nonZero(bot.discord.serverErrors)} />
           </div>
           <History label="REST-Anfragen und Fehler bei Discord" buckets={bot.discordHistory} now={data.generatedAt} />
         </>
@@ -458,10 +602,15 @@ function JobsCard({ data, now }: { data: SystemStatus; now: number }) {
                   {job.lastDurationMillis === null ? '–' : formatDuration(job.lastDurationMillis)}
                 </TableCell>
                 <TableCell>
-                  {job.lastStartedAt === null ? (
+                  {job.runningSince !== null ? (
+                    <Badge>
+                      <LoaderIcon aria-hidden className="motion-safe:animate-spin" />
+                      Läuft
+                    </Badge>
+                  ) : job.lastStartedAt === null ? (
                     '–'
                   ) : job.lastFailure === null ? (
-                    <Badge variant="secondary">
+                    <Badge variant="success">
                       <CircleCheckIcon aria-hidden />
                       OK
                     </Badge>
@@ -476,7 +625,8 @@ function JobsCard({ data, now }: { data: SystemStatus; now: number }) {
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatCount(job.runs)} / {formatCount(job.failures)}
+                  {formatCount(job.runs)} /{' '}
+                  <span className={cn(job.failures > 0 && cn('font-medium', TONE_TEXT.critical))}>{formatCount(job.failures)}</span>
                 </TableCell>
               </TableRow>
             )
@@ -498,7 +648,13 @@ function JobsCard({ data, now }: { data: SystemStatus; now: number }) {
               <TableCell>{scheduledTaskName(task.name)}</TableCell>
               <TableCell>
                 {task.lastAt === null ? 'noch nicht' : formatTime(task.lastAt)}
-                {task.lastOutcome === 'ERROR' && <span className="text-destructive"> (fehlgeschlagen)</span>}
+                {task.lastOutcome === 'ERROR' && (
+                  <span className="inline-flex items-center gap-1 font-medium text-destructive">
+                    {' '}
+                    <CircleXIcon aria-hidden className="size-4" />
+                    fehlgeschlagen
+                  </span>
+                )}
                 {task.lastOutcome === 'STARTED' && <span className="text-muted-foreground"> (läuft)</span>}
               </TableCell>
               <TableCell>{task.nextAt === null ? '–' : formatTime(task.nextAt)}</TableCell>
@@ -517,9 +673,12 @@ function ResourcesCard({ data, now }: { data: SystemStatus; now: number }) {
   return (
     <Section title="Versionen und Ressourcen" description="Was gerade läuft und wie viel Speicher es braucht.">
       {mismatch && (
-        <p className="text-sm">
-          Backend und Bot laufen mit verschiedenen Versionen; nach einem Deploy sollte das nur kurz so sein.
-        </p>
+        <Alert variant="warning" role="status">
+          <TriangleAlertIcon aria-hidden />
+          <AlertDescription>
+            Backend und Bot laufen mit verschiedenen Versionen; nach einem Deploy sollte das nur kurz so sein.
+          </AlertDescription>
+        </Alert>
       )}
       <Table aria-label="Prozesse">
         <TableHeader>
@@ -539,9 +698,7 @@ function ResourcesCard({ data, now }: { data: SystemStatus; now: number }) {
               <TableCell>
                 {formatTime(process.startedAt)} <span className="text-muted-foreground">({formatAgo(process.startedAt, now)})</span>
               </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatBytes(process.heapUsedBytes)} von {formatBytes(process.heapMaxBytes)}
-              </TableCell>
+              <HeapCell used={process.heapUsedBytes} max={process.heapMaxBytes} />
               <TableCell className="text-right tabular-nums">{formatCount(process.threads)}</TableCell>
             </TableRow>
           ))}
@@ -551,9 +708,14 @@ function ResourcesCard({ data, now }: { data: SystemStatus; now: number }) {
         <Fact label="Datenbank">{postgres ? formatBytes(postgres.sizeBytes) : 'unbekannt'}</Fact>
         <Fact label="Schema-Version">{postgres?.schemaVersion ?? 'unbekannt'}</Fact>
         <Fact label="Verbindungen">
-          {postgres?.poolMax == null
-            ? 'unbekannt'
-            : `${postgres.poolActive ?? 0} aktiv, ${postgres.poolIdle ?? 0} frei, ${postgres.poolWaiting ?? 0} wartend, höchstens ${postgres.poolMax}`}
+          {postgres?.poolMax == null ? (
+            'unbekannt'
+          ) : (
+            <span className={cn('inline-flex items-center gap-1', (postgres.poolWaiting ?? 0) > 0 && TONE_TEXT.warning)}>
+              {(postgres.poolWaiting ?? 0) > 0 && <ToneIcon tone="warning" />}
+              {`${postgres.poolActive ?? 0} aktiv, ${postgres.poolIdle ?? 0} frei, ${postgres.poolWaiting ?? 0} wartend, höchstens ${postgres.poolMax}`}
+            </span>
+          )}
         </Fact>
         <Fact label="Redis-Speicher">
           {redis
@@ -562,5 +724,28 @@ function ResourcesCard({ data, now }: { data: SystemStatus; now: number }) {
         </Fact>
       </dl>
     </Section>
+  )
+}
+
+/** Heap in use, with a bar against the maximum that turns to warning when the process runs short. */
+function HeapCell({ used, max }: { used: number; max: number }) {
+  const tone = share(used, max, HEAP_WARNING)
+  return (
+    <TableCell className="text-right tabular-nums">
+      <span className="flex flex-col items-end gap-1">
+        <span className={cn('inline-flex items-center gap-1', tone && TONE_TEXT[tone])}>
+          {tone && <ToneIcon tone={tone} />}
+          {formatBytes(used)} von {formatBytes(max)}
+        </span>
+        {max > 0 && (
+          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+            <span
+              className={cn('block h-full rounded-full', tone ? TONE_BAR[tone] : 'bg-primary')}
+              style={{ width: `${Math.min(100, (used / max) * 100)}%` }}
+            />
+          </span>
+        )}
+      </span>
+    </TableCell>
   )
 }
