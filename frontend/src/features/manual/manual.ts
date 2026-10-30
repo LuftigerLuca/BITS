@@ -462,7 +462,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         intro: 'Unter „Verwaltung“ stellst du ein, wer Abstimmungen leiten darf und wie das Ergebnis aussieht.',
         points: [
           '„Wer Abstimmungen verwalten darf“: die Rollen, die Abstimmungen starten, beenden und abbrechen dürfen. ' +
-            'Admins dürfen das immer.',
+            'Admins dürfen das immer. Nimmst du jemandem die Rolle in Discord, verliert er das Recht sofort, auch ' +
+            'im Dashboard, ohne sich neu anzumelden.',
           '„Parteifarben“: eigene Farben für die Parteien des eigenen Landes in der Grafik.',
           '„Bild der Auswertung“: ein eigener Hintergrund für die Grafik.',
         ],

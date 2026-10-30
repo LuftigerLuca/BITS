@@ -3,6 +3,7 @@ package eu.luftiger.bits.backend.vote.internal
 import eu.luftiger.bits.backend.auth.api.SessionPrincipal
 import eu.luftiger.bits.backend.feature.api.BitsFeature
 import eu.luftiger.bits.backend.feature.api.FeatureToggles
+import eu.luftiger.bits.backend.members.api.GuildMembers
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
 import eu.luftiger.bits.backend.vote.domain.Choice
 import eu.luftiger.bits.backend.vote.domain.Vote
@@ -27,8 +28,12 @@ import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 /**
- * Votes in the dashboard, for admins and members of the roles that may manage votes; the roles come from the session,
- * see [SessionPrincipal.discordRoleIds]. Everybody logged in may ask whether they are one of them.
+ * Votes in the dashboard, for admins and members of the roles that may manage votes. Everybody logged in may ask
+ * whether they are one of them.
+ *
+ * The roles are the ones the bot reported last, see [GuildMembers], so a member who loses a manager role in Discord
+ * loses access right away rather than when the session ends. Only until the bot has reported the roles since the
+ * backend started are the roles from the login used, see [SessionPrincipal.discordRoleIds].
  */
 @RestController
 @RequestMapping("/web/votes")
@@ -38,6 +43,7 @@ class VoteWebController(
     private val guildRoles: GuildRoles,
     private val settingsService: VoteResultSettingsService,
     private val features: FeatureToggles,
+    private val guildMembers: GuildMembers,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -146,8 +152,21 @@ class VoteWebController(
         if (!voteService.mayManage(manager(session))) throw ResponseStatusException(HttpStatus.FORBIDDEN)
     }
 
-    private fun manager(session: Jwt) =
-        SessionPrincipal.of(session).let { VoteManager(it.subject, it.name, it.avatarUrl, it.admin, it.discordRoleIds) }
+    private fun manager(session: Jwt): VoteManager {
+        val principal = SessionPrincipal.of(session)
+        return VoteManager(principal.subject, principal.name, principal.avatarUrl, principal.admin, currentRoleIds(principal))
+    }
+
+    /** A member missing from the bot's list has left the guild and holds no roles. */
+    private fun currentRoleIds(principal: SessionPrincipal): List<String> {
+        val discordUserId = principal.discordUserId ?: return emptyList()
+        val members = guildMembers.members() ?: return principal.discordRoleIds
+        return members
+            .firstOrNull { it.discordUserId == discordUserId }
+            ?.roleIds
+            ?.toList()
+            .orEmpty()
+    }
 
     private fun Vote.toResponse(
         voted: Int? = null,
