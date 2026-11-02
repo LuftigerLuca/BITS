@@ -24,7 +24,7 @@ export function useMember(discordUserId: string) {
   })
 }
 
-/** Judged with fresh WarEra data on every visit, like `/rollen`. */
+/** Judged with fresh WarEra data on every visit, like `/roles`. */
 export function useMemberRoles(discordUserId: string) {
   return useQuery({
     queryKey: [...MEMBERS, 'roles', discordUserId],

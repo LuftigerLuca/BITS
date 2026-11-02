@@ -39,8 +39,9 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 
 | Daten                                            | Wo                         | Wozu                                | Wie lange                                                                   |
 |--------------------------------------------------|----------------------------|-------------------------------------|-----------------------------------------------------------------------------|
-| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profil` | bis zum Lösen, zum Verlassen des Servers oder zu einer neuen Verknüpfung    |
-| Discord-ID, Zeitpunkt                            | `nickname_opt_in`          | Nickname aus WarEra                 | bis `/nickname aus` oder zum Verlassen des Servers                          |
+| Discord-ID, WarEra-ID und -Name, Zeitpunkt       | `account_link`             | Rollen nach WarEra-Daten, `/profile` | bis zum Lösen, zum Verlassen des Servers oder zu einer neuen Verknüpfung    |
+| Discord-ID, Zeitpunkt                            | `nickname_opt_in`          | Nickname aus WarEra                 | bis `/nickname off` oder zum Verlassen des Servers                          |
+| Discord-ID, Sprache, Zeitpunkt                   | `language_preference`      | Sprache privater Nachrichten        | bis `/language` auf Automatisch steht oder zum Verlassen des Servers        |
 | Discord-IDs, -Namen und Rollen der Mitglieder    | Speicher des Backends      | Kennzahlen, Links, Mitgliedersuche  | bis zur nächsten Meldung des Bots oder zum Neustart                         |
 | Discord-ID, WarEra-ID und -Name, Code            | `account_verification`     | offene Verifizierung                | bis zur Verknüpfung oder zum nächsten Code, sonst bis 2 Stunden nach Ablauf |
 | Discord-ID, WarEra-ID, Stimme                    | `vote_ballot`              | laufende Abstimmung                 | bis zur Auswertung oder zum Abbruch                                         |

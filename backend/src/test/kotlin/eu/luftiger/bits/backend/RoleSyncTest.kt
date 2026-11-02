@@ -14,6 +14,7 @@ import eu.luftiger.bits.shared.BitsJson
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.EventStream
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
 import eu.luftiger.bits.shared.MemberRoles
@@ -831,6 +832,37 @@ class RoleSyncTest {
     }
 
     @Test
+    fun `role explanation comes in the requested language`() {
+        warera.parties["de"] = listOf(WareraParty("p1", "Partei"))
+        link("2", "w2")
+        createRule(
+            """{"roleId":"r-veteran","blocks":[[{"type":"COMPANIES","threshold":3},""" +
+                """{"type":"PARTY","countryId":"de","partyId":"p1"}]]}""",
+        )
+        awaitBackgroundWork()
+
+        val rule =
+            (explain("2", Language.ENGLISH) as RoleExplanationResponse.Explained)
+                .roles
+                .single()
+                .rules
+                .single()
+
+        assertEquals("Owns at least 3 companies and Member of party Partei", rule.label)
+        assertEquals("1 of 3 companies and not a member of party Partei", rule.detail)
+        // The stored rule and what the dashboard shows of it stay German.
+        assertEquals(
+            "Besitz von mindestens 3 Firmen und Mitglied der Partei Partei",
+            (explain("2") as RoleExplanationResponse.Explained)
+                .roles
+                .single()
+                .rules
+                .single()
+                .label,
+        )
+    }
+
+    @Test
     fun `admin creates MU leadership and party leader rules`() {
         warera.parties["de"] = listOf(WareraParty("p1", "Partei"))
 
@@ -1343,20 +1375,30 @@ class RoleSyncTest {
                 content = """{"discordUserId":"$discordUserId","memberName":"Member $discordUserId"}"""
             }.andExpect { status { isNoContent() } }
 
-    private fun explain(discordUserId: String): RoleExplanationResponse =
+    private fun explain(
+        discordUserId: String,
+        language: Language? = null,
+    ): RoleExplanationResponse =
         BitsJson.decodeFromString(
-            explainRequest(discordUserId)
+            explainRequest(discordUserId, language)
                 .andExpect { status { isOk() } }
                 .andReturn()
                 .response.contentAsString,
         )
 
-    private fun explainRequest(discordUserId: String) =
-        mockMvc.post("/api/role-explanations") {
-            header("Authorization", "Bearer test-service-token-at-least-32-chars")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"discordUserId":"$discordUserId"}"""
-        }
+    private fun explainRequest(
+        discordUserId: String,
+        language: Language? = null,
+    ) = mockMvc.post("/api/role-explanations") {
+        header("Authorization", "Bearer test-service-token-at-least-32-chars")
+        contentType = MediaType.APPLICATION_JSON
+        content =
+            if (language == null) {
+                """{"discordUserId":"$discordUserId"}"""
+            } else {
+                """{"discordUserId":"$discordUserId","language":"$language"}"""
+            }
+    }
 
     private fun previewRule(
         body: String,

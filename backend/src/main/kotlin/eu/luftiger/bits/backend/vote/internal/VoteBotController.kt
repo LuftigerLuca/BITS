@@ -37,7 +37,7 @@ import java.time.Instant
 import java.util.Base64
 
 /**
- * Votes from Discord: `/abstimmung` and the buttons, and what the bot reports back for the events of a vote. Whether
+ * Votes from Discord: `/vote` and the buttons, and what the bot reports back for the events of a vote. Whether
  * the actor may manage votes is decided here, from the roles the bot sends along; that the member clicking a button
  * has the role is checked by the bot.
  */

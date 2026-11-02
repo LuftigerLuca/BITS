@@ -13,6 +13,8 @@ data class DataExport(
     val link: ExportedLink?,
     val openVerification: ExportedVerification?,
     val nicknameOptedInAt: String?,
+    /** The language the member chose with `/language`; `null` for automatic. */
+    val language: ExportedLanguage?,
     val pings: List<String>,
     val embassies: ExportedEmbassies,
     val systemLog: ExportedSystemLog,
@@ -33,6 +35,12 @@ data class ExportedVerification(
     val wareraUsername: String,
     val code: String,
     val expiresAt: String,
+)
+
+@Serializable
+data class ExportedLanguage(
+    val language: String,
+    val updatedAt: String,
 )
 
 @Serializable

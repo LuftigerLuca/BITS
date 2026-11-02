@@ -4,7 +4,9 @@ import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.BackendTimeoutException
 import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
+import eu.luftiger.bits.bot.language.Languages
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import kotlinx.coroutines.CancellationException
@@ -15,6 +17,8 @@ import net.dv8tion.jda.api.components.buttons.Button
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
+import net.dv8tion.jda.api.interactions.DiscordLocale
+import net.dv8tion.jda.api.interactions.Interaction
 import net.dv8tion.jda.api.interactions.InteractionHook
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
@@ -26,7 +30,7 @@ import java.time.Duration
 
 /**
  * `/verify <name>` links the Discord account to a WarEra account: the user puts a one-time code into the name of
- * one of their companies and confirms with the button "Prüfen".
+ * one of their companies and confirms with the check button.
  *
  * The button carries the code, so it keeps working after a restart of the bot, and the backend can tell an old
  * button from the current one. The backend looks for the code in the background, since WarEra may be slow, and sends
@@ -35,34 +39,48 @@ import java.time.Duration
 class VerifyCommand(
     private val backend: BackendClient,
     private val scope: CoroutineScope,
+    private val languages: Languages,
 ) : ListenerAdapter() {
     private val log = LoggerFactory.getLogger(javaClass)
     private val pendingChecks =
-        PendingChecks<InteractionHook>(scope, CHECK_RESULT_TIMEOUT) { hook ->
-            hook.sendMessage(CHECK_TIMED_OUT_MESSAGE).queue()
+        PendingChecks<PendingCheck>(scope, CHECK_RESULT_TIMEOUT) { check ->
+            check.hook.sendMessage(checkTimedOutMessage(check.language)).queue()
         }
+
+    /** The event with the result knows neither the client of the member nor their language. */
+    private class PendingCheck(
+        val hook: InteractionHook,
+        val language: Language,
+    )
 
     override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
         if (event.name != NAME) return
         val username = event.getOption(OPTION_NAME)?.asString.orEmpty()
         event.deferReply(true).queue()
-        respond(event.hook) {
+        respond(event, event.hook) { language ->
             when (val response = backend.startVerification(event.user.id, username)) {
                 is StartVerificationResponse.Started ->
                     event.hook
-                        .sendMessage(startedMessage(response))
-                        .addComponents(ActionRow.of(Button.primary(CHECK_BUTTON_PREFIX + response.code, "Prüfen")))
+                        .sendMessage(startedMessage(response, language))
+                        .addComponents(ActionRow.of(Button.primary(CHECK_BUTTON_PREFIX + response.code, checkLabel(language))))
                         .queue()
                 StartVerificationResponse.UserNotFound ->
                     event.hook
                         .sendMessage(
-                            "Ich habe keinen WarEra-Account mit dem Namen **${escape(username)}** gefunden. Prüfe die Schreibweise.",
+                            language.text(
+                                "Ich habe keinen WarEra-Account mit dem Namen **${escape(username)}** gefunden. Prüfe die Schreibweise.",
+                                "I could not find a WarEra account named **${escape(username)}**. Please check the spelling.",
+                            ),
                         ).queue()
                 is StartVerificationResponse.NoCompany ->
                     event.hook
                         .sendMessage(
-                            "**${escape(response.wareraUsername)}** hat keine Firma. Zum Verifizieren brauchst du mindestens eine " +
-                                "Firma in WarEra, weil der Code in ihren Namen kommt.",
+                            language.text(
+                                "**${escape(response.wareraUsername)}** hat keine Firma. Zum Verifizieren brauchst du mindestens eine " +
+                                    "Firma in WarEra, weil der Code in ihren Namen kommt.",
+                                "**${escape(response.wareraUsername)}** has no company. To verify, you need at least one company in " +
+                                    "WarEra, because the code goes into its name.",
+                            ),
                         ).queue()
             }
         }
@@ -71,53 +89,55 @@ class VerifyCommand(
     override fun onButtonInteraction(event: ButtonInteractionEvent) {
         val code = event.componentId.removePrefix(CHECK_BUTTON_PREFIX).takeIf { it != event.componentId } ?: return
         event.deferReply(true).queue()
-        // Before the call, since the result may arrive before the answer does.
-        pendingChecks.add(code, event.hook)
-        respond(event.hook, onFailure = { pendingChecks.complete(code) }) {
+        respond(event, event.hook, onFailure = { pendingChecks.complete(code) }) { language ->
+            // Before the call, since the result may arrive before the answer does.
+            pendingChecks.add(code, PendingCheck(event.hook, language))
             val response = backend.checkVerification(event.user.id, code, event.member?.effectiveName ?: event.user.effectiveName)
             if (response != CheckVerificationResponse.Checking) {
                 pendingChecks.complete(code)
-                sendCheckResult(event.hook, response)
+                sendCheckResult(event.hook, response, language)
             }
         }
     }
 
-    /** Answers the click on "Prüfen" that started the check. */
+    /** Answers the click on the button that started the check. */
     fun onChecked(event: VerificationCheckedEvent) {
-        val hook = pendingChecks.complete(event.code) ?: return log.info("No one waits for the check of user {}", event.discordUserId)
-        sendCheckResult(hook, event.result)
+        val check = pendingChecks.complete(event.code) ?: return log.info("No one waits for the check of user {}", event.discordUserId)
+        sendCheckResult(check.hook, event.result, check.language)
     }
 
     /** A new link comes with the offer to take the WarEra name as nickname. */
     private fun sendCheckResult(
         hook: InteractionHook,
         response: CheckVerificationResponse,
+        language: Language,
     ) {
-        val message = hook.sendMessage(checkMessage(response))
-        if (response is CheckVerificationResponse.Linked) message.addComponents(ActionRow.of(NicknameCommand.optInButton))
+        val message = hook.sendMessage(checkMessage(response, language))
+        if (response is CheckVerificationResponse.Linked) message.addComponents(ActionRow.of(NicknameCommand.optInButton(language)))
         message.queue()
     }
 
     private fun respond(
+        interaction: Interaction,
         hook: InteractionHook,
         onFailure: () -> Unit = {},
-        block: suspend () -> Unit,
+        block: suspend (Language) -> Unit,
     ) {
         scope.launch {
+            val language = languages.of(interaction)
             try {
-                block()
+                block(language)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 onFailure()
                 when (e) {
-                    is WareraUnavailableException -> hook.sendMessage(WARERA_UNAVAILABLE_MESSAGE).queue()
-                    is TooManyRequestsException -> hook.sendMessage(tooManyRequestsMessage(e)).queue()
-                    is BackendTimeoutException ->
-                        hook.sendMessage("Das dauert gerade länger als erwartet. Versuche es gleich noch einmal.").queue()
+                    is WareraUnavailableException -> hook.sendMessage(wareraUnavailableWithCode(language)).queue()
+                    is TooManyRequestsException -> hook.sendMessage(tooManyRequestsMessage(e, language)).queue()
+                    is BackendTimeoutException -> hook.sendMessage(backendTimeoutMessage(language)).queue()
                     else -> {
                         log.error("Verification call to backend failed", e)
-                        hook.sendMessage(BITS_UNAVAILABLE_MESSAGE).queue()
+                        hook.sendMessage(bitsUnavailableMessage(language)).queue()
                     }
                 }
             }
@@ -136,67 +156,128 @@ class VerifyCommand(
          */
         private val CHECK_RESULT_TIMEOUT: Duration = Duration.ofMinutes(2)
 
-        private const val WARERA_UNAVAILABLE_MESSAGE =
-            "WarEra ist gerade nicht erreichbar. Versuche es gleich noch einmal, ein offener Code bleibt gültig."
+        private fun checkLabel(language: Language) = language.text("Prüfen", "Check")
 
-        internal const val CHECK_TIMED_OUT_MESSAGE =
-            "Die Prüfung dauert ungewöhnlich lange. Klicke gleich noch einmal auf „Prüfen“, ein offener Code bleibt gültig."
+        private fun wareraUnavailableWithCode(language: Language) =
+            wareraUnavailableMessage(language) + " " + language.text("Ein offener Code bleibt gültig.", "An open code stays valid.")
+
+        internal fun checkTimedOutMessage(language: Language): String =
+            language.text(
+                "Die Prüfung dauert ungewöhnlich lange. Klicke gleich noch einmal auf „Prüfen“, ein offener Code bleibt gültig.",
+                "The check is taking unusually long. Click “Check” again shortly, an open code stays valid.",
+            )
 
         val data: SlashCommandData =
             Commands
-                .slash(NAME, "Verknüpft deinen Discord-Account mit deinem WarEra-Account")
+                .slash(NAME, "Links your Discord account to your WarEra account")
+                .setDescriptionLocalization(DiscordLocale.GERMAN, "Verknüpft deinen Discord-Account mit deinem WarEra-Account")
                 // The backend rejects longer names, so Discord should not let them through.
-                .addOptions(OptionData(OptionType.STRING, OPTION_NAME, "Dein Name in WarEra", true).setMaxLength(MAX_NAME_LENGTH))
+                .addOptions(
+                    OptionData(OptionType.STRING, OPTION_NAME, "Your name in WarEra", true)
+                        .setDescriptionLocalization(DiscordLocale.GERMAN, "Dein Name in WarEra")
+                        .setMaxLength(MAX_NAME_LENGTH),
+                )
 
-        internal fun startedMessage(response: StartVerificationResponse.Started): String {
+        internal fun startedMessage(
+            response: StartVerificationResponse.Started,
+            language: Language,
+        ): String {
             val expiresAt = response.expiresAt / 1000
+            val account = escape(response.wareraUsername)
+            val code = response.code
             val hint =
                 response.linkedWareraUsername
                     ?.let {
-                        "Hinweis: Dein Discord-Account ist bereits mit **${escape(it)}** verknüpft. Wenn du fortfährst, wird diese " +
-                            "Verknüpfung ersetzt.\n\n"
+                        language.text(
+                            "Hinweis: Dein Discord-Account ist bereits mit **${escape(it)}** verknüpft. Wenn du fortfährst, wird diese " +
+                                "Verknüpfung ersetzt.\n\n",
+                            "Note: Your Discord account is already linked to **${escape(it)}**. If you continue, this link will be " +
+                                "replaced.\n\n",
+                        )
                     }.orEmpty()
             return hint +
-                "Dein Code für **${escape(response.wareraUsername)}**: `${response.code}`\n\n" +
                 // WarEra allows at most 20 characters per company name, so appending the code rarely fits.
-                "1. Benenne in WarEra eine deiner Firmen vorübergehend in `${response.code}` um. Firmennamen haben höchstens " +
-                "20 Zeichen, weiterer Text neben dem Code ist aber erlaubt.\n" +
-                "2. Klicke danach auf „Prüfen“.\n\n" +
-                "Der Code ist gültig bis <t:$expiresAt:t> (<t:$expiresAt:R>). Nach der Verknüpfung kannst du ihn wieder aus dem " +
-                "Firmennamen entfernen.\n\n" +
-                PRIVACY_NOTICE + "\n\n" +
-                SOCIAL_ENGINEERING_WARNING
+                language.text(
+                    "Dein Code für **$account**: `$code`\n\n" +
+                        "1. Benenne in WarEra eine deiner Firmen vorübergehend in `$code` um. Firmennamen haben höchstens " +
+                        "20 Zeichen, weiterer Text neben dem Code ist aber erlaubt.\n" +
+                        "2. Klicke danach auf „Prüfen“.\n\n" +
+                        "Der Code ist gültig bis <t:$expiresAt:t> (<t:$expiresAt:R>). Nach der Verknüpfung kannst du ihn wieder aus dem " +
+                        "Firmennamen entfernen.",
+                    "Your code for **$account**: `$code`\n\n" +
+                        "1. In WarEra, temporarily rename one of your companies to `$code`. Company names have at most 20 characters, " +
+                        "but other text next to the code is allowed.\n" +
+                        "2. Then click “Check”.\n\n" +
+                        "The code is valid until <t:$expiresAt:t> (<t:$expiresAt:R>). After linking, you can remove it from the " +
+                        "company name again.",
+                ) + "\n\n" +
+                privacyNotice(language) + "\n\n" +
+                socialEngineeringWarning(language)
         }
 
         /** What the data protection section of the README says, in short. */
-        internal const val PRIVACY_NOTICE =
-            "BITS speichert deine Discord-ID zusammen mit deinem WarEra-Account, um dir passende Rollen zu geben. Mit " +
-                "`/${ProfileCommand.NAME}` können Mitglieder des Servers dein WarEra-Profil sehen. Mit `/${UnverifyCommand.NAME}` " +
-                "löschst du die Verknüpfung jederzeit."
+        internal fun privacyNotice(language: Language): String =
+            language.text(
+                "BITS speichert deine Discord-ID zusammen mit deinem WarEra-Account, um dir passende Rollen zu geben. Mit " +
+                    "`/${ProfileCommand.NAME}` können Mitglieder des Servers dein WarEra-Profil sehen. Mit `/${UnverifyCommand.NAME}` " +
+                    "löschst du die Verknüpfung jederzeit.",
+                "BITS stores your Discord ID together with your WarEra account to give you the matching roles. With " +
+                    "`/${ProfileCommand.NAME}`, members of the server can see your WarEra profile. With `/${UnverifyCommand.NAME}`, " +
+                    "you can delete the link at any time.",
+            )
 
         /** The code proves who renamed the company, not who asked for it; see VerificationService in the backend. */
-        internal const val SOCIAL_ENGINEERING_WARNING =
-            "⚠️ Trage nur Codes ein, die du selbst mit `/verify` bekommen hast. Bittet dich jemand, einen Code in einen " +
-                "Firmennamen zu schreiben, etwa für ein Gewinnspiel, will er deinen WarEra-Account mit seinem Discord-Account " +
-                "verknüpfen und deine Rollen bekommen."
+        internal fun socialEngineeringWarning(language: Language): String =
+            language.text(
+                "⚠️ Trage nur Codes ein, die du selbst mit `/$NAME` bekommen hast. Bittet dich jemand, einen Code in einen " +
+                    "Firmennamen zu schreiben, etwa für ein Gewinnspiel, will er deinen WarEra-Account mit seinem Discord-Account " +
+                    "verknüpfen und deine Rollen bekommen.",
+                "⚠️ Only enter codes you got yourself with `/$NAME`. If somebody asks you to put a code into a company name, for " +
+                    "example for a giveaway, they want to link your WarEra account to their Discord account and get your roles.",
+            )
 
-        internal fun checkMessage(response: CheckVerificationResponse): String =
+        internal fun checkMessage(
+            response: CheckVerificationResponse,
+            language: Language,
+        ): String =
             when (response) {
-                is CheckVerificationResponse.Linked ->
-                    "Fertig! Dein Discord-Account ist jetzt mit **${escape(response.wareraUsername)}** verknüpft. Deine Rollen " +
-                        "bekommst du in den nächsten Minuten automatisch. Du kannst den Code wieder aus dem Firmennamen entfernen.\n\n" +
-                        "Möchtest du deinen WarEra-Namen auch als Nickname tragen? Klicke auf „Nickname übernehmen“ oder nutze " +
-                        "jederzeit `/${NicknameCommand.NAME}`."
+                is CheckVerificationResponse.Linked -> {
+                    val account = escape(response.wareraUsername)
+                    language.text(
+                        "Fertig! Dein Discord-Account ist jetzt mit **$account** verknüpft. Deine Rollen bekommst du in den nächsten " +
+                            "Minuten automatisch. Du kannst den Code wieder aus dem Firmennamen entfernen.\n\n" +
+                            "Möchtest du deinen WarEra-Namen auch als Nickname tragen? Klicke auf „Nickname übernehmen“ oder nutze " +
+                            "jederzeit `/${NicknameCommand.NAME}`.",
+                        "Done! Your Discord account is now linked to **$account**. You will get your roles automatically within the " +
+                            "next few minutes. You can remove the code from the company name again.\n\n" +
+                            "Would you like to use your WarEra name as your nickname too? Click “Use as nickname” or use " +
+                            "`/${NicknameCommand.NAME}` at any time.",
+                    )
+                }
                 // Answered by the event, never shown.
-                CheckVerificationResponse.Checking -> "Ich prüfe deinen Code …"
-                CheckVerificationResponse.WareraUnavailable -> WARERA_UNAVAILABLE_MESSAGE
+                CheckVerificationResponse.Checking -> language.text("Ich prüfe deinen Code …", "Checking your code …")
+                CheckVerificationResponse.WareraUnavailable -> wareraUnavailableWithCode(language)
                 CheckVerificationResponse.CodeMissing ->
-                    "Ich habe den Code in keinem deiner Firmennamen gefunden. Prüfe, ob die Umbenennung gespeichert ist, und versuche es " +
-                        "noch einmal."
-                CheckVerificationResponse.Expired -> "Der Code ist abgelaufen. Starte bitte mit `/verify` neu."
-                CheckVerificationResponse.Invalid -> "Dieser Code ist nicht mehr gültig. Starte bitte mit `/verify` neu."
+                    language.text(
+                        "Ich habe den Code in keinem deiner Firmennamen gefunden. Prüfe, ob die Umbenennung gespeichert ist, und " +
+                            "versuche es noch einmal.",
+                        "I did not find the code in any of your company names. Check that the new name is saved and try again.",
+                    )
+                CheckVerificationResponse.Expired ->
+                    language.text(
+                        "Der Code ist abgelaufen. Starte bitte mit `/$NAME` neu.",
+                        "The code has expired. Please start again with `/$NAME`.",
+                    )
+                CheckVerificationResponse.Invalid ->
+                    language.text(
+                        "Dieser Code ist nicht mehr gültig. Starte bitte mit `/$NAME` neu.",
+                        "This code is no longer valid. Please start again with `/$NAME`.",
+                    )
                 is CheckVerificationResponse.TooEarly ->
-                    "Bitte warte noch ${response.retryAfterSeconds} Sekunden, bevor du erneut prüfst."
+                    language.text(
+                        "Bitte warte noch ${response.retryAfterSeconds} Sekunden, bevor du erneut prüfst.",
+                        "Please wait another ${response.retryAfterSeconds} seconds before checking again.",
+                    )
             }
 
         private fun escape(text: String) = MarkdownSanitizer.escape(text)

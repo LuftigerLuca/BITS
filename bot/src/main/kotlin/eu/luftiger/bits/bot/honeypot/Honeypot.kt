@@ -9,6 +9,7 @@ import eu.luftiger.bits.shared.HoneypotProblemReport
 import eu.luftiger.bits.shared.HoneypotState
 import eu.luftiger.bits.shared.HoneypotWarning
 import eu.luftiger.bits.shared.HoneypotWarningReport
+import eu.luftiger.bits.shared.Language
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -42,6 +43,7 @@ class Honeypot(
     private val backend: HoneypotBackend,
     private val guild: HoneypotGuild,
     private val directMessages: DirectMessages,
+    private val language: suspend (discordUserId: String) -> Language,
     private val guildName: () -> String,
     /** Sends a report to the backend in the background, trying again if it fails. */
     private val report: (what: String, call: suspend () -> Unit) -> Unit,
@@ -127,7 +129,7 @@ class Honeypot(
     ): HoneypotKickOutcome {
         // Before the kick, since the bot can no longer write to somebody without a common server.
         withTimeoutOrNull(DIRECT_MESSAGE_TIMEOUT_MILLIS) {
-            attempt { directMessages.send(message.authorId, kickMessage(guildName())) }
+            attempt { directMessages.send(message.authorId, kickMessage(guildName(), language(message.authorId))) }
         } ?: notes.add(DIRECT_MESSAGE_FAILED)
         return try {
             guild.kick(message.authorId)
@@ -193,7 +195,7 @@ class Honeypot(
             when {
                 warning == null -> false
                 warning.messageId == verifiedWarningId -> true
-                else -> discord { guild.exists(warning) } ?: return
+                else -> discord { guild.update(warning, warningEmbed()) } ?: return
             }
         if (present) {
             verifiedWarningId = warning?.messageId
@@ -259,11 +261,13 @@ class Honeypot(
 
         fun warningEmbed(): MessageEmbed =
             EmbedBuilder()
-                .setTitle("Nicht in diesen Kanal schreiben!")
+                .setTitle("Nicht in diesen Kanal schreiben! / Do not write in this channel!")
                 .setColor(WARNING_COLOR)
                 .setDescription(
                     "Dieser Kanal fängt Spam-Bots ab. Wer hier schreibt, wird automatisch vom Server gekickt und verliert die " +
-                        "Verknüpfung seines WarEra-Accounts.",
+                        "Verknüpfung seines WarEra-Accounts.\n\n" +
+                        "This channel catches spam bots. Whoever writes here is automatically kicked from the server and loses the " +
+                        "link to their WarEra account.",
                 ).build()
 
         const val MEMBER_ABOVE_BOT = "Das Mitglied steht über der Rolle des Bots."
@@ -276,9 +280,16 @@ class Honeypot(
         const val NO_WARNING_PERMISSION = "Dem Bot fehlen im Honeypot-Kanal Rechte für die Warnnachricht."
         const val WARNING_REFUSED = "Discord hat die Warnnachricht im Honeypot-Kanal abgelehnt."
 
-        fun kickMessage(guildName: String) =
+        fun kickMessage(
+            guildName: String,
+            language: Language,
+        ) = language.text(
             "Du wurdest von **$guildName** gekickt, weil von deinem Account eine Nachricht in einem Kanal kam, der Spam-Bots " +
                 "abfängt. War das ein Versehen, kannst du wieder beitreten und deinen WarEra-Account mit `/verify` neu " +
-                "verknüpfen. Warst du es nicht, ist dein Account vielleicht gehackt: Ändere bitte dein Passwort."
+                "verknüpfen. Warst du es nicht, ist dein Account vielleicht gehackt: Ändere bitte dein Passwort.",
+            "You were kicked from **$guildName** because a message from your account was posted in a channel that catches spam " +
+                "bots. If that was a mistake, you can join again and link your WarEra account anew with `/verify`. If it was not " +
+                "you, your account may be hacked: please change your password.",
+        )
     }
 }

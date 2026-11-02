@@ -72,6 +72,7 @@ class AccountPageService(
                     ExportedVerification(it.wareraUserId, it.wareraUsername, it.code, it.expiresAt.toString())
                 },
             nicknameOptedInAt = stored.nicknameOptedInAt?.toString(),
+            language = stored.language?.let { ExportedLanguage(it.language, it.updatedAt.toString()) },
             pings = pings.pingsOf(discordUserId).map { it.toString() },
             embassies =
                 ExportedEmbassies(

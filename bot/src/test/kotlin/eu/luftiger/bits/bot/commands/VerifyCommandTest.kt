@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.commands
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
 import eu.luftiger.bits.shared.CheckVerificationResponse
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import io.mockk.coEvery
@@ -29,7 +30,7 @@ class VerifyCommandTest {
 
     @Test
     fun `started message shows code and expiry and escapes the name`() {
-        val message = VerifyCommand.startedMessage(started)
+        val message = VerifyCommand.startedMessage(started, Language.GERMAN)
 
         assertContains(message, "`BITS-ABC234`")
         assertContains(message, "<t:1800:R>")
@@ -39,25 +40,25 @@ class VerifyCommandTest {
 
     @Test
     fun `started message warns against entering codes of others`() {
-        assertTrue(VerifyCommand.startedMessage(started).endsWith(VerifyCommand.SOCIAL_ENGINEERING_WARNING))
+        assertTrue(VerifyCommand.startedMessage(started, Language.GERMAN).endsWith(VerifyCommand.socialEngineeringWarning(Language.GERMAN)))
     }
 
     @Test
     fun `started message says what BITS stores and how to delete it`() {
-        assertContains(VerifyCommand.startedMessage(started), VerifyCommand.PRIVACY_NOTICE)
-        assertContains(VerifyCommand.PRIVACY_NOTICE, "`/unverify`")
+        assertContains(VerifyCommand.startedMessage(started, Language.GERMAN), VerifyCommand.privacyNotice(Language.GERMAN))
+        assertContains(VerifyCommand.privacyNotice(Language.GERMAN), "`/unverify`")
     }
 
     @Test
     fun `started message warns about an existing link`() {
-        val message = VerifyCommand.startedMessage(started.copy(linkedWareraUsername = "Old"))
+        val message = VerifyCommand.startedMessage(started.copy(linkedWareraUsername = "Old"), Language.GERMAN)
 
         assertTrue(message.startsWith("Hinweis: Dein Discord-Account ist bereits mit **Old** verknüpft."), message)
     }
 
     @Test
     fun `too early message names the seconds to wait`() {
-        assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.TooEarly(retryAfterSeconds = 7)), "7 Sekunden")
+        assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.TooEarly(retryAfterSeconds = 7), Language.GERMAN), "7 Sekunden")
     }
 
     @Test
@@ -73,8 +74,8 @@ class VerifyCommandTest {
                 CheckVerificationResponse.Invalid to "Dieser Code ist nicht mehr gültig.",
                 CheckVerificationResponse.TooEarly(3) to "Bitte warte noch 3 Sekunden",
             )
-        messages.forEach { (response, expected) -> assertContains(VerifyCommand.checkMessage(response), expected) }
-        assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.Linked("x")), "Rollen")
+        messages.forEach { (response, expected) -> assertContains(VerifyCommand.checkMessage(response, Language.GERMAN), expected) }
+        assertContains(VerifyCommand.checkMessage(CheckVerificationResponse.Linked("x"), Language.GERMAN), "Rollen")
     }
 
     @Test
@@ -85,7 +86,7 @@ class VerifyCommandTest {
             command().onSlashCommandInteraction(slashCommand("verify", replies, mapOf("name" to "Luftiger")))
             runCurrent()
 
-            assertEquals(listOf(VerifyCommand.startedMessage(started)), replies.messages)
+            assertEquals(listOf(VerifyCommand.startedMessage(started, Language.GERMAN)), replies.messages)
         }
 
     @Test
@@ -113,7 +114,7 @@ class VerifyCommandTest {
             runCurrent()
 
             assertContains(replies.messages[0], "WarEra ist gerade nicht erreichbar")
-            assertEquals(BITS_UNAVAILABLE_MESSAGE, replies.messages[1])
+            assertEquals(bitsUnavailableMessage(Language.GERMAN), replies.messages[1])
         }
 
     @Test
@@ -128,7 +129,10 @@ class VerifyCommandTest {
 
             command.onChecked(VerificationCheckedEvent("42", "BITS-ABC234", CheckVerificationResponse.Linked("Luftiger"), occurredAt = 0))
 
-            assertEquals(listOf(VerifyCommand.checkMessage(CheckVerificationResponse.Linked("Luftiger"))), replies.messages)
+            assertEquals(
+                listOf(VerifyCommand.checkMessage(CheckVerificationResponse.Linked("Luftiger"), Language.GERMAN)),
+                replies.messages,
+            )
         }
 
     @Test
@@ -139,7 +143,7 @@ class VerifyCommandTest {
             command().onButtonInteraction(buttonClick("verify:check:BITS-ABC234", replies))
             runCurrent()
 
-            assertEquals(listOf(VerifyCommand.checkMessage(CheckVerificationResponse.TooEarly(4))), replies.messages)
+            assertEquals(listOf(VerifyCommand.checkMessage(CheckVerificationResponse.TooEarly(4), Language.GERMAN)), replies.messages)
         }
 
     @Test
@@ -151,5 +155,5 @@ class VerifyCommandTest {
             assertEquals(emptyList(), replies.messages)
         }
 
-    private fun TestScope.command() = VerifyCommand(backend, backgroundScope)
+    private fun TestScope.command() = VerifyCommand(backend, backgroundScope, languages())
 }

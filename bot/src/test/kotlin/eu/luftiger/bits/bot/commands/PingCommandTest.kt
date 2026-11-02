@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.PingResponse
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -18,7 +19,7 @@ class PingCommandTest {
         runTest {
             coEvery { backend.ping("42") } returns PingResponse(pingCount = 3, wareraCountryCount = null)
 
-            PingCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand("ping", replies))
+            PingCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand("ping", replies))
             runCurrent()
 
             assertEquals(listOf("Pong! Pings in den letzten 30 Tagen: 3, WarEra: nicht erreichbar"), replies.messages)
@@ -29,16 +30,16 @@ class PingCommandTest {
         runTest {
             coEvery { backend.ping(any()) } throws IllegalStateException("connection refused")
 
-            PingCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand("ping", replies))
+            PingCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand("ping", replies))
             runCurrent()
 
-            assertEquals(listOf(BITS_UNAVAILABLE_MESSAGE), replies.messages)
+            assertEquals(listOf(bitsUnavailableMessage(Language.GERMAN)), replies.messages)
         }
 
     @Test
     fun `other commands are left to their own listener`() =
         runTest {
-            PingCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand("verify", replies))
+            PingCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand("verify", replies))
             runCurrent()
 
             assertEquals(emptyList(), replies.messages)

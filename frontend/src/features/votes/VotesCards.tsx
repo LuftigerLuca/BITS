@@ -43,7 +43,7 @@ export function OpenVotesCard() {
         ) : votes.data.open.length === 0 ? (
           <EmptyState
             title="Gerade läuft keine Abstimmung"
-            description="Starte eine unter „Neue Abstimmung“ oder mit /abstimmung im Discord."
+            description="Starte eine unter „Neue Abstimmung“ oder mit /vote im Discord."
           />
         ) : (
           <Table>

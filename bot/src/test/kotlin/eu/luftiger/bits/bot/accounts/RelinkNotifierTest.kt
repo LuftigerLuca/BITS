@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.accounts
 
 import eu.luftiger.bits.shared.AccountLinkedEvent
+import eu.luftiger.bits.shared.Language
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -8,7 +9,23 @@ import kotlin.test.assertEquals
 
 class RelinkNotifierTest {
     private val sent = mutableListOf<Pair<String, String>>()
-    private val notifier = RelinkNotifier { userId, text -> sent += userId to text }
+    private val notifier = RelinkNotifier({ userId, text -> sent += userId to text }, { Language.GERMAN })
+
+    @Test
+    fun `the message comes in the language of the previous account`() =
+        runTest {
+            val asked = mutableListOf<String>()
+            val english =
+                RelinkNotifier({ userId, text -> sent += userId to text }, { userId ->
+                    asked += userId
+                    Language.ENGLISH
+                })
+
+            english.handle(relinked)
+
+            assertEquals(listOf("1"), asked)
+            assertContains(sent.single().second, "no longer linked to the WarEra account **\\_Luftiger\\_**")
+        }
 
     private val relinked =
         AccountLinkedEvent(
@@ -39,12 +56,12 @@ class RelinkNotifierTest {
     @Test
     fun `closed direct messages do not fail the event`() =
         runTest {
-            RelinkNotifier { _, _ -> error("Cannot send messages to this user") }.handle(relinked)
+            RelinkNotifier({ _, _ -> error("Cannot send messages to this user") }, { Language.GERMAN }).handle(relinked)
         }
 
     @Test
     fun `message names the account, the time and whom to ask`() {
-        val message = RelinkNotifier.message(relinked)
+        val message = RelinkNotifier.message(relinked, Language.GERMAN)
 
         assertContains(message, "**\\_Luftiger\\_**")
         assertContains(message, "<t:1800:f>")

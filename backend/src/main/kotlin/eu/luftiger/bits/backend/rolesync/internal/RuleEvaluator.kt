@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
 import eu.luftiger.bits.backend.rolesync.domain.RuleBlock
 import eu.luftiger.bits.backend.rolesync.domain.RuleCondition
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.MemberRoles
 import eu.luftiger.bits.shared.RoleGrant
 import eu.luftiger.bits.warera.WareraUser
@@ -148,7 +149,10 @@ class DskCheck(
         }
 
     /** German reason, e.g. "Mitglied der MU Deutsche Marine (DSK1)"; `null` unless [outcome] is [RoleOutcome.MET]. */
-    val label: String? = muName?.let { "Mitglied der MU $it (${dsk.name})" }
+    val label: String? get() = label(Language.GERMAN)
+
+    fun label(language: Language): String? =
+        muName?.let { language.text("Mitglied der MU $it (${dsk.name})", "Member of MU $it (${dsk.name})") }
 }
 
 enum class RoleOutcome {

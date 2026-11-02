@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 /**
- * What the [RuleEvaluator] judges a user against, loaded the same way for the role sync and for `/rollen`, so both
+ * What the [RuleEvaluator] judges a user against, loaded the same way for the role sync and for `/roles`, so both
  * come to the same result.
  */
 @Component

@@ -9,14 +9,14 @@ export const FEATURES: Record<Feature, { label: string; description: string }> =
   ROLE_SYNC: {
     label: 'Rollen-Sync',
     description:
-      'Vergibt und entzieht die Rollen nach den Regeln, dazu /rollen und die Rollen unter „Mein Account“. Solange ' +
+      'Vergibt und entzieht die Rollen nach den Regeln, dazu /roles und die Rollen unter „Mein Account“. Solange ' +
       'er aus ist, bleiben alle Rollen, wie sie sind; beim Einschalten werden alle Mitglieder neu abgeglichen.',
   },
   NICKNAMES: {
     label: 'Nicknames',
     description: 'Setzt WarEra-Namen als Nickname, dazu /nickname. Gesetzte Nicknames bleiben, wenn du sie ausschaltest.',
   },
-  PROFILE: { label: 'Profil', description: '/profil zeigt WarEra-Profile im Discord.' },
+  PROFILE: { label: 'Profil', description: '/profile zeigt WarEra-Profile im Discord.' },
   VOTES: {
     label: 'Abstimmungen',
     description:

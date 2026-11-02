@@ -11,7 +11,7 @@ export function useAccount() {
   return useQuery({ queryKey: [...ACCOUNT, 'overview'], queryFn: getAccount })
 }
 
-/** Judged with fresh WarEra data on every visit, like `/rollen`. */
+/** Judged with fresh WarEra data on every visit, like `/roles`. */
 export function useAccountRoles() {
   return useQuery({ queryKey: [...ACCOUNT, 'roles'], queryFn: getAccountRoles, staleTime: 0 })
 }

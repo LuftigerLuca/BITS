@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.ProfileDetail
 import eu.luftiger.bits.shared.ProfileParty
 import eu.luftiger.bits.shared.ProfileResponse
@@ -40,7 +41,7 @@ class ProfileCommandTest {
     fun `embed shows the profile with a link to WarEra`() {
         val embed =
             assertIs<ProfileCommand.Answer.Profile>(
-                ProfileCommand.answer(found, own = true, mention = "<@42>", roleIds = setOf("r-low", "other", "r-high")),
+                ProfileCommand.answer(found, own = true, mention = "<@42>", roleIds = setOf("r-low", "other", "r-high"), Language.GERMAN),
             ).embed
 
         assertEquals("\\_Luftiger\\_", embed.title)
@@ -90,8 +91,8 @@ class ProfileCommandTest {
 
     @Test
     fun `missing link points the user to verify, but not for someone else`() {
-        val own = ProfileCommand.answer(ProfileResponse.NotLinked, own = true, mention = "<@42>", roleIds = null)
-        val other = ProfileCommand.answer(ProfileResponse.NotLinked, own = false, mention = "<@7>", roleIds = null)
+        val own = ProfileCommand.answer(ProfileResponse.NotLinked, own = true, mention = "<@42>", roleIds = null, Language.GERMAN)
+        val other = ProfileCommand.answer(ProfileResponse.NotLinked, own = false, mention = "<@7>", roleIds = null, Language.GERMAN)
 
         assertEquals(
             ProfileCommand.Answer.Hint(
@@ -109,7 +110,7 @@ class ProfileCommandTest {
             coEvery { backend.profile("7", any()) } returns found
             val replies = Replies()
 
-            ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(
+            ProfileCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(
                 profileCommand(replies, target = member("7"), targetRoleIds = listOf("r-mid")),
             )
             runCurrent()
@@ -128,7 +129,7 @@ class ProfileCommandTest {
             coEvery { backend.profile("42", any()) } returns ProfileResponse.NotLinked
             val replies = Replies()
 
-            ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies))
+            ProfileCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(profileCommand(replies))
             runCurrent()
 
             assertTrue(replies.deletedOriginal)
@@ -144,10 +145,10 @@ class ProfileCommandTest {
             coEvery { backend.profile(any(), any()) } throws WareraUnavailableException(RuntimeException("503"))
             val replies = Replies()
 
-            ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies))
+            ProfileCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(profileCommand(replies))
             runCurrent()
 
-            assertEquals(listOf(ProfileCommand.WARERA_UNAVAILABLE_MESSAGE), replies.ephemeralMessages)
+            assertEquals(listOf(wareraUnavailableMessage(Language.GERMAN)), replies.ephemeralMessages)
         }
 
     @Test
@@ -157,10 +158,10 @@ class ProfileCommandTest {
             coEvery { backend.profile(any(), any()) } throws IllegalStateException("connection refused")
             val replies = Replies()
 
-            ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies))
+            ProfileCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(profileCommand(replies))
             runCurrent()
 
-            assertEquals(listOf(BITS_UNAVAILABLE_MESSAGE), replies.ephemeralMessages)
+            assertEquals(listOf(bitsUnavailableMessage(Language.GERMAN)), replies.ephemeralMessages)
         }
 
     @Test
@@ -170,7 +171,11 @@ class ProfileCommandTest {
             coEvery { backend.profile("42", any()) } returns found
             val replies = Replies()
 
-            ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies, ownRoleIds = listOf("r-low")))
+            ProfileCommand(
+                backend,
+                backgroundScope,
+                languages(),
+            ).onSlashCommandInteraction(profileCommand(replies, ownRoleIds = listOf("r-low")))
             runCurrent()
 
             assertEquals(
@@ -190,7 +195,7 @@ class ProfileCommandTest {
             coEvery { backend.profile("7", any()) } returns found
             val replies = Replies()
 
-            ProfileCommand(backend, backgroundScope).onSlashCommandInteraction(profileCommand(replies, target = member("7")))
+            ProfileCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(profileCommand(replies, target = member("7")))
             runCurrent()
 
             assertEquals(
@@ -206,8 +211,9 @@ class ProfileCommandTest {
         profile: ProfileResponse.Found,
         roleIds: Set<String>?,
     ): List<Pair<String?, String?>> =
-        assertIs<ProfileCommand.Answer.Profile>(ProfileCommand.answer(profile, own = true, mention = "<@42>", roleIds = roleIds))
-            .embed.fields
+        assertIs<ProfileCommand.Answer.Profile>(
+            ProfileCommand.answer(profile, own = true, mention = "<@42>", roleIds = roleIds, Language.GERMAN),
+        ).embed.fields
             .map { it.name to it.value }
 
     private fun withRoles(roleIds: List<String>): Member =
@@ -236,7 +242,7 @@ class ProfileCommandTest {
         every { event.user } returns self
         val ownMember = withRoles(ownRoleIds)
         every { event.member } returns ownMember
-        every { event.getOption("nutzer") } returns
+        every { event.getOption("user") } returns
             target?.let { user ->
                 mockk {
                     every { asUser } returns user

@@ -8,7 +8,7 @@ import java.time.Clock
 import java.time.Duration
 
 /**
- * Limits how often a single member may start something that calls WarEra: `/verify`, `/profil`, `/rollen` and the
+ * Limits how often a single member may start something that calls WarEra: `/verify`, `/profile`, `/roles` and the
  * roles on "Mein Account". All WarEra calls share 100 requests per minute, so without a limit one member calling these
  * again and again could hold up the verification and the role sync of everybody else. The count is per member and
  * minute of the [Clock], shared by all these actions, and kept in Redis. Admin pages are not limited.

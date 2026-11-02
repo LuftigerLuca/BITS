@@ -2,8 +2,10 @@ package eu.luftiger.bits.bot.votes
 
 import eu.luftiger.bits.bot.backend.VoteBackend
 import eu.luftiger.bits.bot.commands.Replies
+import eu.luftiger.bits.bot.commands.languages
 import eu.luftiger.bits.bot.commands.slashCommand
 import eu.luftiger.bits.shared.CloseVoteResponse
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.VoteChoice
@@ -37,12 +39,12 @@ class VoteCommandTest {
             coEvery { backend.startVote(capture(request)) } returns StartVoteResponse.Started(7)
             val replies = Replies()
 
-            VoteCommand(backend, backgroundScope, clock).onSlashCommandInteraction(
+            VoteCommand(backend, backgroundScope, languages(), clock).onSlashCommandInteraction(
                 start(
                     replies,
                     mapOf(
-                        "frage" to "Steuern?",
-                        "ende" to "3d",
+                        "question" to "Steuern?",
+                        "end" to "3d",
                     ),
                 ),
             )
@@ -61,14 +63,14 @@ class VoteCommandTest {
         runTest {
             val request = slot<StartVoteRequest>()
             coEvery { backend.startVote(capture(request)) } returns StartVoteResponse.Started(7)
-            val command = VoteCommand(backend, backgroundScope, clock)
+            val command = VoteCommand(backend, backgroundScope, languages(), clock)
 
-            command.onSlashCommandInteraction(start(Replies(), mapOf("frage" to "Steuern?", "ende" to "offen", "schwelle" to "50")))
+            command.onSlashCommandInteraction(start(Replies(), mapOf("question" to "Steuern?", "end" to "offen", "threshold" to "50")))
             runCurrent()
             assertEquals(VoteThreshold(50, VoteChoice.YES), request.captured.threshold)
             assertEquals(null, request.captured.endsAt)
 
-            command.onSlashCommandInteraction(start(Replies(), mapOf("frage" to "Steuern?", "schwelle" to "66", "stimme" to "NO")))
+            command.onSlashCommandInteraction(start(Replies(), mapOf("question" to "Steuern?", "threshold" to "66", "choice" to "NO")))
             runCurrent()
             assertEquals(VoteThreshold(66, VoteChoice.NO), request.captured.threshold)
         }
@@ -76,16 +78,16 @@ class VoteCommandTest {
     @Test
     fun `a threshold outside 1 to 99 percent or without percentage is explained, not sent`() =
         runTest {
-            val command = VoteCommand(backend, backgroundScope, clock)
+            val command = VoteCommand(backend, backgroundScope, languages(), clock)
             val tooHigh = Replies()
             val choiceOnly = Replies()
 
-            command.onSlashCommandInteraction(start(tooHigh, mapOf("frage" to "?", "schwelle" to "100")))
-            command.onSlashCommandInteraction(start(choiceOnly, mapOf("frage" to "?", "stimme" to "NO")))
+            command.onSlashCommandInteraction(start(tooHigh, mapOf("question" to "?", "threshold" to "100")))
+            command.onSlashCommandInteraction(start(choiceOnly, mapOf("question" to "?", "choice" to "NO")))
             runCurrent()
 
             assertEquals(listOf("Die Schwelle gibst du in Prozent von 1 bis 99 an, z. B. `50` für mehr als die Hälfte."), tooHigh.messages)
-            assertEquals(listOf("Gib zur Stimme auch die Schwelle an, z. B. `schwelle:50`, oder lass beides weg."), choiceOnly.messages)
+            assertEquals(listOf("Gib zur Stimme auch die Schwelle an, z. B. `threshold:50`, oder lass beides weg."), choiceOnly.messages)
             coVerify(exactly = 0) { backend.startVote(any()) }
         }
 
@@ -97,8 +99,9 @@ class VoteCommandTest {
             VoteCommand(
                 backend,
                 backgroundScope,
+                languages(),
                 clock,
-            ).onSlashCommandInteraction(start(replies, mapOf("frage" to "?", "ende" to "morgen")))
+            ).onSlashCommandInteraction(start(replies, mapOf("question" to "?", "end" to "morgen")))
             runCurrent()
 
             assertContains(replies.messages.single(), "Das Ende verstehe ich nicht")
@@ -110,13 +113,13 @@ class VoteCommandTest {
         runTest {
             coEvery { backend.closeVote(7, any(), cancel = true) } returns CloseVoteResponse.Forbidden
             val replies = Replies()
-            val event = withMember(slashCommand("abstimmung", replies, mapOf("abstimmung" to "7")))
-            every { event.subcommandName } returns "abbrechen"
+            val event = withMember(slashCommand("vote", replies, mapOf("vote" to "7")))
+            every { event.subcommandName } returns "cancel"
 
-            VoteCommand(backend, backgroundScope, clock).onSlashCommandInteraction(event)
+            VoteCommand(backend, backgroundScope, languages(), clock).onSlashCommandInteraction(event)
             runCurrent()
 
-            assertEquals(listOf(VoteCommand.FORBIDDEN_MESSAGE), replies.messages)
+            assertEquals(listOf(VoteCommand.forbiddenMessage(Language.GERMAN)), replies.messages)
         }
 
     @Test
@@ -124,10 +127,10 @@ class VoteCommandTest {
         runTest {
             coEvery { backend.closeVote(7, any(), cancel = false) } returns CloseVoteResponse.NotOpen
             val replies = Replies()
-            val event = withMember(slashCommand("abstimmung", replies, mapOf("abstimmung" to "7")))
-            every { event.subcommandName } returns "beenden"
+            val event = withMember(slashCommand("vote", replies, mapOf("vote" to "7")))
+            every { event.subcommandName } returns "end"
 
-            VoteCommand(backend, backgroundScope, clock).onSlashCommandInteraction(event)
+            VoteCommand(backend, backgroundScope, languages(), clock).onSlashCommandInteraction(event)
             runCurrent()
 
             assertEquals(listOf("Diese Abstimmung läuft nicht mehr."), replies.messages)
@@ -137,12 +140,12 @@ class VoteCommandTest {
         replies: Replies,
         options: Map<String, String>,
     ): SlashCommandInteractionEvent {
-        val event = withMember(slashCommand("abstimmung", replies, options))
+        val event = withMember(slashCommand("vote", replies, options))
         val role = mockk<Role>(relaxed = true) { every { id } returns "r-congress" }
         val channel = mockk<GuildChannelUnion>(relaxed = true) { every { id } returns "c-votes" }
-        every { event.subcommandName } returns "starten"
-        every { event.getOption("rolle") } returns mockk { every { asRole } returns role }
-        every { event.getOption("kanal") } returns mockk { every { asChannel } returns channel }
+        every { event.subcommandName } returns "start"
+        every { event.getOption("role") } returns mockk { every { asRole } returns role }
+        every { event.getOption("channel") } returns mockk { every { asChannel } returns channel }
         every {
             event.member!!
                 .guild.selfMember

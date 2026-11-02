@@ -11,7 +11,7 @@ export function DataCard() {
         <CardTitle>Deine Daten</CardTitle>
         <CardDescription>
           Lade als JSON-Datei herunter, was BITS zu deiner Discord-ID speichert: Verknüpfung, offene Verifizierung,
-          Nickname-Einstellung, Pings und Einträge im System-Log. Zustell-Events für den Bot, Server-Logs und Backups
+          Nickname-Einstellung, Sprache, Pings und Einträge im System-Log. Zustell-Events für den Bot, Server-Logs und Backups
           sind nicht enthalten; sie werden nach festen Fristen gelöscht.
         </CardDescription>
       </CardHeader>

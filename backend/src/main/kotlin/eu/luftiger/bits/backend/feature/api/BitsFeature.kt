@@ -13,13 +13,13 @@ enum class BitsFeature {
     /** `/verify` and the button that checks the code. Unlinking always works, since it is about the member's data. */
     VERIFICATION,
 
-    /** The sync of the managed roles and `/rollen`. */
+    /** The sync of the managed roles and `/roles`. */
     ROLE_SYNC,
 
     /** Nicknames from WarEra, set by the same sync as the roles, and `/nickname`. */
     NICKNAMES,
 
-    /** `/profil`. */
+    /** `/profile`. */
     PROFILE,
 
     /** Starting votes; votes that are open already run to their end. */

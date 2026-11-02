@@ -9,6 +9,14 @@ data class StoredAccountData(
     val link: StoredLink?,
     val verification: StoredVerification?,
     val nicknameOptedInAt: Instant?,
+    val language: StoredLanguage?,
+)
+
+/** The language the member chose; without it, BITS goes by their Discord client. */
+@NamedInterface("api")
+data class StoredLanguage(
+    val language: String,
+    val updatedAt: Instant,
 )
 
 @NamedInterface("api")

@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.domain
 
 import eu.luftiger.bits.backend.rolesync.api.dto.GovernmentOffice
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import jakarta.persistence.AttributeConverter
 import jakarta.persistence.CollectionTable
@@ -83,7 +84,9 @@ class RuleBlock(
 
     /** German description, e.g. "Staatsbürgerschaft Germany und Level ab 10"; the reason in Discord's audit log. */
     val label: String
-        get() = conditions.joinToString(" und ") { it.label }
+        get() = label(Language.GERMAN)
+
+    fun label(language: Language): String = conditions.joinToString(language.text(" und ", " and ")) { it.label(language) }
 
     /** The conditions regardless of their order, to catch the same block twice in a rule. */
     val key: String
@@ -139,23 +142,44 @@ class RuleCondition(
 
     /** German description, e.g. "Level ab 10". */
     val label: String
-        get() =
-            when (type) {
-                ConditionType.CITIZENSHIP -> "Staatsbürgerschaft $targetName"
-                ConditionType.GOVERNMENT_OFFICE -> "${officesLabel()} in $targetName"
-                ConditionType.MILITARY_UNIT -> "Mitglied der MU $targetName"
-                ConditionType.LEVEL -> "Level ab $threshold"
-                ConditionType.MILITARY_RANK -> "Militärrang ab $threshold"
-                ConditionType.COMPANIES -> "Besitz von mindestens $threshold ${if (threshold == 1) "Firma" else "Firmen"}"
-                ConditionType.PARTY -> "Mitglied der Partei $targetName"
-                ConditionType.MU_LEADERSHIP -> "${muRole?.label} ${if (muId == null) "einer MU" else "der MU $targetName"}"
-                ConditionType.PARTY_LEADER -> if (partyId == null) "Parteivorsitz in $targetName" else "Vorsitz der Partei $targetName"
+        get() = label(Language.GERMAN)
+
+    /** The description for a member who reads [language], e.g. "Level 10 or higher". */
+    fun label(language: Language): String =
+        when (type) {
+            ConditionType.CITIZENSHIP -> language.text("Staatsbürgerschaft $targetName", "Citizenship $targetName")
+            ConditionType.GOVERNMENT_OFFICE -> "${officesLabel(language)} in $targetName"
+            ConditionType.MILITARY_UNIT -> language.text("Mitglied der MU $targetName", "Member of MU $targetName")
+            ConditionType.LEVEL -> language.text("Level ab $threshold", "Level $threshold or higher")
+            ConditionType.MILITARY_RANK -> language.text("Militärrang ab $threshold", "Military rank $threshold or higher")
+            ConditionType.COMPANIES ->
+                language.text(
+                    "Besitz von mindestens $threshold ${if (threshold == 1) "Firma" else "Firmen"}",
+                    "Owns at least $threshold ${if (threshold == 1) "company" else "companies"}",
+                )
+            ConditionType.PARTY -> language.text("Mitglied der Partei $targetName", "Member of party $targetName")
+            ConditionType.MU_LEADERSHIP -> {
+                val unit =
+                    if (muId == null) {
+                        language.text("einer MU", "of an MU")
+                    } else {
+                        language.text("der MU $targetName", "of MU $targetName")
+                    }
+                "${muRole?.label(language)} $unit"
             }
+            ConditionType.PARTY_LEADER ->
+                if (partyId == null) {
+                    language.text("Parteivorsitz in $targetName", "Party leader in $targetName")
+                } else {
+                    language.text("Vorsitz der Partei $targetName", "Leader of party $targetName")
+                }
+        }
 
     /** The [offices] by rank, e.g. "Präsident, Vizepräsident oder Außenminister". */
-    fun officesLabel(): String {
-        val labels = offices.sorted().map { it.label }
-        return if (labels.size <= 1) labels.joinToString() else "${labels.dropLast(1).joinToString(", ")} oder ${labels.last()}"
+    fun officesLabel(language: Language = Language.GERMAN): String {
+        val labels = offices.sorted().map { it.label(language) }
+        if (labels.size <= 1) return labels.joinToString()
+        return "${labels.dropLast(1).joinToString(", ")} ${language.text("oder", "or")} ${labels.last()}"
     }
 
     /**
@@ -196,14 +220,17 @@ enum class ConditionType {
     PARTY_LEADER,
 }
 
-/** A rank in a military unit, lowest first, with its German name; each includes the ranks above it. */
+/** A rank in a military unit, lowest first, with its names; each includes the ranks above it. */
 enum class MilitaryUnitRole(
     val label: String,
+    private val englishLabel: String,
 ) {
-    COMMANDER("Kommandeur"),
-    MANAGER("Manager"),
-    OWNER("Besitzer"),
+    COMMANDER("Kommandeur", "Commander"),
+    MANAGER("Manager", "Manager"),
+    OWNER("Besitzer", "Owner"),
     ;
+
+    fun label(language: Language) = language.text(label, englishLabel)
 
     /** Whether [userId] holds this rank or a higher one in [mu]. */
     fun isHeldBy(

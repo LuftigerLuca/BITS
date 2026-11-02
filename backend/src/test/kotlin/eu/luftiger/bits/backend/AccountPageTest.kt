@@ -61,8 +61,8 @@ class AccountPageTest {
     fun reset() {
         awaitBackgroundWork()
         jdbc.execute(
-            "TRUNCATE account_link, account_verification, nickname_opt_in, role_rule, role_rule_condition, discord_role, " +
-                "event_publication, ping_log, audit_entry, system_log_entry, system_log_item",
+            "TRUNCATE account_link, account_verification, nickname_opt_in, language_preference, role_rule, role_rule_condition, " +
+                "discord_role, event_publication, ping_log, audit_entry, system_log_entry, system_log_item",
         )
         redisTemplate.delete(EventStream.KEY)
         warera.reset()
@@ -157,6 +157,9 @@ class AccountPageTest {
     fun `the download holds what BITS keeps about the member and nothing about others`() {
         link("1", "w1", Instant.parse("2025-12-24T18:00:00Z"))
         jdbc.update("INSERT INTO nickname_opt_in (discord_user_id, opted_in_at) VALUES ('1', '2025-12-25T10:00:00Z')")
+        jdbc.update(
+            "INSERT INTO language_preference (discord_user_id, language, updated_at) VALUES ('1', 'ENGLISH', '2025-12-26T10:00:00Z')",
+        )
         jdbc.update("INSERT INTO ping_log (discord_user_id, created_at) VALUES ('1', '2025-12-30T09:00:00Z'), ('2', now())")
         // Bob took the WarEra account w2 from the member, then the member linked w1.
         insertEntry("ACCOUNT_LINKED", "1", "Luca", null, null, "w2", "Other")
@@ -186,6 +189,8 @@ class AccountPageTest {
         assertEquals("2025-12-24T18:00:00Z", export.read("$.link.verifiedAt"))
         assertEquals(null, export.read<Any?>("$.openVerification"))
         assertEquals("2025-12-25T10:00:00Z", export.read("$.nicknameOptedInAt"))
+        assertEquals("ENGLISH", export.read("$.language.language"))
+        assertEquals("2025-12-26T10:00:00Z", export.read("$.language.updatedAt"))
         assertEquals(listOf("2025-12-30T09:00:00Z"), export.read("$.pings"))
         assertEquals(listOf("ACCOUNT_LINKED", "ACCOUNT_RELINKED"), export.read("$.systemLog.entries[*].kind"))
         assertEquals(listOf("Luca", "Luca"), export.read("$.systemLog.entries[*].discordName"))

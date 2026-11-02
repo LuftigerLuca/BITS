@@ -96,7 +96,7 @@ class MemberAdminService(
     }
 
     /**
-     * Judged with fresh WarEra data like `/rollen`, with whether the member holds each role now.
+     * Judged with fresh WarEra data like `/roles`, with whether the member holds each role now.
      *
      * @throws eu.luftiger.bits.warera.WareraApiException if the member's WarEra data cannot be loaded
      */

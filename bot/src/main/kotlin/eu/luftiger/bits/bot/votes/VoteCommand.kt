@@ -2,8 +2,10 @@ package eu.luftiger.bits.bot.votes
 
 import eu.luftiger.bits.bot.backend.VoteBackend
 import eu.luftiger.bits.bot.channels.ChannelReporter
-import eu.luftiger.bits.bot.commands.BITS_UNAVAILABLE_MESSAGE
+import eu.luftiger.bits.bot.commands.bitsUnavailableMessage
+import eu.luftiger.bits.bot.language.Languages
 import eu.luftiger.bits.shared.CloseVoteResponse
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.VoteActor
@@ -20,6 +22,7 @@ import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
+import net.dv8tion.jda.api.interactions.DiscordLocale
 import net.dv8tion.jda.api.interactions.commands.Command
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
@@ -30,12 +33,13 @@ import org.slf4j.LoggerFactory
 import java.time.Clock
 
 /**
- * `/abstimmung starten|beenden|abbrechen` for admins and the roles the dashboard allows; the backend decides with the
+ * `/vote start|end|cancel` for admins and the roles the dashboard allows; the backend decides with the
  * member's roles whether they may. The vote itself is posted once the backend's event arrives, see [VoteEvents].
  */
 class VoteCommand(
     private val backend: VoteBackend,
     private val scope: CoroutineScope,
+    private val languages: Languages,
     private val clock: Clock = Clock.systemUTC(),
 ) : ListenerAdapter() {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -45,18 +49,19 @@ class VoteCommand(
         event.deferReply(true).queue()
         val member = event.member
         scope.launch {
+            val language = languages.of(event)
             val message =
                 try {
                     when {
-                        member == null -> "Abstimmungen gibt es nur auf dem Server."
-                        event.subcommandName == START -> start(event, member)
-                        else -> close(event, member, cancel = event.subcommandName == CANCEL)
+                        member == null -> language.text("Abstimmungen gibt es nur auf dem Server.", "Votes only exist on the server.")
+                        event.subcommandName == START -> start(event, member, language)
+                        else -> close(event, member, cancel = event.subcommandName == CANCEL, language)
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     log.error("Vote command failed at the backend", e)
-                    BITS_UNAVAILABLE_MESSAGE
+                    bitsUnavailableMessage(language)
                 }
             event.hook.sendMessage(message).queue()
         }
@@ -87,21 +92,34 @@ class VoteCommand(
     private suspend fun start(
         event: SlashCommandInteractionEvent,
         member: Member,
+        language: Language,
     ): String {
         val question = event.getOption(OPTION_QUESTION)?.asString.orEmpty()
-        val role = event.getOption(OPTION_ROLE)?.asRole ?: return "Wähle die Rolle, die abstimmen darf."
-        val channel = event.getOption(OPTION_CHANNEL)?.asChannel as? GuildChannel ?: return "Wähle einen Kanal."
+        val role =
+            event.getOption(OPTION_ROLE)?.asRole
+                ?: return language.text("Wähle die Rolle, die abstimmen darf.", "Choose the role that may vote.")
+        val channel =
+            event.getOption(OPTION_CHANNEL)?.asChannel as? GuildChannel
+                ?: return language.text("Wähle einen Kanal.", "Choose a channel.")
         val endText = event.getOption(OPTION_END)?.asString ?: VoteMessages.DEFAULT_DURATION
-        if (role.isPublicRole) return "Wähle eine Rolle, nicht @everyone."
+        if (role.isPublicRole) return language.text("Wähle eine Rolle, nicht @everyone.", "Choose a role, not @everyone.")
         if (!member.guild.selfMember.hasPermission(channel, ChannelReporter.POST_PERMISSIONS)) {
-            return "In ${channel.asMention} kann ich keine Abstimmung posten. Ich brauche dort die Rechte, Nachrichten, Embeds und " +
-                "Dateien zu senden und den Verlauf zu lesen."
+            return language.text(
+                "In ${channel.asMention} kann ich keine Abstimmung posten. Ich brauche dort die Rechte, Nachrichten, Embeds und " +
+                    "Dateien zu senden und den Verlauf zu lesen.",
+                "I cannot post a vote in ${channel.asMention}. I need the permissions to send messages, embeds and files there and " +
+                    "to read the history.",
+            )
         }
         val endsAt =
             when (val end = VoteMessages.parseDuration(endText)) {
                 null ->
-                    return "Das Ende verstehe ich nicht. Gib eine Dauer wie `48h`, `3d` oder `90m` an, höchstens 90 Tage, oder " +
-                        "`${VoteMessages.OPEN_END}` für eine Abstimmung ohne Enddatum."
+                    return language.text(
+                        "Das Ende verstehe ich nicht. Gib eine Dauer wie `48h`, `3d` oder `90m` an, höchstens 90 Tage, oder " +
+                            "`${VoteMessages.OPEN_END}` für eine Abstimmung ohne Enddatum.",
+                        "I do not understand the end. Give a duration like `48h`, `3d` or `90m`, at most 90 days, or " +
+                            "`${VoteMessages.OPEN_END}` for a vote without an end date.",
+                    )
                 VoteEnd.Open -> null
                 is VoteEnd.After -> clock.instant().plus(end.duration).toEpochMilli()
             }
@@ -111,22 +129,37 @@ class VoteCommand(
         val percent = thresholdText?.toIntOrNull()
         val choice = thresholdChoiceText?.let { text -> THRESHOLD_CHOICES.firstOrNull { it.name == text } }
         if (thresholdText != null && (percent == null || percent !in 1..99)) {
-            return "Die Schwelle gibst du in Prozent von 1 bis 99 an, z. B. `50` für mehr als die Hälfte."
+            return language.text(
+                "Die Schwelle gibst du in Prozent von 1 bis 99 an, z. B. `50` für mehr als die Hälfte.",
+                "Give the threshold in percent from 1 to 99, e.g. `50` for more than half.",
+            )
         }
-        if (thresholdChoiceText != null && choice == null) return "Die Schwelle gilt für `Ja` oder `Nein`."
+        if (thresholdChoiceText != null && choice == null) {
+            return language.text("Die Schwelle gilt für `Ja` oder `Nein`.", "The threshold applies to `Yes` or `No`.")
+        }
         if (percent == null && choice != null) {
-            return "Gib zur Stimme auch die Schwelle an, z. B. `$OPTION_THRESHOLD:50`, oder lass beides weg."
+            return language.text(
+                "Gib zur Stimme auch die Schwelle an, z. B. `$OPTION_THRESHOLD:50`, oder lass beides weg.",
+                "Give the threshold along with the choice, e.g. `$OPTION_THRESHOLD:50`, or leave out both.",
+            )
         }
         val threshold = percent?.let { VoteThreshold(it, choice ?: VoteChoice.YES) }
         val request = StartVoteRequest(actor(member), question, role.id, channel.id, endsAt, threshold)
         return when (backend.startVote(request)) {
             is StartVoteResponse.Started ->
-                "Die Abstimmung ist gestartet und erscheint gleich in ${channel.asMention}. Beenden oder abbrechen kannst du sie " +
-                    "mit `/$NAME $END` oder `/$NAME $CANCEL` oder im Dashboard."
-            StartVoteResponse.Forbidden -> FORBIDDEN_MESSAGE
+                language.text(
+                    "Die Abstimmung ist gestartet und erscheint gleich in ${channel.asMention}. Beenden oder abbrechen kannst du sie " +
+                        "mit `/$NAME $END` oder `/$NAME $CANCEL` oder im Dashboard.",
+                    "The vote has started and will appear in ${channel.asMention} shortly. You can end or cancel it with " +
+                        "`/$NAME $END` or `/$NAME $CANCEL` or in the dashboard.",
+                )
+            StartVoteResponse.Forbidden -> forbiddenMessage(language)
             StartVoteResponse.ChannelNotPostable ->
-                "In ${channel.asMention} kann ich laut meinem letzten Stand nicht posten. Prüfe meine Rechte dort und versuche es " +
-                    "in ein paar Sekunden noch einmal."
+                language.text(
+                    "In ${channel.asMention} kann ich laut meinem letzten Stand nicht posten. Prüfe meine Rechte dort und versuche es " +
+                        "in ein paar Sekunden noch einmal.",
+                    "As far as I know, I cannot post in ${channel.asMention}. Check my permissions there and try again in a few seconds.",
+                )
         }
     }
 
@@ -134,32 +167,41 @@ class VoteCommand(
         event: SlashCommandInteractionEvent,
         member: Member,
         cancel: Boolean,
+        language: Language,
     ): String {
-        val voteId = event.getOption(OPTION_VOTE)?.asString?.toLongOrNull() ?: return "Wähle eine laufende Abstimmung aus der Liste."
+        val voteId =
+            event.getOption(OPTION_VOTE)?.asString?.toLongOrNull()
+                ?: return language.text("Wähle eine laufende Abstimmung aus der Liste.", "Choose a running vote from the list.")
         return when (backend.closeVote(voteId, actor(member), cancel)) {
             CloseVoteResponse.Closed ->
                 if (cancel) {
-                    "Die Abstimmung ist abgebrochen. Es gibt keine Auswertung, die abgegebenen Stimmen sind gelöscht."
+                    language.text(
+                        "Die Abstimmung ist abgebrochen. Es gibt keine Auswertung, die abgegebenen Stimmen sind gelöscht.",
+                        "The vote is cancelled. There is no result, and the votes cast are deleted.",
+                    )
                 } else {
-                    "Die Abstimmung ist beendet. Die Auswertung erscheint in ein paar Minuten in ihrem Kanal."
+                    language.text(
+                        "Die Abstimmung ist beendet. Die Auswertung erscheint in ein paar Minuten in ihrem Kanal.",
+                        "The vote has ended. The result will appear in its channel in a few minutes.",
+                    )
                 }
-            CloseVoteResponse.Forbidden -> FORBIDDEN_MESSAGE
-            CloseVoteResponse.NotOpen -> "Diese Abstimmung läuft nicht mehr."
+            CloseVoteResponse.Forbidden -> forbiddenMessage(language)
+            CloseVoteResponse.NotOpen -> language.text("Diese Abstimmung läuft nicht mehr.", "This vote is no longer running.")
         }
     }
 
     companion object {
-        const val NAME = "abstimmung"
-        const val START = "starten"
-        private const val END = "beenden"
-        private const val CANCEL = "abbrechen"
-        private const val OPTION_QUESTION = "frage"
-        private const val OPTION_ROLE = "rolle"
-        private const val OPTION_CHANNEL = "kanal"
-        private const val OPTION_END = "ende"
-        private const val OPTION_THRESHOLD = "schwelle"
-        private const val OPTION_THRESHOLD_CHOICE = "stimme"
-        private const val OPTION_VOTE = "abstimmung"
+        const val NAME = "vote"
+        const val START = "start"
+        private const val END = "end"
+        private const val CANCEL = "cancel"
+        private const val OPTION_QUESTION = "question"
+        private const val OPTION_ROLE = "role"
+        private const val OPTION_CHANNEL = "channel"
+        private const val OPTION_END = "end"
+        private const val OPTION_THRESHOLD = "threshold"
+        private const val OPTION_THRESHOLD_CHOICE = "choice"
+        private const val OPTION_VOTE = "vote"
         private const val AUTOCOMPLETE_TIMEOUT_MILLIS = 2_500L
 
         /** Like the backend's limit. */
@@ -168,44 +210,71 @@ class VoteCommand(
         /** Abstaining decides nothing, so a threshold is for Yes or No only. */
         private val THRESHOLD_CHOICES = listOf(VoteChoice.YES, VoteChoice.NO)
 
-        internal const val FORBIDDEN_MESSAGE =
-            "Abstimmungen verwalten dürfen nur Admins und Mitglieder der Rollen, die dafür im Dashboard freigegeben sind."
+        internal fun forbiddenMessage(language: Language): String =
+            language.text(
+                "Abstimmungen verwalten dürfen nur Admins und Mitglieder der Rollen, die dafür im Dashboard freigegeben sind.",
+                "Only admins and members of the roles allowed in the dashboard may manage votes.",
+            )
+
+        private fun runningVote() =
+            OptionData(OptionType.STRING, OPTION_VOTE, "The running vote", true, true)
+                .setDescriptionLocalization(DiscordLocale.GERMAN, "Die laufende Abstimmung")
 
         val data: SlashCommandData =
             Commands
-                .slash(NAME, "Startet, beendet oder bricht eine Ja/Nein-Abstimmung ab")
+                .slash(NAME, "Starts, ends or cancels a yes/no vote")
+                .setDescriptionLocalization(DiscordLocale.GERMAN, "Startet, beendet oder bricht eine Ja/Nein-Abstimmung ab")
                 .addSubcommands(
-                    SubcommandData(START, "Startet eine Abstimmung mit den Buttons Ja, Nein und Enthaltung")
+                    SubcommandData(START, "Starts a vote with the buttons Ja, Nein and Enthaltung")
+                        .setDescriptionLocalization(DiscordLocale.GERMAN, "Startet eine Abstimmung mit den Buttons Ja, Nein und Enthaltung")
                         .addOptions(
-                            OptionData(OptionType.STRING, OPTION_QUESTION, "Worüber abgestimmt wird", true)
+                            OptionData(OptionType.STRING, OPTION_QUESTION, "What the vote is about", true)
+                                .setDescriptionLocalization(DiscordLocale.GERMAN, "Worüber abgestimmt wird")
                                 .setMaxLength(MAX_QUESTION_LENGTH),
-                            OptionData(OptionType.ROLE, OPTION_ROLE, "Wer abstimmen darf", true),
-                            OptionData(OptionType.CHANNEL, OPTION_CHANNEL, "Wo die Abstimmung und ihr Ergebnis erscheinen", true)
+                            OptionData(OptionType.ROLE, OPTION_ROLE, "Who may vote", true)
+                                .setDescriptionLocalization(DiscordLocale.GERMAN, "Wer abstimmen darf"),
+                            OptionData(OptionType.CHANNEL, OPTION_CHANNEL, "Where the vote and its result appear", true)
+                                .setDescriptionLocalization(DiscordLocale.GERMAN, "Wo die Abstimmung und ihr Ergebnis erscheinen")
                                 .setChannelTypes(ChannelType.TEXT, ChannelType.NEWS),
                             OptionData(
                                 OptionType.STRING,
                                 OPTION_END,
-                                "Dauer wie 48h, 3d oder 90m, oder „${VoteMessages.OPEN_END}“ für kein Enddatum; Standard 48h",
+                                "Duration like 48h, 3d or 90m, or “${VoteMessages.OPEN_END}” for no end date; default 48h",
                                 false,
+                            ).setDescriptionLocalization(
+                                DiscordLocale.GERMAN,
+                                "Dauer wie 48h, 3d oder 90m, oder „${VoteMessages.OPEN_END}“ für kein Enddatum; Standard 48h",
                             ),
                             OptionData(
                                 OptionType.INTEGER,
                                 OPTION_THRESHOLD,
-                                "Endet vorzeitig, sobald mehr als so viel Prozent aller Stimmberechtigten mit „stimme“ stimmen",
+                                "Ends early once more than this percentage of all voters vote “choice”",
                                 false,
+                            ).setDescriptionLocalization(
+                                DiscordLocale.GERMAN,
+                                "Endet vorzeitig, sobald mehr als so viel Prozent aller Stimmberechtigten mit „choice“ stimmen",
                             ).setRequiredRange(1, 99),
                             OptionData(
                                 OptionType.STRING,
                                 OPTION_THRESHOLD_CHOICE,
-                                "Für welche Stimme die Schwelle gilt; Standard Ja",
+                                "Which vote the threshold applies to; default Yes",
                                 false,
-                            ).addChoice(VoteMessages.label(VoteChoice.YES), VoteChoice.YES.name)
-                                .addChoice(VoteMessages.label(VoteChoice.NO), VoteChoice.NO.name),
+                            ).setDescriptionLocalization(DiscordLocale.GERMAN, "Für welche Stimme die Schwelle gilt; Standard Ja")
+                                .addChoices(
+                                    Command
+                                        .Choice(VoteMessages.label(VoteChoice.YES, Language.ENGLISH), VoteChoice.YES.name)
+                                        .setNameLocalization(DiscordLocale.GERMAN, VoteMessages.label(VoteChoice.YES)),
+                                    Command
+                                        .Choice(VoteMessages.label(VoteChoice.NO, Language.ENGLISH), VoteChoice.NO.name)
+                                        .setNameLocalization(DiscordLocale.GERMAN, VoteMessages.label(VoteChoice.NO)),
+                                ),
                         ),
-                    SubcommandData(END, "Beendet eine Abstimmung vorzeitig; die Auswertung folgt")
-                        .addOptions(OptionData(OptionType.STRING, OPTION_VOTE, "Die laufende Abstimmung", true, true)),
-                    SubcommandData(CANCEL, "Bricht eine Abstimmung ohne Auswertung ab")
-                        .addOptions(OptionData(OptionType.STRING, OPTION_VOTE, "Die laufende Abstimmung", true, true)),
+                    SubcommandData(END, "Ends a vote early; the result follows")
+                        .setDescriptionLocalization(DiscordLocale.GERMAN, "Beendet eine Abstimmung vorzeitig; die Auswertung folgt")
+                        .addOptions(runningVote()),
+                    SubcommandData(CANCEL, "Cancels a vote without a result")
+                        .setDescriptionLocalization(DiscordLocale.GERMAN, "Bricht eine Abstimmung ohne Auswertung ab")
+                        .addOptions(runningVote()),
                 )
 
         /** The member as the backend needs them to decide whether they may manage votes. */

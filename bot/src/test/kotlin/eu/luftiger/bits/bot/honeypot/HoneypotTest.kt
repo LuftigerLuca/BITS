@@ -8,6 +8,7 @@ import eu.luftiger.bits.shared.HoneypotProblemReport
 import eu.luftiger.bits.shared.HoneypotState
 import eu.luftiger.bits.shared.HoneypotWarning
 import eu.luftiger.bits.shared.HoneypotWarningReport
+import eu.luftiger.bits.shared.Language
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import net.dv8tion.jda.api.entities.MessageEmbed
 import java.io.IOException
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -57,6 +59,7 @@ class HoneypotTest {
         val kicked = mutableListOf<String>()
         val posted = mutableListOf<String>()
         val embeds = mutableListOf<MessageEmbed>()
+        val updated = mutableListOf<MessageEmbed>()
         var missing = false
         var channelGone = false
         var kickFails = false
@@ -73,7 +76,14 @@ class HoneypotTest {
             return "warning-${posted.size}"
         }
 
-        override suspend fun exists(warning: HoneypotWarning) = !missing
+        override suspend fun update(
+            warning: HoneypotWarning,
+            embed: MessageEmbed,
+        ): Boolean {
+            if (missing) return false
+            updated += embed
+            return true
+        }
 
         override suspend fun delete(
             channelId: String,
@@ -94,6 +104,8 @@ class HoneypotTest {
     private val backend = FakeBackend()
     private val guild = FakeGuild()
     private val directMessages = mutableListOf<String>()
+    private val directMessageTexts = mutableListOf<String>()
+    private var memberLanguage = Language.GERMAN
     private var dmFails = false
     private var time = 1_000_000L
 
@@ -101,10 +113,12 @@ class HoneypotTest {
         Honeypot(
             backend,
             guild,
-            { id, _ ->
+            { id, text ->
                 if (dmFails) throw IOException("closed")
                 directMessages += id
+                directMessageTexts += text
             },
+            { memberLanguage },
             { "WarEra" },
             { _, call -> launch { call() } },
             { time },
@@ -336,7 +350,7 @@ class HoneypotTest {
 
             assertEquals(listOf("trap"), guild.posted)
             assertEquals(HoneypotWarning("trap", "warning-1"), backend.state.warning)
-            assertEquals("Nicht in diesen Kanal schreiben!", guild.embeds.single().title)
+            assertEquals("Nicht in diesen Kanal schreiben! / Do not write in this channel!", guild.embeds.single().title)
         }
 
     @Test
@@ -354,12 +368,39 @@ class HoneypotTest {
         }
 
     @Test
-    fun `a warning that exists after a restart is not posted again`() =
+    fun `a warning that exists after a restart is not posted again, but brought up to date once`() =
         runTest {
             backend.state = backend.state.copy(warning = HoneypotWarning("trap", "old"))
-            honeypot().refresh()
+            val honeypot = honeypot()
+
+            honeypot.refresh()
+            honeypot.refresh()
 
             assertEquals(emptyList(), guild.posted)
+            assertEquals(listOf(Honeypot.warningEmbed()), guild.updated)
+        }
+
+    @Test
+    fun `the warning speaks German and English`() {
+        val warning = Honeypot.warningEmbed()
+
+        assertContains(warning.title.orEmpty(), "Nicht in diesen Kanal schreiben!")
+        assertContains(warning.title.orEmpty(), "Do not write in this channel!")
+        assertContains(warning.description.orEmpty(), "automatisch vom Server gekickt")
+        assertContains(warning.description.orEmpty(), "automatically kicked from the server")
+    }
+
+    @Test
+    fun `the direct message of a kick comes in the language of the member`() =
+        runTest {
+            memberLanguage = Language.ENGLISH
+            val honeypot = honeypot()
+            honeypot.refresh()
+
+            honeypot.handle(message())
+
+            assertEquals(listOf(Honeypot.kickMessage("WarEra", Language.ENGLISH)), directMessageTexts)
+            assertEquals(listOf("1"), guild.kicked)
         }
 
     @Test
@@ -394,7 +435,7 @@ class HoneypotTest {
                         backend.reportHoneypotWarning(report)
                     }
                 }
-            val flaky = Honeypot(failing, guild, { _, _ -> }, { "WarEra" }, { _, call -> launch { call() } }, { time })
+            val flaky = Honeypot(failing, guild, { _, _ -> }, { Language.GERMAN }, { "WarEra" }, { _, call -> launch { call() } }, { time })
             flaky.refresh()
             flaky.refresh()
 

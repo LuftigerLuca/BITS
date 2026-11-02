@@ -4,6 +4,7 @@ import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordChannelDto
 import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
@@ -260,7 +261,10 @@ class MemberReporterTest {
             requestedBy: String,
         ): ProfileResponse = TODO()
 
-        override suspend fun explainRoles(discordUserId: String): RoleExplanationResponse = TODO()
+        override suspend fun explainRoles(
+            discordUserId: String,
+            language: Language,
+        ): RoleExplanationResponse = TODO()
 
         override suspend fun reportRoles(roles: List<DiscordRoleDto>) = TODO()
 
