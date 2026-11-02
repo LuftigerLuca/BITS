@@ -5,9 +5,13 @@ import eu.luftiger.bits.shared.Language
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import net.dv8tion.jda.api.components.buttons.Button
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
 import net.dv8tion.jda.api.interactions.DiscordLocale
+import net.dv8tion.jda.api.interactions.Interaction
+import net.dv8tion.jda.api.interactions.InteractionHook
 import net.dv8tion.jda.api.interactions.commands.Command
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
@@ -15,7 +19,10 @@ import net.dv8tion.jda.api.interactions.commands.build.OptionData
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
 import org.slf4j.LoggerFactory
 
-/** `/language` stores the language of what BITS writes only to the member; it works without a linked account. */
+/**
+ * `/language` stores the language of what BITS writes only to the member; it works without a linked account. The buttons
+ * [languageButtons] after linking store it as well. Their IDs hold all they need, so they keep working after a restart.
+ */
 class LanguageCommand(
     private val languages: Languages,
     private val scope: CoroutineScope,
@@ -31,6 +38,25 @@ class LanguageCommand(
                 else -> null
             }
         event.deferReply(true).queue()
+        save(event, event.hook, chosen)
+    }
+
+    override fun onButtonInteraction(event: ButtonInteractionEvent) {
+        val chosen =
+            when (event.componentId) {
+                GERMAN_BUTTON -> Language.GERMAN
+                ENGLISH_BUTTON -> Language.ENGLISH
+                else -> return
+            }
+        event.deferReply(true).queue()
+        save(event, event.hook, chosen)
+    }
+
+    private fun save(
+        event: Interaction,
+        hook: InteractionHook,
+        chosen: Language?,
+    ) {
         scope.launch {
             val message =
                 try {
@@ -43,7 +69,7 @@ class LanguageCommand(
                     log.error("Setting the language at the backend failed", e)
                     bitsUnavailableMessage(languages.of(event))
                 }
-            event.hook.sendMessage(message).queue()
+            hook.sendMessage(message).queue()
         }
     }
 
@@ -53,6 +79,12 @@ class LanguageCommand(
         private const val CHOICE_GERMAN = "de"
         private const val CHOICE_ENGLISH = "en"
         private const val CHOICE_AUTOMATIC = "auto"
+        const val GERMAN_BUTTON = "language:de"
+        const val ENGLISH_BUTTON = "language:en"
+
+        /** Named in their own language, since whoever needs them may not read the other one. */
+        val languageButtons: List<Button> =
+            listOf(Button.secondary(GERMAN_BUTTON, "Deutsch"), Button.secondary(ENGLISH_BUTTON, "English"))
 
         val data: SlashCommandData =
             Commands

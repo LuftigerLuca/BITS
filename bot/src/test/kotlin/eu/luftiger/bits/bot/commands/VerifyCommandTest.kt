@@ -18,6 +18,28 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VerifyCommandTest {
+    @Test
+    fun `a new link asks for the language with its buttons, a failed check does not`() =
+        runTest {
+            val backend = mockk<BackendClient>()
+            val command = VerifyCommand(backend, backgroundScope, languages())
+            val linked = Replies()
+            coEvery { backend.checkVerification("42", "ABC", any()) } returns CheckVerificationResponse.Linked("Luftiger")
+            command.onButtonInteraction(buttonClick(VerifyCommand.CHECK_BUTTON_PREFIX + "ABC", linked))
+            runCurrent()
+
+            assertContains(linked.messages.single(), "In welcher Sprache soll BITS dir schreiben")
+            assertContains(linked.components.toString(), LanguageCommand.GERMAN_BUTTON)
+            assertContains(linked.components.toString(), LanguageCommand.ENGLISH_BUTTON)
+
+            val missing = Replies()
+            coEvery { backend.checkVerification("42", "DEF", any()) } returns CheckVerificationResponse.CodeMissing
+            command.onButtonInteraction(buttonClick(VerifyCommand.CHECK_BUTTON_PREFIX + "DEF", missing))
+            runCurrent()
+
+            assertEquals(emptyList(), missing.components.toList())
+        }
+
     private val backend = mockk<BackendClient>()
     private val replies = Replies()
     private val started =

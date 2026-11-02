@@ -106,14 +106,16 @@ class VerifyCommand(
         sendCheckResult(check.hook, event.result, check.language)
     }
 
-    /** A new link comes with the offer to take the WarEra name as nickname. */
+    /** A new link comes with the offer to take the WarEra name as nickname and the question for the language. */
     private fun sendCheckResult(
         hook: InteractionHook,
         response: CheckVerificationResponse,
         language: Language,
     ) {
         val message = hook.sendMessage(checkMessage(response, language))
-        if (response is CheckVerificationResponse.Linked) message.addComponents(ActionRow.of(NicknameCommand.optInButton(language)))
+        if (response is CheckVerificationResponse.Linked) {
+            message.addComponents(ActionRow.of(NicknameCommand.optInButton(language)), ActionRow.of(LanguageCommand.languageButtons))
+        }
         message.queue()
     }
 
@@ -247,11 +249,15 @@ class VerifyCommand(
                         "Fertig! Dein Discord-Account ist jetzt mit **$account** verknüpft. Deine Rollen bekommst du in den nächsten " +
                             "Minuten automatisch. Du kannst den Code wieder aus dem Firmennamen entfernen.\n\n" +
                             "Möchtest du deinen WarEra-Namen auch als Nickname tragen? Klicke auf „Nickname übernehmen“ oder nutze " +
-                            "jederzeit `/${NicknameCommand.NAME}`.",
+                            "jederzeit `/${NicknameCommand.NAME}`.\n\n" +
+                            "In welcher Sprache soll BITS dir schreiben, wenn nur du es liest? Wähle unten eine Sprache; ohne Wahl " +
+                            "richtet sich BITS nach deiner Discord-Sprache. Ändern kannst du das jederzeit mit `/${LanguageCommand.NAME}`.",
                         "Done! Your Discord account is now linked to **$account**. You will get your roles automatically within the " +
                             "next few minutes. You can remove the code from the company name again.\n\n" +
                             "Would you like to use your WarEra name as your nickname too? Click “Use as nickname” or use " +
-                            "`/${NicknameCommand.NAME}` at any time.",
+                            "`/${NicknameCommand.NAME}` at any time.\n\n" +
+                            "Which language should BITS use when only you read it? Choose one below; without a choice, BITS follows your " +
+                            "Discord language. You can change this at any time with `/${LanguageCommand.NAME}`.",
                     )
                 }
                 // Answered by the event, never shown.
