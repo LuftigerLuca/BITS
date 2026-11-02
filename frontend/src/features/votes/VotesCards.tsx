@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronRightIcon } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '@/components/QueryState'
 import {
   AlertDialog,
@@ -13,9 +14,10 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { voteResultImageUrl, type Vote } from './api'
-import { STATUS, errorMessage, formatTime, participation, thresholdText } from './labels'
+import { STATUS, errorMessage, formatDate, formatTime, participation, thresholdText } from './labels'
 import { useCloseVote, useVotes } from './queries'
 
 /** The running votes with their participation, to end or cancel early. */
@@ -188,48 +190,66 @@ export function VoteArchiveCard() {
 }
 
 function closedText(vote: Vote): string {
-  if (vote.closedBy) return `beendet von ${vote.closedBy}`
-  if (vote.endedByThreshold && vote.threshold) return `automatisch beendet bei ${thresholdText(vote.threshold)}`
-  return 'beendet'
+  if (vote.closedBy) return `Beendet von ${vote.closedBy}`
+  if (vote.endedByThreshold && vote.threshold) return `Automatisch beendet bei ${thresholdText(vote.threshold)}`
+  return 'Beendet'
 }
 
 function ArchivedVote({ vote }: { vote: Vote }) {
   const status = STATUS[vote.status]
   return (
-    <article className="flex flex-col gap-3" aria-label={vote.question}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="font-medium">{vote.question}</h3>
-          <p className="text-xs text-muted-foreground">
-            {vote.roleName ?? 'Unbekannte Rolle'} in #{vote.channelName ?? 'unbekannt'} · gestartet von {vote.startedBy}
-            , {formatTime(vote.startedAt)}
-            {vote.closedAt !== null && (
-              <>
-                {' '}
-                · {closedText(vote)}, {formatTime(vote.closedAt)}
-              </>
-            )}
-          </p>
-        </div>
+    <Collapsible render={<article aria-label={vote.question} />}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 className="min-w-0 flex-1 basis-64">
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="group -ml-2.5 h-auto min-h-7 justify-start text-left font-medium whitespace-normal"
+              />
+            }
+          >
+            <ChevronRightIcon className="transition-transform group-data-[panel-open]:rotate-90" aria-hidden />
+            {vote.question}
+          </CollapsibleTrigger>
+        </h3>
+        {vote.closedAt !== null && (
+          <span className="text-xs text-muted-foreground">{formatDate(vote.closedAt)}</span>
+        )}
         <Badge variant={status.variant}>{status.label}</Badge>
       </div>
-      {vote.status === 'EVALUATED' && vote.resultText !== null && (
-        <details className="group">
-          <summary className="cursor-pointer text-sm font-medium">Ergebnis anzeigen</summary>
-          <div className="mt-3 flex flex-col gap-3">
-            <img
-              src={voteResultImageUrl(vote.id)}
-              alt={`Ergebnis als Grafik: ${vote.question}`}
-              loading="lazy"
-              className="w-full max-w-3xl rounded-md border"
-            />
-            <p className="text-sm whitespace-pre-wrap">{vote.resultText}</p>
+      <CollapsibleContent>
+        <div className="mt-2 flex flex-col gap-3 pl-6">
+          <div className="text-xs text-muted-foreground">
+            <p>
+              Rolle: {vote.roleName ?? 'Unbekannte Rolle'} · Kanal: #{vote.channelName ?? 'unbekannt'}
+            </p>
+            <p>
+              Gestartet von {vote.startedBy}, {formatTime(vote.startedAt)}
+            </p>
+            {vote.closedAt !== null && (
+              <p>
+                {closedText(vote)}, {formatTime(vote.closedAt)}
+              </p>
+            )}
           </div>
-        </details>
-      )}
-      {vote.status === 'COUNTING' && (
-        <p className="text-sm text-muted-foreground">Die Auswertung läuft und erscheint gleich im Kanal.</p>
-      )}
-    </article>
+          {vote.status === 'EVALUATED' && vote.resultText !== null && (
+            <>
+              <p className="text-sm whitespace-pre-wrap">{vote.resultText}</p>
+              <img
+                src={voteResultImageUrl(vote.id)}
+                alt={`Ergebnis als Grafik: ${vote.question}`}
+                loading="lazy"
+                className="w-full max-w-xl rounded-md border"
+              />
+            </>
+          )}
+          {vote.status === 'COUNTING' && (
+            <p className="text-sm text-muted-foreground">Die Auswertung läuft und erscheint gleich im Kanal.</p>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

@@ -10,7 +10,7 @@ export function BotBackendCard({ data }: { data: SystemStatus }) {
   const { api, events, bot } = data
   return (
     <Section
-      title="Bot ↔ Backend"
+      title="Bot und Backend"
       icon={ArrowLeftRightIcon}
       description="Der Bot ruft das Backend per REST auf, das Backend erreicht den Bot über Events im Redis-Stream."
     >

@@ -19,9 +19,14 @@ export function thresholdText(threshold: VoteThreshold): string {
 export const DEFAULT_DURATION_MILLIS = 48 * 60 * 60 * 1000
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
+const DATE = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' })
 
 export function formatTime(epochMillis: number): string {
   return TIME.format(epochMillis)
+}
+
+export function formatDate(epochMillis: number): string {
+  return DATE.format(epochMillis)
 }
 
 /** The value a `datetime-local` input takes, in the browser's time zone. */
