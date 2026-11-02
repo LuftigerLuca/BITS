@@ -30,4 +30,6 @@ data class DiscordChannelDto(
      * create private threads, manage threads and send messages in threads.
      */
     val threadsCreatable: Boolean = false,
+    /** Whether the bot may watch the channel as a honeypot: post its warning, delete messages there and kick members. */
+    val honeypotUsable: Boolean = false,
 )

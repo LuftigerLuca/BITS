@@ -1,5 +1,6 @@
 import { BotPresenceCard } from '@/features/bot-presence/BotPresenceCard'
 import { FeaturesCard } from '@/features/feature-toggles/FeaturesCard'
+import { HoneypotCard } from '@/features/honeypot/HoneypotCard'
 import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
 import { ManagerRolesCard } from '@/features/votes/ManagerRolesCard'
 import { PartyColorsCard } from '@/features/votes/PartyColorsCard'
@@ -13,6 +14,7 @@ export function AdminPage() {
       <FeaturesCard />
       <CountrySettingCard />
       <BotPresenceCard />
+      <HoneypotCard />
       <ManagerRolesCard />
       <ResultImageCard />
       <PartyColorsCard />

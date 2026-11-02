@@ -103,6 +103,19 @@ sealed interface SystemProblem {
         val error: String,
     ) : SystemProblem
 
+    /** The bot kicked [kickCount] members from the honeypot within [windowMinutes] and stopped until an admin lets it go on. */
+    @NamedInterface("api")
+    data class HoneypotKicksPaused(
+        val kickCount: Int,
+        val windowMinutes: Int,
+    ) : SystemProblem
+
+    /** The bot cannot keep its warning in the honeypot; [reason] is in German. */
+    @NamedInterface("api")
+    data class HoneypotWarningFailed(
+        val reason: String,
+    ) : SystemProblem
+
     /** Events for the bot could not be written to Redis for a while. */
     @NamedInterface("api")
     data class OutboxStuck(

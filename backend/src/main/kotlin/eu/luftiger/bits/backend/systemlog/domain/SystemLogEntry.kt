@@ -94,6 +94,9 @@ enum class EntryKind(
 
     /** The link of a member who left the guild was deleted. */
     ACCOUNT_REMOVED(Category.ACCOUNT),
+
+    /** A member was kicked for writing in the honeypot. */
+    HONEYPOT_KICKED(Category.ACCOUNT),
     WARERA_USERS_UNAVAILABLE(Category.ERROR),
     GOVERNMENT_UNAVAILABLE(Category.ERROR),
 
@@ -125,6 +128,18 @@ enum class EntryKind(
 
     /** The bot could not rename an embassy thread. */
     EMBASSY_THREAD_RENAME_FAILED(Category.ERROR),
+
+    /** A member wrote in the honeypot, but the bot did not try to kick them. */
+    HONEYPOT_KICK_SKIPPED(Category.ERROR),
+
+    /** A member wrote in the honeypot, but could not be kicked. */
+    HONEYPOT_KICK_FAILED(Category.ERROR),
+
+    /** The bot reached its limit of kicks and paused them. */
+    HONEYPOT_KICKS_PAUSED(Category.ERROR),
+
+    /** The bot cannot keep its warning in the honeypot. */
+    HONEYPOT_WARNING_FAILED(Category.ERROR),
     ;
 
     enum class Category {

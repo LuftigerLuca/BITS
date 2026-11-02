@@ -45,4 +45,6 @@ interface SystemLog {
     fun recordAccountRemoved(removal: AccountRemovalRecord)
 
     fun recordProblem(problem: SystemProblem)
+
+    fun recordHoneypotAction(action: HoneypotAction)
 }

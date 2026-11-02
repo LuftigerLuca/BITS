@@ -25,6 +25,11 @@ import eu.luftiger.bits.shared.EmbassySyncReport
 import eu.luftiger.bits.shared.EmbassyThreadCreationReport
 import eu.luftiger.bits.shared.EmbassyThreadRenameReport
 import eu.luftiger.bits.shared.FeatureStates
+import eu.luftiger.bits.shared.HoneypotKickReport
+import eu.luftiger.bits.shared.HoneypotPauseReport
+import eu.luftiger.bits.shared.HoneypotProblemReport
+import eu.luftiger.bits.shared.HoneypotState
+import eu.luftiger.bits.shared.HoneypotWarningReport
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
@@ -80,7 +85,7 @@ import kotlinx.coroutines.CancellationException
 import java.time.Duration
 
 /**
- * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [PresenceBackend] and [HeartbeatBackend] that
+ * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [PresenceBackend] and [HeartbeatBackend] that
  * authenticate with the service token of the bot. [calls] counts every request and how it ended.
  */
 class KtorBackendClient(
@@ -93,6 +98,7 @@ class KtorBackendClient(
     VoteBackend,
     EmbassyBackend,
     FeatureBackend,
+    HoneypotBackend,
     PresenceBackend,
     HeartbeatBackend,
     AutoCloseable {
@@ -237,6 +243,36 @@ class KtorBackendClient(
     override suspend fun features(): FeatureStates = http.get("api/features").body()
 
     override suspend fun botPresence(): BotPresence = http.get("api/bot-presence").body()
+
+    override suspend fun honeypot(): HoneypotState = http.get("api/honeypot").body()
+
+    override suspend fun reportHoneypotWarning(report: HoneypotWarningReport) {
+        http.put("api/honeypot/warning") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportHoneypotKick(report: HoneypotKickReport) {
+        http.post("api/honeypot/kicks") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportHoneypotPause(report: HoneypotPauseReport) {
+        http.post("api/honeypot/pause") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportHoneypotProblem(report: HoneypotProblemReport) {
+        http.post("api/honeypot/problems") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
 
     override suspend fun heartbeat(heartbeat: BotHeartbeat) {
         http.post("api/bot-heartbeat") {
