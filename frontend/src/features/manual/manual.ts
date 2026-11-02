@@ -222,7 +222,8 @@ export const MANUAL_PAGES: ManualPage[] = [
             'das Land gewechselt hat, zählt deshalb noch für das alte.',
           'Das Ergebnis erscheint als Grafik und Text im Kanal der Abstimmung, mit den Namen derer, die nicht ' +
             'abgestimmt haben.',
-          'Unter „Abstimmungen“ im Dashboard stehen beendete Abstimmungen im Archiv.',
+          'Unter „Abstimmungen“ im Dashboard stehen beendete Abstimmungen im Archiv. Klappe einen Eintrag auf, um die ' +
+            'Details und das Ergebnis zu sehen.',
         ],
       },
     ],
@@ -436,13 +437,13 @@ export const MANUAL_PAGES: ManualPage[] = [
         steps: [
           'Wähle unter „Botschaften“ die Ämter, die jemanden zum Botschafter machen (Standard: Präsident, ' +
             'Vizepräsident, Außenminister), die Botschafter-Rolle, Gastgeber-Rollen wie die eigene Regierung, den ' +
-            'Botschafts-Kanal und den Thread-Namen, z. B. „🏛️ Botschaft {land}“. {land} steht dabei für den ' +
-            'englischen Ländernamen aus WarEra, z. B. „Germany“; Standard ist „Botschaft {land}“.',
+            'Botschafts-Kanal und den Thread-Namen. {land} steht dabei für den englischen Ländernamen aus WarEra, ' +
+            'z. B. „Germany“; Standard ist „Botschaft {land}“.',
           'Verknüpft sich jemand mit einem dieser Ämter in einem Land ohne Thread, legt der Bot im Botschafts-Kanal ' +
             'einen privaten Thread mit diesem Namen an und ordnet ihn zu.',
           'Unter „Botschafts-Threads“ kannst du einem Land auch selbst einen bestehenden Thread zuordnen oder mit ' +
             '„Automatisch anlegen“ einen Thread anlegen lassen; der Name aus der Vorlage ist vorbelegt und änderbar.',
-          'Füge bei Bedarf Mitglieder von Hand hinzu.',
+          'Klappe eine Botschaft auf, um ihre Mitglieder zu sehen, und füge bei Bedarf welche von Hand hinzu.',
         ],
         points: [
           'Im Thread sind die verknüpften Mitglieder mit einem der Ämter im Land, die von Hand Hinzugefügten und die ' +
@@ -509,7 +510,7 @@ export const MANUAL_PAGES: ManualPage[] = [
           '„WarEra-API“: wie viele Requests BITS an WarEra schickt, gemessen an den 90 pro Minute, die es sich erlaubt, ' +
             'nach Prozedur und danach, wofür sie gebraucht wurden, etwa Rollen-Sync oder Verifizierung. Dazu Fehler, ' +
             'Wiederholungen, wie oft WarEra BITS bremsen musste und was der Cache gespart hat.',
-          '„Bot ↔ Backend“: die Anfragen des Bots an das Backend, auch aus seiner Sicht mit Zeitüberschreitungen, und ' +
+          '„Bot und Backend“: die Anfragen des Bots an das Backend, auch aus seiner Sicht mit Zeitüberschreitungen, und ' +
             'die Events an den Bot mit allem, was noch auf ihn wartet.',
           'Außerdem: die Verbindung des Bots zu Discord, die Hintergrund-Jobs mit ihrem letzten Lauf sowie Versionen ' +
             'und Speicher von Backend, Bot, Datenbank und Redis.',

@@ -23,7 +23,7 @@ export function EmbassyThreadsCard({ embassies }: { embassies: Embassies }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Botschafts-Threads</CardTitle>
+        <CardTitle>Botschafts-Threads ({embassies.threads.length})</CardTitle>
         <CardDescription>
           Wähle einen privaten Thread aus Discord oder lass ihn vom Bot im Botschafts-Kanal anlegen. Der Bot braucht im
           Kanal die Rechte „Threads verwalten“ und „Nachrichten in Threads senden“. BITS gleicht die Threads nach jeder

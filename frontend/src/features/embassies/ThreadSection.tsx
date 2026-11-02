@@ -3,7 +3,7 @@ import { Trash2Icon, UserPlusIcon } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { IconAction } from '@/components/IconAction'
 import { ErrorState, LoadingState } from '@/components/QueryState'
-import { Subsection } from '@/components/Subsection'
+import { CollapsibleSubsection } from '@/components/Subsection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,71 +13,82 @@ import type { EmbassyThread } from './api'
 import { errorMessage } from './labels'
 import { useAddMember, useMemberSearch, useRemoveMember, useUnassignThread } from './queries'
 
+function memberCount(count: number): string {
+  return count === 1 ? '1 Mitglied' : `${count} Mitglieder`
+}
+
 export function ThreadSection({ thread }: { thread: EmbassyThread }) {
   const unassign = useUnassignThread()
   const removeMember = useRemoveMember()
   const [unassigning, setUnassigning] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<EmbassyThread['manualMembers'][number] | null>(null)
   return (
-    <Subsection
-      title={thread.countryName}
-      label={`Botschaft ${thread.countryName}`}
-      description={`${thread.channelName ? `#${thread.channelName} › ` : ''}${thread.threadName}`}
-      actions={
-        <>
-          {thread.missing && <Badge variant="destructive">Fehlt in Discord</Badge>}
-          {thread.renameSkipped && <Badge variant="outline">Archiviert, beim Umbenennen übersprungen</Badge>}
-          <Button variant="outline" size="sm" disabled={unassign.isPending} onClick={() => setUnassigning(true)}>
-            Zuordnung aufheben
-          </Button>
-        </>
-      }
-    >
-      {thread.members.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Der Bot hat noch keine Mitglieder gemeldet.</p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Mitglied</TableHead>
-              <TableHead>Grund</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {thread.members.map((member) => (
-              <TableRow key={member.discordUserId}>
-                <TableCell>{member.name}</TableCell>
-                <TableCell>{member.reason}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      <div className="flex flex-col gap-2">
-        <h4 className="text-sm font-medium">Manuell hinzugefügt</h4>
-        {thread.manualMembers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Niemand.</p>
+    <>
+      <CollapsibleSubsection
+        title={
+          <>
+            {thread.countryName}{' '}
+            <span className="font-normal text-muted-foreground">{memberCount(thread.members.length)}</span>
+          </>
+        }
+        label={`Botschaft ${thread.countryName}`}
+        description={`${thread.channelName ? `#${thread.channelName} › ` : ''}${thread.threadName}`}
+        actions={
+          <>
+            {thread.missing && <Badge variant="destructive">Fehlt in Discord</Badge>}
+            {thread.renameSkipped && <Badge variant="outline">Archiviert, beim Umbenennen übersprungen</Badge>}
+            <Button variant="outline" size="sm" disabled={unassign.isPending} onClick={() => setUnassigning(true)}>
+              Zuordnung aufheben
+            </Button>
+          </>
+        }
+      >
+        {thread.members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Der Bot hat noch keine Mitglieder gemeldet.</p>
         ) : (
-          <ul className="flex flex-col gap-1">
-            {thread.manualMembers.map((member) => {
-              const name = member.name ?? member.discordUserId
-              return (
-                <li key={member.discordUserId} className="flex items-center gap-2 text-sm">
-                  <span>{name}</span>
-                  <IconAction
-                    label={`${name} aus ${thread.countryName} entfernen`}
-                    disabled={removeMember.isPending}
-                    onClick={() => setMemberToRemove(member)}
-                  >
-                    <Trash2Icon />
-                  </IconAction>
-                </li>
-              )
-            })}
-          </ul>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Mitglied</TableHead>
+                <TableHead>Grund</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {thread.members.map((member) => (
+                <TableRow key={member.discordUserId}>
+                  <TableCell>{member.name}</TableCell>
+                  <TableCell>{member.reason}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
-        <MemberSearch thread={thread} />
-      </div>
+        <div className="flex flex-col gap-2">
+          <h4 className="text-sm font-medium">Manuell hinzugefügt</h4>
+          {thread.manualMembers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Niemand.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {thread.manualMembers.map((member) => {
+                const name = member.name ?? member.discordUserId
+                return (
+                  <li key={member.discordUserId} className="flex items-center gap-2 text-sm">
+                    <span>{name}</span>
+                    <IconAction
+                      label={`${name} aus ${thread.countryName} entfernen`}
+                      disabled={removeMember.isPending}
+                      onClick={() => setMemberToRemove(member)}
+                    >
+                      <Trash2Icon />
+                    </IconAction>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <MemberSearch thread={thread} />
+        </div>
+      </CollapsibleSubsection>
       <ConfirmDialog
         open={unassigning}
         title={`Zuordnung von ${thread.countryName} aufheben?`}
@@ -101,7 +112,7 @@ export function ThreadSection({ thread }: { thread: EmbassyThread }) {
         }}
         onCancel={() => setMemberToRemove(null)}
       />
-    </Subsection>
+    </>
   )
 }
 

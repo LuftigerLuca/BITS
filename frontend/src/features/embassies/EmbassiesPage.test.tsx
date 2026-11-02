@@ -72,12 +72,67 @@ function bodies(calls: unknown[]) {
   }
 }
 
+async function openFrance() {
+  const section = await screen.findByRole('region', { name: 'Botschaft France' })
+  await userEvent.click(within(section).getByRole('button', { name: 'France 2 Mitglieder' }))
+  return section
+}
+
 describe('embassies', () => {
+  it('starts collapsed with the counts, its warnings and actions in reach', async () => {
+    stub({
+      'GET /web/admin/embassies': () =>
+        json({
+          ...embassies,
+          threads: [
+            { ...embassies.threads[0], missing: true },
+            {
+              ...embassies.threads[0],
+              threadId: 't-pl',
+              countryId: 'pl',
+              countryName: 'Poland',
+              members: [{ discordUserId: '3', name: 'Minister', reason: 'Manuell hinzugefügt' }],
+            },
+            { ...embassies.threads[0], threadId: 't-it', countryId: 'it', countryName: 'Italy', members: [] },
+          ],
+        }),
+    })
+    renderApp('/admin/embassies')
+
+    expect(await screen.findByRole('heading', { name: 'Botschafts-Threads (3)' })).toBeInTheDocument()
+    const france = screen.getByRole('region', { name: 'Botschaft France' })
+    expect(within(france).getByRole('button', { name: 'France 2 Mitglieder' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(within(france).getByText('Fehlt in Discord')).toBeInTheDocument()
+    expect(within(france).getByRole('button', { name: 'Zuordnung aufheben' })).toBeInTheDocument()
+    expect(within(france).queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Mitglied hinzufügen')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Poland 1 Mitglied' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Italy 0 Mitglieder' })).toBeInTheDocument()
+  })
+
+  it('keeps an opened embassy open when a member is added', async () => {
+    stub({
+      'GET /web/admin/embassies/member-search': () => json([{ discordUserId: '7', name: 'Diplomat' }]),
+      'POST /web/admin/embassies/threads/t-fr/members': () => status(204),
+    })
+    renderApp('/admin/embassies')
+
+    const section = await openFrance()
+    await userEvent.type(within(section).getByLabelText('Mitglied hinzufügen'), 'Dipl')
+    await userEvent.click(await within(section).findByRole('button', { name: 'Diplomat zu France hinzufügen' }))
+    await expectToast('success', 'Mitglied hinzugefügt')
+
+    expect(within(section).getByRole('table')).toBeInTheDocument()
+  })
+
   it('shows who is in each thread and why', async () => {
     stub()
     renderApp('/admin/embassies')
 
-    const section = await screen.findByRole('region', { name: 'Botschaft France' })
+    const section = await openFrance()
     expect(within(section).getByText('#diplomatie › botschaft-frankreich')).toBeInTheDocument()
     expect(within(section).getByRole('row', { name: 'Minister Außenminister von France' })).toBeInTheDocument()
     expect(within(section).getByRole('button', { name: 'Guest aus France entfernen' })).toBeInTheDocument()
@@ -112,7 +167,8 @@ describe('embassies', () => {
     })
     renderApp('/admin/embassies')
 
-    await userEvent.type(await screen.findByLabelText('Mitglied hinzufügen'), 'Dipl')
+    await openFrance()
+    await userEvent.type(screen.getByLabelText('Mitglied hinzufügen'), 'Dipl')
     await userEvent.click(await screen.findByRole('button', { name: 'Diplomat zu France hinzufügen' }))
     await expect.poll(() => added).toEqual([{ discordUserId: '7' }])
 
@@ -226,7 +282,8 @@ describe('embassies', () => {
     })
     renderApp('/admin/embassies')
 
-    await userEvent.type(await screen.findByLabelText('Mitglied hinzufügen'), 'Dipl')
+    await openFrance()
+    await userEvent.type(screen.getByLabelText('Mitglied hinzufügen'), 'Dipl')
     await userEvent.click(await screen.findByRole('button', { name: 'Diplomat zu France hinzufügen' }))
 
     await expectToast(
@@ -315,7 +372,7 @@ describe('embassies', () => {
   it('has no accessibility violations axe can find, also with a dialog open', async () => {
     stub()
     renderApp('/admin/embassies')
-    await screen.findByRole('region', { name: 'Botschaft France' })
+    await openFrance()
     await expectNoAxeViolations()
 
     await userEvent.click(screen.getByRole('button', { name: 'Guest aus France entfernen' }))

@@ -76,8 +76,17 @@ describe('votes page', () => {
     expect(screen.getByText('3 von 7 haben abgestimmt')).toBeInTheDocument()
 
     const archived = screen.getByRole('article', { name: 'Steuern senken?' })
-    expect(within(archived).getByText(/beendet von Mia/)).toBeInTheDocument()
-    await userEvent.click(within(archived).getByText('Ergebnis anzeigen'))
+    expect(within(archived).getByText('Ausgewertet')).toBeInTheDocument()
+    expect(within(archived).getByText('21.10.2026')).toBeInTheDocument()
+    // Collapsed, without details and without loading the image.
+    expect(within(archived).queryByText(/Beendet von Mia/)).not.toBeInTheDocument()
+    expect(within(archived).queryByRole('img')).not.toBeInTheDocument()
+
+    const toggle = within(archived).getByRole('button', { name: 'Steuern senken?' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(within(archived).getByText(/Beendet von Mia/)).toBeInTheDocument()
     expect(within(archived).getByText(/2 von 2 haben abgestimmt \(100 %\)/)).toBeInTheDocument()
     expect(within(archived).getByRole('img')).toHaveAttribute('src', '/web/votes/2/result.png')
   })
@@ -156,7 +165,8 @@ describe('votes page', () => {
 
     expect(await screen.findByText('Endet automatisch bei mehr als 50 % mit Ja')).toBeInTheDocument()
     const archived = screen.getByRole('article', { name: 'Steuern senken?' })
-    expect(within(archived).getByText(/automatisch beendet bei mehr als 66 % mit Nein/)).toBeInTheDocument()
+    await userEvent.click(within(archived).getByRole('button', { name: 'Steuern senken?' }))
+    expect(within(archived).getByText(/Automatisch beendet bei mehr als 66 % mit Nein/)).toBeInTheDocument()
   })
 
   it('ends a vote only after asking', async () => {
