@@ -91,7 +91,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         title: 'Sprache',
         intro:
           'Mit /language wählst du Deutsch, English oder Automatisch für alles, was BITS nur dir schreibt: private ' +
-          'Antworten auf Befehle und Direktnachrichten. Das geht auch ohne verknüpften WarEra-Account.',
+          'Antworten auf Befehle und Direktnachrichten. Das geht auch ohne verknüpften WarEra-Account. Nach dem ' +
+          'Verknüpfen fragt BITS dich außerdem mit den Buttons „Deutsch“ und „English“.',
         points: [
           'Automatisch richtet sich nach der Sprache deines Discord-Clients: Deutsch bleibt Deutsch, alles andere wird ' +
             'Englisch. Direktnachrichten kommen dann auf Deutsch, weil BITS dort deine Client-Sprache nicht kennt.',

@@ -48,6 +48,31 @@ class LanguageCommandTest {
         }
 
     @Test
+    fun `the buttons after linking store the language and confirm in it`() =
+        runTest {
+            val replies = Replies()
+
+            LanguageCommand(Languages(backend), backgroundScope)
+                .onButtonInteraction(buttonClick(LanguageCommand.ENGLISH_BUTTON, replies))
+            runCurrent()
+
+            coVerify { backend.setLanguagePreference("42", Language.ENGLISH) }
+            assertEquals(listOf(LanguageCommand.savedMessage(Language.ENGLISH, Language.ENGLISH)), replies.messages)
+        }
+
+    @Test
+    fun `other buttons are left alone`() =
+        runTest {
+            val replies = Replies()
+
+            LanguageCommand(Languages(backend), backgroundScope).onButtonInteraction(buttonClick("verify:check:ABC", replies))
+            runCurrent()
+
+            coVerify(exactly = 0) { backend.setLanguagePreference(any(), any()) }
+            assertEquals(emptyList(), replies.messages)
+        }
+
+    @Test
     fun `says BITS is not reachable when the backend fails`() =
         runTest {
             coEvery { backend.setLanguagePreference(any(), any()) } throws IllegalStateException("connection refused")

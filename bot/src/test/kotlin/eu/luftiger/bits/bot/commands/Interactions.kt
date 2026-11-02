@@ -37,6 +37,9 @@ class Replies {
     /** The part of [messages] sent only to the user. */
     val ephemeralMessages = CopyOnWriteArrayList<String>()
 
+    /** Rows of components sent with [messages]. */
+    val components = CopyOnWriteArrayList<MessageTopLevelComponent>()
+
     /** Embeds the deferred reply was replaced with. */
     val embeds = CopyOnWriteArrayList<MessageEmbed>()
 
@@ -50,7 +53,10 @@ class Replies {
                 messages += text
                 val action = mockk<WebhookMessageCreateAction<Message>>(relaxed = true)
                 // Relaxed mocks cannot tell the generic type of what the builder methods return.
-                every { action.addComponents(*anyVararg<MessageTopLevelComponent>()) } returns action
+                every { action.addComponents(*anyVararg<MessageTopLevelComponent>()) } answers {
+                    components += args.filterIsInstance<Array<*>>().single().filterIsInstance<MessageTopLevelComponent>()
+                    action
+                }
                 every { action.setEphemeral(any()) } answers {
                     if (firstArg()) ephemeralMessages += text
                     action
