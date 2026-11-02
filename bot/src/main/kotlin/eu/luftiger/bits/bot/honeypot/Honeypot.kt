@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import net.dv8tion.jda.api.EmbedBuilder
+import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException
 import org.slf4j.LoggerFactory
 
@@ -197,7 +199,7 @@ class Honeypot(
             verifiedWarningId = warning?.messageId
             return
         }
-        val id = discord { guild.post(target, WARNING) } ?: return
+        val id = discord { guild.post(target, warningEmbed()) } ?: return
         verifiedWarningId = id
         lastProblem = null
         setWarning(HoneypotWarning(target, id))
@@ -253,9 +255,16 @@ class Honeypot(
         private const val DUPLICATE_MILLIS = 5_000L
         private const val DIRECT_MESSAGE_TIMEOUT_MILLIS = 3_000L
 
-        const val WARNING =
-            "**Nicht in diesen Kanal schreiben!** Dieser Kanal fängt Spam-Bots ab. Wer hier schreibt, wird automatisch " +
-                "vom Server gekickt und verliert die Verknüpfung seines WarEra-Accounts."
+        private const val WARNING_COLOR = 0xED4245
+
+        fun warningEmbed(): MessageEmbed =
+            EmbedBuilder()
+                .setTitle("Nicht in diesen Kanal schreiben!")
+                .setColor(WARNING_COLOR)
+                .setDescription(
+                    "Dieser Kanal fängt Spam-Bots ab. Wer hier schreibt, wird automatisch vom Server gekickt und verliert die " +
+                        "Verknüpfung seines WarEra-Accounts.",
+                ).build()
 
         const val MEMBER_ABOVE_BOT = "Das Mitglied steht über der Rolle des Bots."
         const val KICKS_PAUSED = "Die Kicks sind pausiert."

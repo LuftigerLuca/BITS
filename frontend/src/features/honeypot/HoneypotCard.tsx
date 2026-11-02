@@ -94,7 +94,7 @@ function HoneypotForm({ saved }: { saved: Honeypot }) {
             placeholder="Kanal wählen"
           />
           <FieldDescription>
-            Nimm einen eigenen, leeren Kanal. Der Bot braucht dort die Rechte zum Schreiben und zum Verwalten von
+            Nimm einen eigenen, leeren Kanal. Der Bot braucht dort die Rechte zum Schreiben, zum Einbetten von Links und zum Verwalten von
             Nachrichten und auf dem Server „Mitglieder kicken“.
           </FieldDescription>
         </Field>

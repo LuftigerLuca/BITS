@@ -529,8 +529,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         steps: [
           'Lege in Discord einen eigenen Kanal an, den alle sehen und in dem alle schreiben dürfen. Wähle nie einen ' +
             'Kanal, der genutzt wird.',
-          'Gib dem Bot die Rechte „Mitglieder kicken“ und, im Kanal, „Nachrichten verwalten“, „Nachrichten senden“ und ' +
-            '„Nachrichtenverlauf lesen“. Sonst steht der Kanal nicht zur Auswahl.',
+          'Gib dem Bot die Rechte „Mitglieder kicken“ und, im Kanal, „Nachrichten verwalten“, „Nachrichten senden“, ' +
+            '„Links einbetten“ und „Nachrichtenverlauf lesen“. Sonst steht der Kanal nicht zur Auswahl.',
           'Wähle den Kanal unter „Verwaltung“ in der Karte „Honeypot“ und bestätige. Innerhalb von 30 Sekunden postet ' +
             'der Bot dort eine Warnung und stellt sie wieder her, falls sie gelöscht wird.',
         ],
