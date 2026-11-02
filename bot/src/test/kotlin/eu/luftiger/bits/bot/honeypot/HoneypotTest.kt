@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import net.dv8tion.jda.api.entities.MessageEmbed
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -55,6 +56,7 @@ class HoneypotTest {
         val deleted = mutableListOf<String>()
         val kicked = mutableListOf<String>()
         val posted = mutableListOf<String>()
+        val embeds = mutableListOf<MessageEmbed>()
         var missing = false
         var channelGone = false
         var kickFails = false
@@ -63,10 +65,11 @@ class HoneypotTest {
 
         override suspend fun post(
             channelId: String,
-            text: String,
+            embed: MessageEmbed,
         ): String {
             if (channelGone) throw HoneypotChannelGone()
             posted += channelId
+            embeds += embed
             return "warning-${posted.size}"
         }
 
@@ -333,6 +336,7 @@ class HoneypotTest {
 
             assertEquals(listOf("trap"), guild.posted)
             assertEquals(HoneypotWarning("trap", "warning-1"), backend.state.warning)
+            assertEquals("Nicht in diesen Kanal schreiben!", guild.embeds.single().title)
         }
 
     @Test

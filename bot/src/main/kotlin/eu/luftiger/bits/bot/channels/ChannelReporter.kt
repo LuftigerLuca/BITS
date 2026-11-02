@@ -93,6 +93,7 @@ class ChannelReporter(
             listOf(
                 Permission.VIEW_CHANNEL,
                 Permission.MESSAGE_SEND,
+                Permission.MESSAGE_EMBED_LINKS,
                 Permission.MESSAGE_HISTORY,
                 Permission.MESSAGE_MANAGE,
                 Permission.KICK_MEMBERS,

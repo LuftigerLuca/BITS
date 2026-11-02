@@ -5,6 +5,7 @@ import kotlinx.coroutines.future.await
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
+import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.entities.UserSnowflake
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel
 import net.dv8tion.jda.api.exceptions.ErrorResponseException
@@ -15,7 +16,7 @@ interface HoneypotGuild {
     /** Returns the ID of the new message; fails with [HoneypotChannelGone] if there is no such channel. */
     suspend fun post(
         channelId: String,
-        text: String,
+        embed: MessageEmbed,
     ): String
 
     /** Whether the message is still there; `false` also if its channel is gone. */
@@ -46,11 +47,11 @@ class JdaHoneypotGuild(
 
     override suspend fun post(
         channelId: String,
-        text: String,
+        embed: MessageEmbed,
     ): String {
         val channel = channel(channelId) ?: throw HoneypotChannelGone()
         return channel
-            .sendMessage(text)
+            .sendMessageEmbeds(embed)
             .submit()
             .await()
             .id
