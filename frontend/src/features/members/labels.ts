@@ -23,6 +23,11 @@ const KINDS: Record<LogEntryType, string> = {
   EMBASSY_THREAD_UNAVAILABLE: 'Botschafts-Thread nicht erreichbar',
   EMBASSY_THREAD_CREATION_FAILED: 'Botschafts-Thread nicht angelegt',
   EMBASSY_THREAD_RENAME_FAILED: 'Botschafts-Thread nicht umbenannt',
+  HONEYPOT_KICKED: 'Vom Honeypot gekickt',
+  HONEYPOT_KICK_SKIPPED: 'Im Honeypot geschrieben, nicht gekickt',
+  HONEYPOT_KICK_FAILED: 'Honeypot-Kick fehlgeschlagen',
+  HONEYPOT_KICKS_PAUSED: 'Honeypot-Kicks pausiert',
+  HONEYPOT_WARNING_FAILED: 'Honeypot-Warnung nicht möglich',
 }
 
 /** One line on what happened to the member, in German. */

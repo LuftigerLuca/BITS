@@ -5,6 +5,8 @@ import eu.luftiger.bits.backend.systemlog.api.AccountLinkRecord
 import eu.luftiger.bits.backend.systemlog.api.AccountRemovalRecord
 import eu.luftiger.bits.backend.systemlog.api.EmbassyChangeOutcome
 import eu.luftiger.bits.backend.systemlog.api.EmbassySyncResult
+import eu.luftiger.bits.backend.systemlog.api.HoneypotAction
+import eu.luftiger.bits.backend.systemlog.api.HoneypotActionOutcome
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -142,6 +144,25 @@ class SystemLogService(
                 },
             )
         }
+    }
+
+    @Transactional
+    override fun recordHoneypotAction(action: HoneypotAction) {
+        val (kind, text) =
+            when (action.outcome) {
+                HoneypotActionOutcome.KICKED -> EntryKind.HONEYPOT_KICKED to "wegen einer Nachricht im Honeypot-Kanal gekickt."
+                HoneypotActionOutcome.SKIPPED -> EntryKind.HONEYPOT_KICK_SKIPPED to "schrieb im Honeypot-Kanal, wurde aber nicht gekickt."
+                HoneypotActionOutcome.FAILED -> EntryKind.HONEYPOT_KICK_FAILED to "schrieb im Honeypot-Kanal, der Kick schlug aber fehl."
+            }
+        entries.save(
+            SystemLogEntry(
+                clock.instant(),
+                kind,
+                discordUserId = action.discordUserId,
+                discordName = action.memberName,
+                message = listOfNotNull("${action.memberName} $text", action.reason).joinToString(" "),
+            ),
+        )
     }
 
     /**

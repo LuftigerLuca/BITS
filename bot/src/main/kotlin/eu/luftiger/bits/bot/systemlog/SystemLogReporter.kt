@@ -41,7 +41,8 @@ class SystemLogReporter(
     fun reportUndeliveredEvent(report: UndeliveredEventReport) =
         send("undelivered event ${report.streamId}") { backend.reportUndeliveredEvent(report) }
 
-    private fun send(
+    /** Sends [call] in the background like the reports above. */
+    fun send(
         what: String,
         call: suspend () -> Unit,
     ) {

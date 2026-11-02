@@ -19,6 +19,7 @@ function stub(overview: Overview, setCountry: (init?: RequestInit) => Response) 
     'GET /web/admin/role-sync/countries': () => json(countries),
     'GET /web/admin/overview': () => json(overview),
     'GET /web/admin/bot-presence': () => json({}),
+    'GET /web/admin/honeypot': () => json({ channelId: null, kicksPaused: false, channels: [] }),
     'PUT /web/admin/overview/country': setCountry,
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),

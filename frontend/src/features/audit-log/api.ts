@@ -32,6 +32,8 @@ export type AuditAction =
   | 'MEMBER_SYNC_REQUESTED'
   | 'MEMBER_UNLINKED'
   | 'BOT_PRESENCE_CHANGED'
+  | 'HONEYPOT_CHANNEL_CHANGED'
+  | 'HONEYPOT_KICKS_RESUMED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'

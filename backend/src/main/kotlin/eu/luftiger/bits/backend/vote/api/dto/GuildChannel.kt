@@ -10,6 +10,8 @@ data class GuildChannel(
     val category: String?,
     /** Whether the bot may create private threads there and manage them. */
     val threadsCreatable: Boolean,
+    /** Whether the bot may watch the channel as a honeypot. */
+    val honeypotUsable: Boolean,
     val everyoneCanView: Boolean,
     /** Roles that may see the channel; empty if [everyoneCanView]. */
     val viewerRoleIds: Set<String>,

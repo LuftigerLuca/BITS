@@ -28,6 +28,9 @@ class DiscordChannel(
     /** Whether the bot may create embassy threads there. */
     @Column(name = "threads_creatable", nullable = false)
     val threadsCreatable: Boolean,
+    /** Whether the bot may watch the channel as a honeypot. */
+    @Column(name = "honeypot_usable", nullable = false)
+    val honeypotUsable: Boolean,
     @Column(name = "everyone_can_view", nullable = false)
     val everyoneCanView: Boolean,
     /** Roles that may see the channel; empty if [everyoneCanView]. */

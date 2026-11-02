@@ -30,6 +30,8 @@ export const ACTIONS: Record<AuditAction, string> = {
   REMOVAL_LIMIT_TOGGLED: 'Schutz vor Massenentzug umgeschaltet',
   MEMBER_SYNC_REQUESTED: 'Mitglied abgeglichen',
   MEMBER_UNLINKED: 'Verknüpfung eines Mitglieds gelöst',
+  HONEYPOT_CHANNEL_CHANGED: 'Honeypot-Kanal geändert',
+  HONEYPOT_KICKS_RESUMED: 'Honeypot-Kicks fortgesetzt',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

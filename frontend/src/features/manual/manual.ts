@@ -521,6 +521,32 @@ export const MANUAL_PAGES: ManualPage[] = [
         ],
       },
       {
+        id: 'honeypot',
+        title: 'Honeypot gegen Spam-Bots',
+        intro:
+          'Spam-Bots schreiben oft wahllos in alle Kanäle. Lege unter „Verwaltung“ einen Kanal als Honeypot fest, in dem ' +
+          'Menschen nichts schreiben: Wer dort schreibt, wird automatisch gekickt.',
+        steps: [
+          'Lege in Discord einen eigenen Kanal an, den alle sehen und in dem alle schreiben dürfen. Wähle nie einen ' +
+            'Kanal, der genutzt wird.',
+          'Gib dem Bot die Rechte „Mitglieder kicken“ und, im Kanal, „Nachrichten verwalten“, „Nachrichten senden“ und ' +
+            '„Nachrichtenverlauf lesen“. Sonst steht der Kanal nicht zur Auswahl.',
+          'Wähle den Kanal unter „Verwaltung“ in der Karte „Honeypot“ und bestätige. Innerhalb von 30 Sekunden postet ' +
+            'der Bot dort eine Warnung und stellt sie wieder her, falls sie gelöscht wird.',
+        ],
+        points: [
+          'Der Bot löscht die Nachricht, schickt eine Direktnachricht mit dem Grund und kickt den Account. Der Account ' +
+            'kann wieder beitreten; im Discord-Audit-Log steht der Kick mit Grund.',
+          'Auch verifizierte Mitglieder werden gekickt und verlieren ihre WarEra-Verknüpfung. Sie können sich nach dem ' +
+            'Beitritt mit /verify neu verknüpfen.',
+          'Ausgenommen sind andere Bots, Webhooks, Meldungen von Discord und Admins. Mitglieder über der Rolle des Bots ' +
+            'kann er nicht kicken; er löscht nur ihre Nachricht.',
+          'Notbremse: Nach 10 Kicks in 10 Minuten pausiert der Bot die Kicks und löscht nur noch. Prüfe im System-Log, ' +
+            'ob es wirklich Bots waren, und setze die Kicks in der Karte fort. Eine neue Kanalwahl hebt die Pause auch auf.',
+          'Das System-Log zeigt jeden Fall mit Ergebnis, aber nie den Inhalt der Nachricht.',
+        ],
+      },
+      {
         id: 'safety',
         title: 'Schutz vor Fehlern',
         intro:

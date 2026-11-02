@@ -21,6 +21,9 @@ import eu.luftiger.bits.bot.events.LoggingEventHandler
 import eu.luftiger.bits.bot.events.RedisStreamEventConsumer
 import eu.luftiger.bits.bot.features.FeatureGate
 import eu.luftiger.bits.bot.features.Features
+import eu.luftiger.bits.bot.honeypot.Honeypot
+import eu.luftiger.bits.bot.honeypot.HoneypotListener
+import eu.luftiger.bits.bot.honeypot.JdaHoneypotGuild
 import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.presence.PresenceUpdater
 import eu.luftiger.bits.bot.roles.RoleReporter
@@ -86,11 +89,12 @@ fun main() {
     val features = Features(backend, scope)
     features.refreshPeriodically()
 
-    // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent.
+    // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent. The honeypot
+    // needs to see that a message was written, not what it says, so it does without MESSAGE_CONTENT.
     val jda =
         JDABuilder
             .createLight(config.discordToken)
-            .enableIntents(GatewayIntent.GUILD_MEMBERS)
+            .enableIntents(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGES)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .setChunkingFilter(ChunkingFilter.ALL)
             // The builder JDA would take itself, so its timeouts and pools stay, with the requests counted.
@@ -150,6 +154,16 @@ fun main() {
     val systemLog = SystemLogReporter(backend, scope, backend)
     val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit, systemLog::reportRoleSync)
     val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
+    val honeypot =
+        Honeypot(
+            backend,
+            JdaHoneypotGuild(jda, config.guildId),
+            JdaDirectMessages(jda),
+            { guild.name },
+            systemLog::send,
+        )
+    jda.addEventListener(HoneypotListener(config.guildId, honeypot, scope))
+    honeypot.refreshPeriodically(scope)
     val votes = VoteEvents(jda, config.guildId, backend)
     val embassyGuild = JdaEmbassyGuild(jda, config.guildId)
     val embassies = EmbassySyncHandler(embassyGuild, systemLog::reportEmbassySync)

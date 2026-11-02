@@ -63,6 +63,13 @@ Renaming embassy threads waits in the stream while the bot is down. A thread tha
 may not manage threads, or whose rename Discord refuses, keeps its name and is recorded in the system log; the others
 are renamed. While the backend is down, the bot sends those failures again with backoff for about an hour.
 
+The honeypot needs only the bot and Discord for its kicks. The bot asks the backend for the channel every 30 seconds and
+keeps the last answer while the backend is down, so it goes on deleting and kicking; results are sent again with backoff
+for about an hour, a pause with every poll until the backend takes it. After a start, it watches nothing until the backend has answered once. Messages written
+while the bot is down are not looked at later. If Discord refuses the message deletion, the direct message or the kick,
+the other steps still run and the system log says what failed. A pause of the kicks survives a restart, since the
+backend keeps it; if the bot cannot report it before stopping, its count starts over.
+
 Which features an admin switched off under "Verwaltung" the bot asks the backend every 30 seconds. Until its first
 answer after a start everything is on; while the backend is down, the bot keeps the last answer, and the commands fail
 at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;

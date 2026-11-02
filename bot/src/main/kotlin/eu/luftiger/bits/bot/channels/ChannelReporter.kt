@@ -88,6 +88,16 @@ class ChannelReporter(
                 Permission.MESSAGE_SEND_IN_THREADS,
             )
 
+        /** What the bot needs to watch a channel as a honeypot: keep its warning, delete messages and kick the author. */
+        val HONEYPOT_PERMISSIONS =
+            listOf(
+                Permission.VIEW_CHANNEL,
+                Permission.MESSAGE_SEND,
+                Permission.MESSAGE_HISTORY,
+                Permission.MESSAGE_MANAGE,
+                Permission.KICK_MEMBERS,
+            )
+
         /** Text and announcement channels in the order of Discord's channel list. */
         internal fun channels(guild: Guild): List<DiscordChannelDto> =
             guild.channels.filterIsInstance<StandardGuildMessageChannel>().mapIndexed { index, channel ->
@@ -108,6 +118,7 @@ class ChannelReporter(
                         },
                     // Announcement channels have no private threads.
                     threadsCreatable = channel is TextChannel && guild.selfMember.hasPermission(channel, THREAD_PERMISSIONS),
+                    honeypotUsable = guild.selfMember.hasPermission(channel, HONEYPOT_PERMISSIONS),
                 )
             }
     }

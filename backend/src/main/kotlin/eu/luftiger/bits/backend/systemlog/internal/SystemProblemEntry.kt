@@ -14,6 +14,16 @@ fun entryOf(
     now: Instant,
 ): SystemLogEntry =
     when (problem) {
+        is SystemProblem.HoneypotKicksPaused ->
+            SystemLogEntry(
+                now,
+                EntryKind.HONEYPOT_KICKS_PAUSED,
+                message =
+                    "Der Bot hat ${problem.kickCount} Mitglieder in ${problem.windowMinutes} Minuten aus dem Honeypot-Kanal gekickt " +
+                        "und pausiert weitere Kicks, bis ein Admin sie unter „Verwaltung“ fortsetzt. Nachrichten löscht er weiter.",
+            )
+        is SystemProblem.HoneypotWarningFailed ->
+            SystemLogEntry(now, EntryKind.HONEYPOT_WARNING_FAILED, message = problem.reason)
         is SystemProblem.WareraUsersUnavailable ->
             SystemLogEntry(
                 now,
