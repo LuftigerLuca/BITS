@@ -189,8 +189,8 @@ What these flows show:
   `SystemProblem` subtype; errors that only matter for debugging stay in the application log.
 - **Background jobs** use `@Scheduled` with a cron from the configuration (`-` in tests, which start them by hand)
   and the injected `Clock`. A job that must not run twice at once gets its own single thread.
-- **The bot** defers the reply, does the work in its coroutine scope and turns each failure into a German
-  message (`BITS_UNAVAILABLE_MESSAGE` when the backend does not answer). Event handlers are idempotent and never
+- **The bot** defers the reply, does the work in its coroutine scope and turns each failure into a message in the
+  member's language (`Languages`; see "Language" under "Code style") (`BITS_UNAVAILABLE_MESSAGE` when the backend does not answer). Event handlers are idempotent and never
   let an expected failure, such as closed direct messages, keep an event pending.
 
 ## Code style
@@ -221,8 +221,10 @@ What these flows show:
   checks for every pair the dashboard shows. `primary` is no text colour, only for icons and as background.
   Icons are Lucide icons, never emojis or symbol characters in the text.
 - `.editorconfig` defines indentation and line endings.
-- **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (Discord messages,
-  dashboard) is in German.
+- **Language:** Code, comments, logs, commits and branch names are in English. User-facing text (public Discord
+  messages, dashboard) is in German. What the bot writes only to one member, in ephemeral replies and direct messages,
+  comes in that member's language: pick it with `Languages` and write both texts with `Language.text`. Command names,
+  subcommands and options are English for everyone; their descriptions are English with a German localization.
 - Add KDoc to classes and public functions whose purpose is not clear from their name. Comments explain why,
   not what.
 - Get the current time from the injected `Clock`, never from `Instant.now()`, so tests can control it.

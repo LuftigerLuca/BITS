@@ -4,6 +4,8 @@ import eu.luftiger.bits.bot.accounts.JdaDirectMessages
 import eu.luftiger.bits.bot.accounts.RelinkNotifier
 import eu.luftiger.bits.bot.backend.KtorBackendClient
 import eu.luftiger.bits.bot.channels.ChannelReporter
+import eu.luftiger.bits.bot.commands.BOT_COMMANDS
+import eu.luftiger.bits.bot.commands.LanguageCommand
 import eu.luftiger.bits.bot.commands.NicknameCommand
 import eu.luftiger.bits.bot.commands.PingCommand
 import eu.luftiger.bits.bot.commands.ProfileCommand
@@ -24,6 +26,7 @@ import eu.luftiger.bits.bot.features.Features
 import eu.luftiger.bits.bot.honeypot.Honeypot
 import eu.luftiger.bits.bot.honeypot.HoneypotListener
 import eu.luftiger.bits.bot.honeypot.JdaHoneypotGuild
+import eu.luftiger.bits.bot.language.Languages
 import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.presence.PresenceUpdater
 import eu.luftiger.bits.bot.roles.RoleReporter
@@ -85,7 +88,8 @@ fun main() {
     val memberReporter = MemberReporter(config.guildId, backend, scope)
     val channelReporter = ChannelReporter(config.guildId, backend, scope)
     val threadReporter = ThreadReporter(config.guildId, backend, scope)
-    val verifyCommand = VerifyCommand(backend, scope)
+    val languages = Languages(backend)
+    val verifyCommand = VerifyCommand(backend, scope, languages)
     val features = Features(backend, scope)
     features.refreshPeriodically()
 
@@ -100,7 +104,8 @@ fun main() {
             // The builder JDA would take itself, so its timeouts and pools stay, with the requests counted.
             .setHttpClientBuilder(IOUtil.newHttpClientBuilder().addInterceptor(discordRequests))
             .addEventListeners(
-                PingCommand(backend, scope),
+                PingCommand(backend, scope, languages),
+                LanguageCommand(languages, scope),
                 // Commands of a feature an admin switched off answer with a hint. Votes that are open run to their end,
                 // so only starting one is gated; ending, cancelling and the buttons stay. Unlinking always works, since
                 // members must be able to take back their data.
@@ -109,20 +114,41 @@ fun main() {
                     { it.verification },
                     VerifyCommand.NAME,
                     buttonPrefix = VerifyCommand.CHECK_BUTTON_PREFIX,
+                    languages = languages,
                     delegate = verifyCommand,
                 ),
-                UnverifyCommand(backend, scope),
+                UnverifyCommand(backend, scope, languages),
                 FeatureGate(
                     features,
                     { it.nicknames },
                     NicknameCommand.NAME,
                     buttonPrefix = NicknameCommand.OPT_IN_BUTTON,
-                    delegate = NicknameCommand(backend, scope),
+                    languages = languages,
+                    delegate = NicknameCommand(backend, scope, languages),
                 ),
-                FeatureGate(features, { it.profile }, ProfileCommand.NAME, delegate = ProfileCommand(backend, scope)),
-                FeatureGate(features, { it.roleSync }, RolesCommand.NAME, delegate = RolesCommand(backend, scope)),
-                FeatureGate(features, { it.votes }, VoteCommand.NAME, VoteCommand.START, delegate = VoteCommand(backend, scope)),
-                VoteButtons(backend, scope),
+                FeatureGate(
+                    features,
+                    { it.profile },
+                    ProfileCommand.NAME,
+                    languages = languages,
+                    delegate = ProfileCommand(backend, scope, languages),
+                ),
+                FeatureGate(
+                    features,
+                    { it.roleSync },
+                    RolesCommand.NAME,
+                    languages = languages,
+                    delegate = RolesCommand(backend, scope, languages),
+                ),
+                FeatureGate(
+                    features,
+                    { it.votes },
+                    VoteCommand.NAME,
+                    VoteCommand.START,
+                    languages = languages,
+                    delegate = VoteCommand(backend, scope, languages),
+                ),
+                VoteButtons(backend, scope, languages),
                 roleReporter,
                 memberReporter,
                 channelReporter,
@@ -133,15 +159,8 @@ fun main() {
     val guild = jda.getGuildById(config.guildId) ?: error("Bot is not a member of guild ${config.guildId}")
     guild
         .updateCommands()
-        .addCommands(
-            PingCommand.data,
-            VerifyCommand.data,
-            UnverifyCommand.data,
-            NicknameCommand.data,
-            ProfileCommand.data,
-            RolesCommand.data,
-            VoteCommand.data,
-        ).queue()
+        .addCommands(BOT_COMMANDS)
+        .queue()
     roleReporter.reportPeriodically(guild)
     memberReporter.reportPeriodically(guild)
     channelReporter.reportPeriodically(guild)
@@ -153,12 +172,13 @@ fun main() {
     val logging = LoggingEventHandler()
     val systemLog = SystemLogReporter(backend, scope, backend)
     val roleSync = RoleSyncHandler(jda, config.guildId, config.removalLimit, systemLog::reportRoleSync)
-    val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda))
+    val relinkNotifier = RelinkNotifier(JdaDirectMessages(jda), languages::ofDirectMessage)
     val honeypot =
         Honeypot(
             backend,
             JdaHoneypotGuild(jda, config.guildId),
             JdaDirectMessages(jda),
+            languages::ofDirectMessage,
             { guild.name },
             systemLog::send,
         )

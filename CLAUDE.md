@@ -36,7 +36,8 @@ The reasons behind the architecture are in [docs/adr](docs/adr/README.md), the b
   `ModulithStructureTest` fails on it.
 - Change the database schema only with a new Flyway migration. Never touch existing migrations.
 - Get the current time from the injected `Clock`.
-- Code and comments in English, user-facing text in German.
+- Code and comments in English. User-facing text is in German, except what the bot writes only to one member, which
+  also comes in English (`Language.text`), and command names and options, which are English for everyone.
 
 ## Checks
 

@@ -1,9 +1,11 @@
 package eu.luftiger.bits.bot.votes
 
 import eu.luftiger.bits.bot.backend.VoteBackend
-import eu.luftiger.bits.bot.commands.BITS_UNAVAILABLE_MESSAGE
 import eu.luftiger.bits.bot.commands.VerifyCommand
+import eu.luftiger.bits.bot.commands.bitsUnavailableMessage
+import eu.luftiger.bits.bot.language.Languages
 import eu.luftiger.bits.shared.CastVoteResponse
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.VoteChoice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 class VoteButtons(
     private val backend: VoteBackend,
     private val scope: CoroutineScope,
+    private val languages: Languages,
 ) : ListenerAdapter() {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -36,12 +39,16 @@ class VoteButtons(
         event.deferReply(true).queue()
         val member = event.member
         scope.launch {
+            val language = languages.of(event)
             val message =
                 try {
                     if (member == null || member.roles.none { it.id == button.roleId }) {
-                        "Abstimmen dürfen nur Mitglieder mit der Rolle <@&${button.roleId}>."
+                        language.text(
+                            "Abstimmen dürfen nur Mitglieder mit der Rolle <@&${button.roleId}>.",
+                            "Only members with the role <@&${button.roleId}> may vote.",
+                        )
                     } else {
-                        castMessage(backend.castVote(button.voteId, member.id, button.choice), button.choice).also {
+                        castMessage(backend.castVote(button.voteId, member.id, button.choice), button.choice, language).also {
                             updateLater(button.voteId, button.roleId, event.message)
                         }
                     }
@@ -49,7 +56,7 @@ class VoteButtons(
                     throw e
                 } catch (e: Exception) {
                     log.error("Casting a vote at the backend failed", e)
-                    BITS_UNAVAILABLE_MESSAGE
+                    bitsUnavailableMessage(language)
                 }
             event.hook.sendMessage(message).queue()
         }
@@ -92,20 +99,38 @@ class VoteButtons(
         internal fun castMessage(
             response: CastVoteResponse,
             choice: VoteChoice,
-        ): String =
-            when (response) {
+            language: Language,
+        ): String {
+            val label = VoteMessages.label(choice, language)
+            return when (response) {
                 is CastVoteResponse.Cast ->
                     when (val previous = response.previous) {
                         null ->
-                            "Deine Stimme ist gespeichert: **${VoteMessages.label(choice)}**. Sehen kann sie nur du; bis zum Ende " +
-                                "kannst du sie ändern."
-                        choice -> "Du hast schon mit **${VoteMessages.label(choice)}** gestimmt."
-                        else -> "Deine Stimme ist geändert: **${VoteMessages.label(choice)}** statt ${VoteMessages.label(previous)}."
+                            language.text(
+                                "Deine Stimme ist gespeichert: **$label**. Sehen kann sie nur du; bis zum Ende kannst du sie ändern.",
+                                "Your vote is saved: **$label**. Only you can see it; you can change it until the end.",
+                            )
+                        choice -> language.text("Du hast schon mit **$label** gestimmt.", "You already voted **$label**.")
+                        else -> {
+                            val before = VoteMessages.label(previous, language)
+                            language.text(
+                                "Deine Stimme ist geändert: **$label** statt $before.",
+                                "Your vote is changed: **$label** instead of $before.",
+                            )
+                        }
                     }
                 CastVoteResponse.NotLinked ->
-                    "Zum Abstimmen brauchst du einen verknüpften WarEra-Account. Verknüpfe ihn mit `/${VerifyCommand.NAME}` und stimme " +
-                        "dann ab."
-                CastVoteResponse.Closed -> "Die Abstimmung ist beendet, es werden keine Stimmen mehr angenommen."
+                    language.text(
+                        "Zum Abstimmen brauchst du einen verknüpften WarEra-Account. Verknüpfe ihn mit `/${VerifyCommand.NAME}` und " +
+                            "stimme dann ab.",
+                        "To vote, you need a linked WarEra account. Link it with `/${VerifyCommand.NAME}`, then vote.",
+                    )
+                CastVoteResponse.Closed ->
+                    language.text(
+                        "Die Abstimmung ist beendet, es werden keine Stimmen mehr angenommen.",
+                        "The vote has ended, no more votes are accepted.",
+                    )
             }
+        }
     }
 }

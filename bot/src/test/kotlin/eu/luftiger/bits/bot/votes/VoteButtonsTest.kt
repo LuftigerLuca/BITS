@@ -3,7 +3,9 @@ package eu.luftiger.bits.bot.votes
 import eu.luftiger.bits.bot.backend.VoteBackend
 import eu.luftiger.bits.bot.commands.Replies
 import eu.luftiger.bits.bot.commands.buttonClick
+import eu.luftiger.bits.bot.commands.languages
 import eu.luftiger.bits.shared.CastVoteResponse
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.VoteChoice
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -26,7 +28,7 @@ class VoteButtonsTest {
             val event = buttonClick("vote:7:YES:r-congress", replies)
             every { event.member!!.roles } returns emptyList()
 
-            VoteButtons(backend, backgroundScope).onButtonInteraction(event)
+            VoteButtons(backend, backgroundScope, languages()).onButtonInteraction(event)
             runCurrent()
 
             assertEquals(listOf("Abstimmen dürfen nur Mitglieder mit der Rolle <@&r-congress>."), replies.messages)
@@ -39,7 +41,7 @@ class VoteButtonsTest {
             coEvery { backend.castVote(7, "42", VoteChoice.NO) } returns CastVoteResponse.NotLinked
             val replies = Replies()
 
-            VoteButtons(backend, backgroundScope).onButtonInteraction(clickWithRole("vote:7:NO:r-congress", replies))
+            VoteButtons(backend, backgroundScope, languages()).onButtonInteraction(clickWithRole("vote:7:NO:r-congress", replies))
             runCurrent()
 
             assertContains(replies.messages.single(), "`/verify`")
@@ -47,10 +49,16 @@ class VoteButtonsTest {
 
     @Test
     fun `the answer says whether the vote was new, the same or changed`() {
-        assertContains(VoteButtons.castMessage(CastVoteResponse.Cast(previous = null), VoteChoice.YES), "gespeichert: **Ja**")
-        assertContains(VoteButtons.castMessage(CastVoteResponse.Cast(VoteChoice.YES), VoteChoice.YES), "schon mit **Ja**")
-        assertContains(VoteButtons.castMessage(CastVoteResponse.Cast(VoteChoice.YES), VoteChoice.ABSTAIN), "**Enthaltung** statt Ja")
-        assertContains(VoteButtons.castMessage(CastVoteResponse.Closed, VoteChoice.YES), "beendet")
+        assertContains(
+            VoteButtons.castMessage(CastVoteResponse.Cast(previous = null), VoteChoice.YES, Language.GERMAN),
+            "gespeichert: **Ja**",
+        )
+        assertContains(VoteButtons.castMessage(CastVoteResponse.Cast(VoteChoice.YES), VoteChoice.YES, Language.GERMAN), "schon mit **Ja**")
+        assertContains(
+            VoteButtons.castMessage(CastVoteResponse.Cast(VoteChoice.YES), VoteChoice.ABSTAIN, Language.GERMAN),
+            "**Enthaltung** statt Ja",
+        )
+        assertContains(VoteButtons.castMessage(CastVoteResponse.Closed, VoteChoice.YES, Language.GERMAN), "beendet")
     }
 
     @Test
@@ -58,7 +66,7 @@ class VoteButtonsTest {
         runTest {
             val replies = Replies()
 
-            VoteButtons(backend, backgroundScope).onButtonInteraction(buttonClick("nickname:on", replies))
+            VoteButtons(backend, backgroundScope, languages()).onButtonInteraction(buttonClick("nickname:on", replies))
             runCurrent()
 
             assertEquals(emptyList(), replies.messages)

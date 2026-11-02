@@ -75,22 +75,37 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'nickname',
         title: 'WarEra-Name als Nickname',
         intro:
-          'Mit /nickname an oder dem Button „Nickname übernehmen“ nach der Verknüpfung setzt BITS deinen Nickname ' +
+          'Mit /nickname on oder dem Button „Nickname übernehmen“ nach der Verknüpfung setzt BITS deinen Nickname ' +
           'auf deinen WarEra-Namen. Das geht auch schon vor dem Verknüpfen.',
         points: [
           'BITS gleicht den Nickname bei jedem Abgleich an, nach einer Umbenennung in WarEra also spätestens nach ' +
             'einer Stunde.',
           'Löst du die Verknüpfung oder übernimmt ein anderer Discord-Account deinen WarEra-Account, entfernt BITS ' +
             'den Nickname wieder, sofern er noch dem WarEra-Namen entspricht.',
-          'Mit /nickname aus hört BITS auf; der Nickname bleibt, wie er ist.',
+          'Mit /nickname off hört BITS auf; der Nickname bleibt, wie er ist.',
         ],
         tips: ['Ohne dein Einverständnis ändert BITS deinen Nickname nie.'],
+      },
+      {
+        id: 'language',
+        title: 'Sprache',
+        intro:
+          'Mit /language wählst du Deutsch, English oder Automatisch für alles, was BITS nur dir schreibt: private ' +
+          'Antworten auf Befehle und Direktnachrichten. Das geht auch ohne verknüpften WarEra-Account.',
+        points: [
+          'Automatisch richtet sich nach der Sprache deines Discord-Clients: Deutsch bleibt Deutsch, alles andere wird ' +
+            'Englisch. Direktnachrichten kommen dann auf Deutsch, weil BITS dort deine Client-Sprache nicht kennt.',
+          'Öffentliche Nachrichten wie das Profil, Abstimmungen und Reports bleiben auf Deutsch, das Dashboard auch. ' +
+            'Rollen-, Länder- und Firmennamen bleiben, wie sie sind.',
+          'Die Namen aller Befehle sind für alle englisch; ihre Beschreibungen folgen deiner Client-Sprache.',
+          'Verlässt du den Server, löscht BITS die Einstellung. Nach einem neuen Beitritt gilt wieder Automatisch.',
+        ],
       },
       {
         id: 'profile',
         title: 'Profile ansehen',
         intro:
-          'Mit /profil zeigt BITS im Kanal das WarEra-Profil deines verknüpften Accounts, mit /profil @mitglied das ' +
+          'Mit /profile zeigt BITS im Kanal das WarEra-Profil deines verknüpften Accounts, mit /profile @mitglied das ' +
           'eines anderen Mitglieds.',
         points: [
           'Name mit Link zu WarEra, Level, Militärrang und Staatsbürgerschaft',
@@ -107,13 +122,13 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'roles',
         title: 'Warum du eine Rolle hast',
         intro:
-          'Mit /rollen siehst du, nur für dich, zu jeder Rolle, die BITS verwaltet, ob du sie bekommst und warum: die ' +
+          'Mit /roles siehst du, nur für dich, zu jeder Rolle, die BITS verwaltet, ob du sie bekommst und warum: die ' +
           'Teil der Regel, der greift, oder was dir je Teil fehlt, etwa „Level 8 von 10“.',
         points: [
           'BITS prüft dafür deine aktuellen WarEra-Daten, ändert aber keine Rollen.',
           'Auf dem Server gleicht der nächste Abgleich deine Rollen an, spätestens nach einer Stunde.',
           'Rollen von Hand zu vergeben hilft nicht: Wer die Regel einer verwalteten Rolle nicht erfüllt, verliert sie.',
-          '/verify, /profil, /rollen und die Rollen unter „Mein Account“ fragen jedes Mal WarEra. Zusammen geht das ' +
+          '/verify, /profile, /roles und die Rollen unter „Mein Account“ fragen jedes Mal WarEra. Zusammen geht das ' +
             'sechsmal pro Minute; danach sagt BITS dir, wie lange du warten musst. So bleibt WarEra für alle erreichbar.',
           'Beim Zurückkehren in den Browser-Tab lädt das Dashboard nichts neu. Aktuelle Daten holst du mit „Aktualisieren“ ' +
             'bei den Rollen.',
@@ -156,7 +171,7 @@ export const MANUAL_PAGES: ManualPage[] = [
         intro: 'Unter „Mein Account“ im Dashboard siehst du, was BITS über dich weiß.',
         points: [
           'deine Verknüpfung und wann alle Mitglieder zuletzt abgeglichen wurden',
-          'die Rollen, die BITS verwaltet, mit Begründung wie bei /rollen',
+          'die Rollen, die BITS verwaltet, mit Begründung wie bei /roles',
           '„Verknüpfung lösen“, das wie /unverify wirkt',
           'einen Download als JSON-Datei mit allem, was BITS zu deiner Discord-ID speichert',
         ],
@@ -178,14 +193,14 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'start',
         title: 'Abstimmung starten',
         intro:
-          'In Discord startest du eine Abstimmung mit /abstimmung starten, im Dashboard unter „Abstimmungen“ mit ' +
+          'In Discord startest du eine Abstimmung mit /vote start, im Dashboard unter „Abstimmungen“ mit ' +
           '„Neue Abstimmung“.',
         steps: [
           'Gib die Frage ein.',
           'Wähle die Rolle, die abstimmen darf. BITS pingt sie mit der Abstimmung.',
           'Wähle den Kanal, in dem Abstimmung und Ergebnis erscheinen. Angeboten werden nur Kanäle, in denen der Bot ' +
             'posten kann.',
-          'Wähle das Ende: eine Dauer wie 48h (Standard), 3d oder 90m, oder „offen“ für kein festes Ende.',
+          'Wähle das Ende: eine Dauer wie 48h (Standard), 3d oder 90m, oder kein festes Ende; das heißt in Discord „open“.',
           'Starte die Abstimmung. Der Bot postet sie mit den Buttons Ja, Nein und Enthaltung.',
         ],
       },
@@ -205,9 +220,9 @@ export const MANUAL_PAGES: ManualPage[] = [
         title: 'Beenden und abbrechen',
         intro: 'Eine laufende Abstimmung kannst du vor ihrem Ende beenden oder abbrechen.',
         points: [
-          '/abstimmung beenden oder „Beenden“ im Dashboard wertet sie sofort aus; das Ergebnis erscheint kurz darauf ' +
+          '/vote end oder „Beenden“ im Dashboard wertet sie sofort aus; das Ergebnis erscheint kurz darauf ' +
             'im Kanal.',
-          '/abstimmung abbrechen oder „Abbrechen“ beendet sie ohne Ergebnis und löscht die abgegebenen Stimmen.',
+          '/vote cancel oder „Abbrechen“ beendet sie ohne Ergebnis und löscht die abgegebenen Stimmen.',
         ],
       },
       {
@@ -273,7 +288,7 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Ohne Rollen-Sync und ohne Botschaften bleiben Rollen und Threads, wie sie sind. Schaltest du sie wieder ' +
             'ein, gleicht BITS sofort alle Mitglieder ab.',
           'Ohne Abstimmungen startet niemand eine neue. Laufende enden wie geplant und lassen sich in Discord mit ' +
-            '/abstimmung beenden oder abbrechen.',
+            '/vote end oder cancel.',
         ],
         tips: ['Jedes Umschalten steht im Audit-Log.'],
       },
@@ -350,7 +365,7 @@ export const MANUAL_PAGES: ManualPage[] = [
             'behält sie. Entferne sie bei Bedarf in Discord.',
           'Ist die Verifizierung ausgeschaltet, ändert BITS an den Statusrollen nichts. Der Rollen-Sync spielt ' +
             'dafür keine Rolle.',
-          '/rollen und die Rollenkarte im Konto nennen die Statusrolle mit dem Grund „Verifiziert“.',
+          '/roles und die Rollenkarte im Konto nennen die Statusrolle mit dem Grund „Verifiziert“.',
           'Wurde eine Statusrolle in Discord gelöscht oder steht sie über der Rolle des Bots, zeigt die Karte das an ' +
             'und BITS vergibt sie nicht.',
         ],
@@ -380,7 +395,7 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Eine DSK ohne Rolle bewirkt nichts.',
           'Entfernst du eine MU, löschst die DSK oder nimmst ihr die Rolle, verlieren die Mitglieder die Rolle ' +
             'beim folgenden Abgleich. Vor dem Entfernen einer MU und dem Löschen einer DSK fragt das Dashboard nach.',
-          'In /rollen und im Audit-Log von Discord steht als Grund etwa „Mitglied der MU Bundeswehr (DSK1)“.',
+          'In /roles und im Audit-Log von Discord steht als Grund etwa „Mitglied der MU Bundeswehr (DSK1)“.',
           'Ist der Rollen-Sync ausgeschaltet, vergibt und entzieht BITS auch die Rollen der DSKs nicht.',
         ],
       },
@@ -413,7 +428,7 @@ export const MANUAL_PAGES: ManualPage[] = [
           'WarEra-Namen oder seine Discord-ID.',
         points: [
           'die Verknüpfung: mit welchem WarEra-Account und seit wann',
-          'die Rollen, die BITS verwaltet, mit frischen WarEra-Daten geprüft wie bei /rollen, und ob das Mitglied ' +
+          'die Rollen, die BITS verwaltet, mit frischen WarEra-Daten geprüft wie bei /roles, und ob das Mitglied ' +
             'sie gerade hat',
           'die letzten Einträge des System-Logs zu dem Mitglied, mit einem Link zu allen',
           '„Jetzt abgleichen“: gleicht das Mitglied sofort mit frischen WarEra-Daten ab; das Ergebnis steht kurz ' +
@@ -537,6 +552,7 @@ export const MANUAL_PAGES: ManualPage[] = [
         points: [
           'Der Bot löscht die Nachricht, schickt eine Direktnachricht mit dem Grund und kickt den Account. Der Account ' +
             'kann wieder beitreten; im Discord-Audit-Log steht der Kick mit Grund.',
+          'Die Warnung steht auf Deutsch und Englisch. Die Direktnachricht folgt der Spracheinstellung des Mitglieds.',
           'Auch verifizierte Mitglieder werden gekickt und verlieren ihre WarEra-Verknüpfung. Sie können sich nach dem ' +
             'Beitritt mit /verify neu verknüpfen.',
           'Ausgenommen sind andere Bots, Webhooks, Meldungen von Discord und Admins. Mitglieder über der Rolle des Bots ' +

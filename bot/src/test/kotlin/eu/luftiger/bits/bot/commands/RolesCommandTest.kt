@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.commands
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.ManagedRoleExplanation
 import eu.luftiger.bits.shared.ManagedRoleOutcome
 import eu.luftiger.bits.shared.RoleExplanationResponse
@@ -49,7 +50,7 @@ class RolesCommandTest {
 
     @Test
     fun `message names the rule that is met and what is missing for each role`() {
-        val message = RolesCommand.explanationMessage(explained)
+        val message = RolesCommand.explanationMessage(explained, Language.GERMAN)
 
         assertContains(message, "**\\_Luftiger\\_**")
         assertContains(message, "✅ <@&1>: Staatsbürgerschaft Germany\n")
@@ -63,17 +64,17 @@ class RolesCommandTest {
 
     @Test
     fun `unlinked user is pointed to verify, and no rules are said as such`() {
-        assertContains(RolesCommand.explanationMessage(RoleExplanationResponse.NotLinked), "`/verify`")
+        assertContains(RolesCommand.explanationMessage(RoleExplanationResponse.NotLinked, Language.GERMAN), "`/verify`")
         assertEquals(
             "BITS vergibt gerade keine Rollen.",
-            RolesCommand.explanationMessage(RoleExplanationResponse.Explained("Luftiger", emptyList())),
+            RolesCommand.explanationMessage(RoleExplanationResponse.Explained("Luftiger", emptyList()), Language.GERMAN),
         )
     }
 
     @Test
     fun `many roles are cut to fit into one message`() {
         val role = explained.roles[1]
-        val message = RolesCommand.explanationMessage(explained.copy(roles = List(100) { role.copy(roleId = "$it") }))
+        val message = RolesCommand.explanationMessage(explained.copy(roles = List(100) { role.copy(roleId = "$it") }), Language.GERMAN)
 
         assertTrue(message.length <= Message.MAX_CONTENT_LENGTH)
         assertContains(message, Regex("… und \\d+ weitere\n"))
@@ -83,39 +84,39 @@ class RolesCommandTest {
     fun `command explains the own roles`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.explainRoles("42") } returns explained
+            coEvery { backend.explainRoles("42", Language.GERMAN) } returns explained
             val replies = Replies()
 
-            RolesCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
+            RolesCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
             runCurrent()
 
-            assertEquals(listOf(RolesCommand.explanationMessage(explained)), replies.messages)
+            assertEquals(listOf(RolesCommand.explanationMessage(explained, Language.GERMAN)), replies.messages)
         }
 
     @Test
     fun `command says when WarEra or BITS cannot be reached`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.explainRoles("42") } throws WareraUnavailableException(RuntimeException("503"))
+            coEvery { backend.explainRoles("42", Language.GERMAN) } throws WareraUnavailableException(RuntimeException("503"))
             val replies = Replies()
 
-            RolesCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
+            RolesCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
             runCurrent()
-            coEvery { backend.explainRoles("42") } throws IllegalStateException("connection refused")
-            RolesCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
+            coEvery { backend.explainRoles("42", Language.GERMAN) } throws IllegalStateException("connection refused")
+            RolesCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
             runCurrent()
 
-            assertEquals(listOf(RolesCommand.WARERA_UNAVAILABLE_MESSAGE, BITS_UNAVAILABLE_MESSAGE), replies.messages)
+            assertEquals(listOf(wareraUnavailableMessage(Language.GERMAN), bitsUnavailableMessage(Language.GERMAN)), replies.messages)
         }
 
     @Test
     fun `command says how long to wait after asking too often`() =
         runTest {
             val backend = mockk<BackendClient>()
-            coEvery { backend.explainRoles("42") } throws TooManyRequestsException(30, RuntimeException("429"))
+            coEvery { backend.explainRoles("42", Language.GERMAN) } throws TooManyRequestsException(30, RuntimeException("429"))
             val replies = Replies()
 
-            RolesCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
+            RolesCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(slashCommand(RolesCommand.NAME, replies))
             runCurrent()
 
             assertEquals(

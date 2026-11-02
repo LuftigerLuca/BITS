@@ -17,9 +17,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Keeps answers that hardly ever change for a while, since every WarEra call counts against the 100 per minute that
  * verification and role sync share: the countries, loaded for each `/ping`, country picker and country rule, the
  * military units, loaded for each search in the MU picker and each MU leadership rule, and the parties and the
- * government of each country, loaded for each `/profil`. Role sync, `/rollen` and the evaluation of votes therefore see
+ * government of each country, loaded for each `/profile`. Role sync, `/roles` and the evaluation of votes therefore see
  * parties and governments up to [countryDetailsTtl] old, and military units up to [militaryUnitTtl]. Users are kept for
- * [userTtl] only, so that `/profil`, `/rollen` and the dashboard called again and again cost one call, while a member
+ * [userTtl] only, so that `/profile`, `/roles` and the dashboard called again and again cost one call, while a member
  * who changed something in WarEra sees it in BITS after a short while. Errors are not kept.
  *
  * A hit never waits. A miss waits only for a load of the same key, which may take seconds behind the rate limiter, so

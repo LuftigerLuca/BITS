@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.backend
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordChannelDto
 import eu.luftiger.bits.shared.DiscordRoleDto
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileResponse
@@ -46,7 +47,10 @@ interface BackendClient {
     ): ProfileResponse
 
     /** @throws WareraUnavailableException if the backend cannot load the user from WarEra */
-    suspend fun explainRoles(discordUserId: String): RoleExplanationResponse
+    suspend fun explainRoles(
+        discordUserId: String,
+        language: Language,
+    ): RoleExplanationResponse
 
     /** Replaces the roles of the guild known to the backend. */
     suspend fun reportRoles(roles: List<DiscordRoleDto>)

@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 /**
- * The WarEra profile behind a link, for `/profil`. The user comes fresh from WarEra on every call, so the profile
+ * The WarEra profile behind a link, for `/profile`. The user comes fresh from WarEra on every call, so the profile
  * matches what WarEra shows; the countries, military units, parties and governments come from the cache of the WarEra
  * client. The party, the offices and the companies are details: if WarEra cannot deliver one, the profile comes
  * without it; only a user that cannot be loaded fails the whole call.

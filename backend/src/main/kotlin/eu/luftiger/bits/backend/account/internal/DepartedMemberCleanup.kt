@@ -13,6 +13,7 @@ class DepartedMemberCleanup(
     private val linkRepository: AccountLinkRepository,
     private val verificationRepository: AccountVerificationRepository,
     private val nicknameOptInRepository: NicknameOptInRepository,
+    private val languageRepository: LanguagePreferenceRepository,
     private val systemLog: SystemLog,
 ) : AccountRemoval {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -24,6 +25,7 @@ class DepartedMemberCleanup(
         linkRepository.deleteAll(links)
         verificationRepository.deleteAllById(byId.keys)
         nicknameOptInRepository.deleteAllById(byId.keys)
+        languageRepository.deleteAllById(byId.keys)
         links.forEach { link ->
             systemLog.recordAccountRemoved(
                 AccountRemovalRecord(link.discordUserId, byId[link.discordUserId]?.discordName, link.wareraUserId, link.wareraUsername),
@@ -31,5 +33,10 @@ class DepartedMemberCleanup(
             log.info("Link of user {} deleted, they left the guild", link.discordUserId)
         }
         return links.size
+    }
+
+    @Transactional
+    override fun removeLanguagesExcept(memberIds: Set<String>) {
+        languageRepository.deleteAllById(languageRepository.findAll().map { it.discordUserId }.filter { it !in memberIds })
     }
 }

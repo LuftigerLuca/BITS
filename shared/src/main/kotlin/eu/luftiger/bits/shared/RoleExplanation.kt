@@ -6,9 +6,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class RoleExplanationRequest(
     val discordUserId: String,
+    /** The language of the labels and details of the answer. */
+    val language: Language = Language.GERMAN,
 )
 
-/** Answer to `/rollen`. Each subtype is identified by its `type` field. */
+/** Answer to `/roles`. Each subtype is identified by its `type` field. */
 @Serializable
 sealed interface RoleExplanationResponse {
     @Serializable
@@ -48,12 +50,12 @@ enum class ManagedRoleOutcome {
 /** One block of the rule of a role. */
 @Serializable
 data class RuleExplanation(
-    /** German description of the block, as in the dashboard; its conditions joined with "und", all of which must be met. */
+    /** Description of the block in the requested language; its conditions joined with "und", all of which must be met. */
     val label: String,
     /** `null` if the WarEra data to decide is missing. */
     val met: Boolean?,
     /**
-     * German description of what is missing, e.g. "Level 8 von 10": the conditions that fail joined with "und", or if
+     * Description of what is missing in the requested language, e.g. "Level 8 von 10": the conditions that fail joined with "und", or if
      * none fails, those that cannot be checked; `null` if the block is met.
      */
     val detail: String?,

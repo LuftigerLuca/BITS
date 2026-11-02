@@ -6,7 +6,7 @@ import eu.luftiger.bits.backend.rolesync.domain.StatusRoleSetting
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Component
 
-/** The roles for verified and unverified members as the role sync and `/rollen` use them. */
+/** The roles for verified and unverified members as the role sync and `/roles` use them. */
 @Component
 class StatusRoleLookup(
     private val repository: StatusRoleRepository,

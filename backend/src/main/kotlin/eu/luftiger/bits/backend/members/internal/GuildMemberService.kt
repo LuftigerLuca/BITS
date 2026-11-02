@@ -60,6 +60,8 @@ class GuildMemberService(
         }
         refusing = false
         if (departed.isNotEmpty()) accountRemoval.removeDeparted(departed.map { DepartedMember(it) })
+        // An empty list is a bot that has not seen its members, not a server without any.
+        if (discordUserIds.isNotEmpty()) accountRemoval.removeLanguagesExcept(discordUserIds)
         members = discordUserIds
         roles = if (withRoles.isEmpty() && discordUserIds.isNotEmpty()) null else withRoles.associateBy { it.discordUserId }
         log.info("Member list of {} members received, {} links of departed members deleted", discordUserIds.size, departed.size)

@@ -57,7 +57,7 @@ export async function getMember(discordUserId: string): Promise<MemberDetail> {
   return (await request(`${MEMBERS}/${encodeURIComponent(discordUserId)}`)).json()
 }
 
-/** Judged with fresh WarEra data like `/rollen`; 503 if WarEra cannot be reached. */
+/** Judged with fresh WarEra data like `/roles`; 503 if WarEra cannot be reached. */
 export async function getMemberRoles(discordUserId: string): Promise<MemberRoles> {
   return (await request(`${MEMBERS}/${encodeURIComponent(discordUserId)}/roles`)).json()
 }

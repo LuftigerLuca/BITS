@@ -11,6 +11,7 @@ import eu.luftiger.bits.shared.CastVoteResponse
 import eu.luftiger.bits.shared.DiscordRequestCount
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.FeatureStates
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
 import eu.luftiger.bits.shared.PingResponse
@@ -179,7 +180,43 @@ class KtorBackendClientTest {
                 }
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
-            assertEquals(45, assertFailsWith<TooManyRequestsException> { client.explainRoles("42") }.retryAfterSeconds)
+            assertEquals(45, assertFailsWith<TooManyRequestsException> { client.explainRoles("42", Language.GERMAN) }.retryAfterSeconds)
+        }
+
+    @Test
+    fun `role explanation in English says so`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    assertEquals("""{"discordUserId":"42","language":"ENGLISH"}""", request.body.toByteArray().decodeToString())
+                    respond("""{"type":"not_linked"}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(RoleExplanationResponse.NotLinked, client.explainRoles("42", Language.ENGLISH))
+        }
+
+    @Test
+    fun `the language of a member is asked for and stored`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    when (request.method) {
+                        HttpMethod.Get -> {
+                            assertEquals("http://backend:8080/api/language-preferences/42", request.url.toString())
+                            respond("""{"language":"ENGLISH"}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                        }
+                        else -> {
+                            assertEquals("http://backend:8080/api/language-preferences", request.url.toString())
+                            assertEquals("""{"discordUserId":"42"}""", request.body.toByteArray().decodeToString())
+                            respond("{}", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                        }
+                    }
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            assertEquals(Language.ENGLISH, client.languagePreference("42"))
+            client.setLanguagePreference("42", null)
         }
 
     @Test
@@ -193,7 +230,7 @@ class KtorBackendClientTest {
                 }
             val client = KtorBackendClient("http://backend:8080", "secret", engine)
 
-            assertEquals(RoleExplanationResponse.NotLinked, client.explainRoles("42"))
+            assertEquals(RoleExplanationResponse.NotLinked, client.explainRoles("42", Language.GERMAN))
         }
 
     @Test

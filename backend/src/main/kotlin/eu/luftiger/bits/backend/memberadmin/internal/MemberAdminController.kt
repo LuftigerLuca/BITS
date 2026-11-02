@@ -39,7 +39,7 @@ class MemberAdminController(
         @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,
     ): MemberDetailResponse = service.member(discordUserId)
 
-    /** Judged with fresh WarEra data like `/rollen`, so it can take a while; 503 if WarEra cannot be reached. */
+    /** Judged with fresh WarEra data like `/roles`, so it can take a while; 503 if WarEra cannot be reached. */
     @GetMapping("/{discordUserId}/roles")
     fun roles(
         @PathVariable @Size(max = WebInput.MAX_ID_LENGTH) discordUserId: String,

@@ -25,6 +25,6 @@ class RoleExplanationController(
     ): RoleExplanationResponse {
         BotInput.discordUserId(request.discordUserId)
         rateLimit.check(request.discordUserId)
-        return explanationService.explain(request.discordUserId)
+        return explanationService.explain(request.discordUserId, request.language)
     }
 }

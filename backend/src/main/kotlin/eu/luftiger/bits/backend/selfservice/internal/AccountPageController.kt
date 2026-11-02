@@ -37,7 +37,7 @@ class AccountPageController(
     ): AccountResponse = service.account(discordUserId(jwt))
 
     /**
-     * Judged with fresh WarEra data like `/rollen`, so it can take a while; 503 if WarEra cannot be reached, 429 if the
+     * Judged with fresh WarEra data like `/roles`, so it can take a while; 503 if WarEra cannot be reached, 429 if the
      * member asked too often, see [MemberRateLimit].
      */
     @GetMapping("/roles")

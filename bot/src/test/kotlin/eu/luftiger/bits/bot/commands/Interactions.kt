@@ -1,5 +1,8 @@
 package eu.luftiger.bits.bot.commands
 
+import eu.luftiger.bits.bot.backend.LanguageBackend
+import eu.luftiger.bits.bot.language.Languages
+import eu.luftiger.bits.shared.Language
 import io.mockk.every
 import io.mockk.mockk
 import net.dv8tion.jda.api.components.MessageTopLevelComponent
@@ -7,11 +10,25 @@ import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
+import net.dv8tion.jda.api.interactions.DiscordLocale
 import net.dv8tion.jda.api.interactions.InteractionHook
 import net.dv8tion.jda.api.requests.RestAction
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+
+/** Languages with what a member chose; nothing unless [stored] says so. */
+fun languages(stored: Language? = null) =
+    Languages(
+        object : LanguageBackend {
+            override suspend fun languagePreference(discordUserId: String) = stored
+
+            override suspend fun setLanguagePreference(
+                discordUserId: String,
+                language: Language?,
+            ) = Unit
+        },
+    )
 
 /** Replies the bot sent through an interaction hook, in order. */
 class Replies {
@@ -60,6 +77,7 @@ fun slashCommand(
     val event = mockk<SlashCommandInteractionEvent>(relaxed = true)
     every { event.name } returns name
     every { event.user.id } returns "42"
+    every { event.userLocale } returns DiscordLocale.GERMAN
     every { event.hook } returns replies.hook
     every { event.getOption(any<String>()) } answers {
         options[firstArg()]?.let { value -> mockk { every { asString } returns value } }
@@ -75,6 +93,7 @@ fun buttonClick(
     val event = mockk<ButtonInteractionEvent>(relaxed = true)
     every { event.componentId } returns componentId
     every { event.user.id } returns "42"
+    every { event.userLocale } returns DiscordLocale.GERMAN
     every { event.member!!.effectiveName } returns "Luca"
     every { event.hook } returns replies.hook
     return event

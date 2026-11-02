@@ -4,6 +4,8 @@ import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.BackendTimeoutException
 import eu.luftiger.bits.bot.backend.TooManyRequestsException
 import eu.luftiger.bits.bot.backend.WareraUnavailableException
+import eu.luftiger.bits.bot.language.Languages
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.ProfileDetail
 import eu.luftiger.bits.shared.ProfileResponse
 import kotlinx.coroutines.CancellationException
@@ -14,15 +16,17 @@ import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
+import net.dv8tion.jda.api.interactions.DiscordLocale
 import net.dv8tion.jda.api.interactions.InteractionHook
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
+import net.dv8tion.jda.api.interactions.commands.build.OptionData
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
 import net.dv8tion.jda.api.utils.MarkdownSanitizer
 import org.slf4j.LoggerFactory
 
 /**
- * `/profil [nutzer]` shows the WarEra profile of the user's own linked account, or of the given member's, in the
+ * `/profile [user]` shows the WarEra profile of the user's own linked account, or of the given member's, in the
  * channel. Hints, such as a missing link or an unreachable WarEra, only the user sees.
  *
  * WarEra may be slow, so the reply is deferred, and in public, since that is the usual outcome. A hint deletes the
@@ -31,6 +35,7 @@ import org.slf4j.LoggerFactory
 class ProfileCommand(
     private val backend: BackendClient,
     private val scope: CoroutineScope,
+    private val languages: Languages,
 ) : ListenerAdapter() {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -43,13 +48,14 @@ class ProfileCommand(
         val roleIds = (if (option == null) event.member else option.asMember)?.roles?.mapTo(HashSet()) { it.id }
         event.deferReply().queue()
         scope.launch {
+            val language = languages.of(event)
             val answer =
                 try {
-                    answer(backend.profile(target.id, event.user.id), own, target.asMention, roleIds)
+                    answer(backend.profile(target.id, event.user.id), own, target.asMention, roleIds, language)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Answer.Hint(failureMessage(e))
+                    Answer.Hint(failureMessage(e, language))
                 }
             when (answer) {
                 is Answer.Profile -> event.hook.editOriginalEmbeds(answer.embed).queue()
@@ -73,14 +79,17 @@ class ProfileCommand(
         hook.sendMessage(text).setEphemeral(true).queue()
     }
 
-    private fun failureMessage(e: Exception): String =
+    private fun failureMessage(
+        e: Exception,
+        language: Language,
+    ): String =
         when (e) {
-            is WareraUnavailableException -> WARERA_UNAVAILABLE_MESSAGE
-            is TooManyRequestsException -> tooManyRequestsMessage(e)
-            is BackendTimeoutException -> "Das dauert gerade länger als erwartet. Versuche es gleich noch einmal."
+            is WareraUnavailableException -> wareraUnavailableMessage(language)
+            is TooManyRequestsException -> tooManyRequestsMessage(e, language)
+            is BackendTimeoutException -> backendTimeoutMessage(language)
             else -> {
                 log.error("Profile call to backend failed", e)
-                BITS_UNAVAILABLE_MESSAGE
+                bitsUnavailableMessage(language)
             }
         }
 
@@ -95,42 +104,55 @@ class ProfileCommand(
     }
 
     companion object {
-        const val NAME = "profil"
-        private const val OPTION_USER = "nutzer"
-
-        internal const val WARERA_UNAVAILABLE_MESSAGE = "WarEra ist gerade nicht erreichbar. Versuche es gleich noch einmal."
+        const val NAME = "profile"
+        private const val OPTION_USER = "user"
 
         val data: SlashCommandData =
             Commands
-                .slash(NAME, "Zeigt das WarEra-Profil eines verknüpften Accounts")
-                .addOption(OptionType.USER, OPTION_USER, "Wessen Profil; ohne Angabe dein eigenes", false)
+                .slash(NAME, "Shows the WarEra profile of a linked account")
+                .setDescriptionLocalization(DiscordLocale.GERMAN, "Zeigt das WarEra-Profil eines verknüpften Accounts")
+                .addOptions(
+                    OptionData(OptionType.USER, OPTION_USER, "Whose profile; your own if left out", false)
+                        .setDescriptionLocalization(DiscordLocale.GERMAN, "Wessen Profil; ohne Angabe dein eigenes"),
+                )
 
         /**
          * [own] if the user asked for their own profile; [mention] is the member whose profile was asked for, [roleIds]
-         * their Discord roles, `null` if they are not on the server.
+         * their Discord roles, `null` if they are not on the server. [language] is for the hints only the user sees; the
+         * profile is public and stays German.
          */
         internal fun answer(
             response: ProfileResponse,
             own: Boolean,
             mention: String,
             roleIds: Set<String>?,
+            language: Language,
         ): Answer =
             when (response) {
                 is ProfileResponse.Found -> Answer.Profile(embed(response, mention, roleIds))
                 ProfileResponse.NotLinked ->
                     Answer.Hint(
                         if (own) {
-                            "Dein Discord-Account ist mit keinem WarEra-Account verknüpft. Mit `/${VerifyCommand.NAME}` verknüpfst du ihn."
+                            language.text(
+                                "Dein Discord-Account ist mit keinem WarEra-Account verknüpft. Mit `/${VerifyCommand.NAME}` verknüpfst du ihn.",
+                                "Your Discord account is not linked to a WarEra account. Link it with `/${VerifyCommand.NAME}`.",
+                            )
                         } else {
-                            "$mention hat keinen WarEra-Account verknüpft."
+                            language.text("$mention hat keinen WarEra-Account verknüpft.", "$mention has not linked a WarEra account.")
                         },
                     )
                 ProfileResponse.WareraUserNotFound ->
                     Answer.Hint(
                         if (own) {
-                            "Deinen verknüpften WarEra-Account gibt es nicht mehr. Mit `/${VerifyCommand.NAME}` verknüpfst du einen neuen."
+                            language.text(
+                                "Deinen verknüpften WarEra-Account gibt es nicht mehr. Mit `/${VerifyCommand.NAME}` verknüpfst du einen neuen.",
+                                "Your linked WarEra account no longer exists. Link a new one with `/${VerifyCommand.NAME}`.",
+                            )
                         } else {
-                            "Den WarEra-Account, mit dem $mention verknüpft ist, gibt es nicht mehr."
+                            language.text(
+                                "Den WarEra-Account, mit dem $mention verknüpft ist, gibt es nicht mehr.",
+                                "The WarEra account $mention is linked to no longer exists.",
+                            )
                         },
                     )
             }

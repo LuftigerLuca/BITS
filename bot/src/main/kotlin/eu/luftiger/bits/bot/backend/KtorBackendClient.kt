@@ -30,6 +30,9 @@ import eu.luftiger.bits.shared.HoneypotPauseReport
 import eu.luftiger.bits.shared.HoneypotProblemReport
 import eu.luftiger.bits.shared.HoneypotState
 import eu.luftiger.bits.shared.HoneypotWarningReport
+import eu.luftiger.bits.shared.Language
+import eu.luftiger.bits.shared.LanguagePreferenceRequest
+import eu.luftiger.bits.shared.LanguagePreferenceResponse
 import eu.luftiger.bits.shared.NicknamePreferenceRequest
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
@@ -85,7 +88,7 @@ import kotlinx.coroutines.CancellationException
 import java.time.Duration
 
 /**
- * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [PresenceBackend] and [HeartbeatBackend] that
+ * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
  * authenticate with the service token of the bot. [calls] counts every request and how it ended.
  */
 class KtorBackendClient(
@@ -99,6 +102,7 @@ class KtorBackendClient(
     EmbassyBackend,
     FeatureBackend,
     HoneypotBackend,
+    LanguageBackend,
     PresenceBackend,
     HeartbeatBackend,
     AutoCloseable {
@@ -148,8 +152,23 @@ class KtorBackendClient(
         requestedBy: String,
     ): ProfileResponse = post("api/profiles", ProfileRequest(discordUserId, requestedBy))
 
-    override suspend fun explainRoles(discordUserId: String): RoleExplanationResponse =
-        post("api/role-explanations", RoleExplanationRequest(discordUserId))
+    override suspend fun explainRoles(
+        discordUserId: String,
+        language: Language,
+    ): RoleExplanationResponse = post("api/role-explanations", RoleExplanationRequest(discordUserId, language))
+
+    override suspend fun languagePreference(discordUserId: String): Language? =
+        http.get("api/language-preferences/$discordUserId").body<LanguagePreferenceResponse>().language
+
+    override suspend fun setLanguagePreference(
+        discordUserId: String,
+        language: Language?,
+    ) {
+        post<LanguagePreferenceRequest, LanguagePreferenceResponse>(
+            "api/language-preferences",
+            LanguagePreferenceRequest(discordUserId, language),
+        )
+    }
 
     override suspend fun reportRoles(roles: List<DiscordRoleDto>) {
         http.put("api/discord-roles") {

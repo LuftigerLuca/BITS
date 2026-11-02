@@ -9,7 +9,7 @@ import type { AccountRole } from './api'
 import { OUTCOMES, rolesErrorMessage } from './labels'
 import { useAccountRoles } from './queries'
 
-/** Which managed roles the member meets and why, as `/rollen` tells them in Discord. */
+/** Which managed roles the member meets and why, as `/roles` tells them in Discord. */
 export function RolesCard() {
   const roles = useAccountRoles()
 
@@ -68,7 +68,7 @@ export function RolesCard() {
   )
 }
 
-/** The blocks of a role with whether each is met, as `/rollen` lists them. */
+/** The blocks of a role with whether each is met, as `/roles` lists them. */
 export function Rules({ rules }: { rules: AccountRole['rules'] }) {
   return (
     <ul className="flex flex-col gap-1">

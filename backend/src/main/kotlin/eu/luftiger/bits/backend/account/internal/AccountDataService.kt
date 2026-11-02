@@ -2,6 +2,7 @@ package eu.luftiger.bits.backend.account.internal
 
 import eu.luftiger.bits.backend.account.api.AccountSelfService
 import eu.luftiger.bits.backend.account.api.dto.StoredAccountData
+import eu.luftiger.bits.backend.account.api.dto.StoredLanguage
 import eu.luftiger.bits.backend.account.api.dto.StoredLink
 import eu.luftiger.bits.backend.account.api.dto.StoredVerification
 import org.springframework.data.repository.findByIdOrNull
@@ -13,6 +14,7 @@ class AccountDataService(
     private val linkRepository: AccountLinkRepository,
     private val verificationRepository: AccountVerificationRepository,
     private val optInRepository: NicknameOptInRepository,
+    private val languageRepository: LanguagePreferenceRepository,
     private val verificationService: VerificationService,
 ) : AccountSelfService {
     @Transactional(readOnly = true)
@@ -27,6 +29,7 @@ class AccountDataService(
                     StoredVerification(it.wareraUserId, it.wareraUsername, it.code, it.expiresAt)
                 },
             nicknameOptedInAt = optInRepository.findByIdOrNull(discordUserId)?.optedInAt,
+            language = languageRepository.findByIdOrNull(discordUserId)?.let { StoredLanguage(it.language.name, it.updatedAt) },
         )
 
     override fun unlink(discordUserId: String): Boolean = verificationService.unlink(discordUserId).wareraUsername != null

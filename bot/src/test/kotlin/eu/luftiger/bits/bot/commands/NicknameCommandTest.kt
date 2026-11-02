@@ -1,6 +1,7 @@
 package eu.luftiger.bits.bot.commands
 
 import eu.luftiger.bits.bot.backend.BackendClient
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -23,10 +24,10 @@ class NicknameCommandTest {
         runTest {
             coEvery { backend.setNicknamePreference("42", true) } returns NicknamePreferenceResponse(true, "_Luftiger_")
             val replies = Replies()
-            val event = slashCommand("nickname", replies, mapOf("modus" to "an"))
+            val event = slashCommand("nickname", replies, mapOf("mode" to "on"))
             renamable(event.member!!, true)
 
-            NicknameCommand(backend, backgroundScope).onSlashCommandInteraction(event)
+            NicknameCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(event)
             runCurrent()
 
             val message = replies.messages.single()
@@ -40,7 +41,15 @@ class NicknameCommandTest {
             coEvery { backend.setNicknamePreference("42", false) } returns NicknamePreferenceResponse(false, "Luftiger")
             val replies = Replies()
 
-            NicknameCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand("nickname", replies, mapOf("modus" to "aus")))
+            NicknameCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(
+                slashCommand(
+                    "nickname",
+                    replies,
+                    mapOf(
+                        "mode" to "off",
+                    ),
+                ),
+            )
             runCurrent()
 
             assertContains(replies.messages.single(), "Er bleibt, wie er ist")
@@ -52,7 +61,7 @@ class NicknameCommandTest {
             coEvery { backend.setNicknamePreference("42", true) } returns NicknamePreferenceResponse(true, "Luftiger")
             val replies = Replies()
 
-            NicknameCommand(backend, backgroundScope).onButtonInteraction(buttonClick(NicknameCommand.OPT_IN_BUTTON, replies))
+            NicknameCommand(backend, backgroundScope, languages()).onButtonInteraction(buttonClick(NicknameCommand.OPT_IN_BUTTON, replies))
             runCurrent()
 
             coVerify { backend.setNicknamePreference("42", true) }
@@ -61,7 +70,7 @@ class NicknameCommandTest {
 
     @Test
     fun `says when the bot cannot rename the member or they are not linked yet`() {
-        val message = NicknameCommand.preferenceMessage(NicknamePreferenceResponse(true, null), renamable = false)
+        val message = NicknameCommand.preferenceMessage(NicknamePreferenceResponse(true, null), renamable = false, Language.GERMAN)
 
         assertContains(message, "Sobald du dich mit `/verify` verknüpft hast")
         assertContains(message, "Hinweis: Deinen Nickname kann ich gerade nicht ändern")
@@ -73,10 +82,18 @@ class NicknameCommandTest {
             coEvery { backend.setNicknamePreference(any(), any()) } throws IllegalStateException("connection refused")
             val replies = Replies()
 
-            NicknameCommand(backend, backgroundScope).onSlashCommandInteraction(slashCommand("nickname", replies, mapOf("modus" to "an")))
+            NicknameCommand(backend, backgroundScope, languages()).onSlashCommandInteraction(
+                slashCommand(
+                    "nickname",
+                    replies,
+                    mapOf(
+                        "mode" to "on",
+                    ),
+                ),
+            )
             runCurrent()
 
-            assertEquals(listOf(BITS_UNAVAILABLE_MESSAGE), replies.messages)
+            assertEquals(listOf(bitsUnavailableMessage(Language.GERMAN)), replies.messages)
         }
 
     private fun renamable(

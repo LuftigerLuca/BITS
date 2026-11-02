@@ -10,6 +10,7 @@ import net.dv8tion.jda.api.entities.UserSnowflake
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel
 import net.dv8tion.jda.api.exceptions.ErrorResponseException
 import net.dv8tion.jda.api.requests.ErrorResponse
+import net.dv8tion.jda.api.utils.messages.MessageEditBuilder
 
 /** What the honeypot needs from Discord; every call fails with what JDA throws. */
 interface HoneypotGuild {
@@ -19,8 +20,14 @@ interface HoneypotGuild {
         embed: MessageEmbed,
     ): String
 
-    /** Whether the message is still there; `false` also if its channel is gone. */
-    suspend fun exists(warning: HoneypotWarning): Boolean
+    /**
+     * Whether the message is still there, `false` also if its channel is gone; if it is, it now shows [embed], so a warning
+     * posted by an older version gets the current text.
+     */
+    suspend fun update(
+        warning: HoneypotWarning,
+        embed: MessageEmbed,
+    ): Boolean
 
     /** Succeeds as well if the message or its channel is gone already. */
     suspend fun delete(
@@ -57,10 +64,23 @@ class JdaHoneypotGuild(
             .id
     }
 
-    override suspend fun exists(warning: HoneypotWarning): Boolean {
+    override suspend fun update(
+        warning: HoneypotWarning,
+        embed: MessageEmbed,
+    ): Boolean {
         val channel = channel(warning.channelId) ?: return false
         return try {
-            channel.retrieveMessageById(warning.messageId).submit().await()
+            val message = channel.retrieveMessageById(warning.messageId).submit().await()
+            val shown = message.embeds.singleOrNull()
+            // Only if needed: an edit is a request of its own, and Discord marks the message as edited.
+            if (message.contentRaw.isNotEmpty() || shown?.title != embed.title || shown?.description != embed.description) {
+                val edit =
+                    MessageEditBuilder()
+                        .setContent("")
+                        .setEmbeds(embed)
+                        .build()
+                message.editMessage(edit).submit().await()
+            }
             true
         } catch (e: ErrorResponseException) {
             if (e.errorResponse != ErrorResponse.UNKNOWN_MESSAGE && e.errorResponse != ErrorResponse.UNKNOWN_CHANNEL) throw e

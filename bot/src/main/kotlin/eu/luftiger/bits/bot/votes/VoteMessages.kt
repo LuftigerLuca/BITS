@@ -1,5 +1,6 @@
 package eu.luftiger.bits.bot.votes
 
+import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.ParticipationResponse
 import eu.luftiger.bits.shared.VoteChoice
 import eu.luftiger.bits.shared.VoteDto
@@ -89,12 +90,15 @@ object VoteMessages {
         )
     }
 
-    fun label(choice: VoteChoice) =
-        when (choice) {
-            VoteChoice.YES -> "Ja"
-            VoteChoice.NO -> "Nein"
-            VoteChoice.ABSTAIN -> "Enthaltung"
-        }
+    /** German by default, as on the public message and its buttons. */
+    fun label(
+        choice: VoteChoice,
+        language: Language = Language.GERMAN,
+    ) = when (choice) {
+        VoteChoice.YES -> language.text("Ja", "Yes")
+        VoteChoice.NO -> language.text("Nein", "No")
+        VoteChoice.ABSTAIN -> language.text("Enthaltung", "Abstain")
+    }
 
     /** `vote:<id>:<choice>:<role ID>`; the role lets the bot check the voter without asking the backend. */
     private fun buttonId(
@@ -117,7 +121,7 @@ object VoteMessages {
      */
     fun parseDuration(text: String): VoteEnd? {
         val value = text.trim().lowercase()
-        if (value == OPEN_END) return VoteEnd.Open
+        if (value == OPEN_END || value == OLD_OPEN_END) return VoteEnd.Open
         val match = Regex("""(\d{1,5})\s*([mhd])""").matchEntire(value) ?: return null
         val amount = match.groupValues[1].toLong()
         val duration =
@@ -130,7 +134,10 @@ object VoteMessages {
         return VoteEnd.After(duration)
     }
 
-    const val OPEN_END = "offen"
+    const val OPEN_END = "open"
+
+    /** What the option took before the commands became English; members know it from earlier votes. */
+    private const val OLD_OPEN_END = "offen"
     const val DEFAULT_DURATION = "48h"
     val MAX_DURATION: Duration = Duration.ofDays(90)
 }

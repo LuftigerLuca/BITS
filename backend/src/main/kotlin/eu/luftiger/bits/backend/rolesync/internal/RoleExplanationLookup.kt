@@ -6,7 +6,7 @@ import eu.luftiger.bits.backend.rolesync.api.dto.MemberRoleExplanation
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import org.springframework.stereotype.Component
 
-/** Adds the names of the roles, which the bot looks up itself for `/rollen`. */
+/** Adds the names of the roles, which the bot looks up itself for `/roles`. */
 @Component
 class RoleExplanationLookup(
     private val explanationService: RoleExplanationService,
