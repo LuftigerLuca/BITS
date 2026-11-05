@@ -55,6 +55,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         ],
         tips: [
           'Der Code zählt nur in einer Firma, die dir gehört.',
+          'Die Verknüpfung können auch Tools lesen, denen Admins dafür ein API-Token geben. Mit /unverify löschst du ' +
+            'sie in BITS, nicht aber, was ein Tool schon gelesen hat.',
           'Verknüpft sich ein anderer Discord-Account mit demselben WarEra-Account, ersetzt das die alte ' +
             'Verknüpfung. Der vorherige Account bekommt dann eine Direktnachricht, falls er welche annimmt.',
         ],
@@ -496,6 +498,31 @@ export const MANUAL_PAGES: ManualPage[] = [
             'im Dashboard, ohne sich neu anzumelden.',
           '„Parteifarben“: eigene Farben für die Parteien des eigenen Landes in der Grafik.',
           '„Bild der Auswertung“: ein eigener Hintergrund für die Grafik.',
+        ],
+      },
+      {
+        id: 'api-tokens',
+        title: 'API für andere Tools',
+        intro:
+          'Andere Tools, etwa Statistik-Bots, lesen Daten von BITS über eine API. Dafür brauchen sie ein API-Token, das ' +
+          'du unter „API-Tokens“ anlegst. Was die API liefert, steht in der API-Dokumentation unter /external/docs, ' +
+          'die jeder öffnen kann.',
+        steps: [
+          'Gib unter „Token anlegen“ einen Namen ein, der sagt, wofür das Token ist.',
+          'Wähle, bis wann es gilt: einschließlich dieses Tages, höchstens ein Jahr ab heute.',
+          'Hake die Scopes an. Jeder erlaubt genau einen Endpunkt, etwa „Verknüpften WarEra-Account zu einer ' +
+            'Discord-ID abrufen“. Gib nur, was das Tool braucht.',
+          'Kopiere das Token und gib es dem Tool. BITS zeigt es nur dieses eine Mal an.',
+        ],
+        points: [
+          'Die API liest nur: verknüpfte Accounts, die Kennzahlen pro Tag, die DSKs mit ihren MUs und Abstimmungen. ' +
+            'Ergebnisse gibt es erst nach der Auswertung, nie einzelne Stimmen oder Namen.',
+          'Scopes und Ablaufdatum lassen sich nicht ändern. Für mehr Rechte oder länger legst du ein neues Token an ' +
+            'und widerrufst das alte.',
+          'Widerrufen wirkt sofort. Abgelaufene Tokens funktionieren nicht mehr und lassen sich aus der Liste entfernen; ' +
+            'zwei Wochen vor Ablauf steht „Läuft bald ab“ daran.',
+          'Jedes Token darf 60 Anfragen pro Minute stellen. „Zuletzt benutzt“ zeigt, ob ein Tool es noch verwendet.',
+          'Anlegen und Widerrufen stehen im Audit-Log.',
         ],
       },
       {

@@ -222,10 +222,10 @@ class VerifyCommand(
             language.text(
                 "BITS speichert deine Discord-ID zusammen mit deinem WarEra-Account, um dir passende Rollen zu geben. Mit " +
                     "`/${ProfileCommand.NAME}` können Mitglieder des Servers dein WarEra-Profil sehen. Mit `/${UnverifyCommand.NAME}` " +
-                    "löschst du die Verknüpfung jederzeit.",
+                    "löschst du die Verknüpfung jederzeit. Tools, denen Admins ein API-Token dafür geben, können sie ebenfalls lesen.",
                 "BITS stores your Discord ID together with your WarEra account to give you the matching roles. With " +
                     "`/${ProfileCommand.NAME}`, members of the server can see your WarEra profile. With `/${UnverifyCommand.NAME}`, " +
-                    "you can delete the link at any time.",
+                    "you can delete the link at any time. Tools that admins give an API token for it can read it as well.",
             )
 
         /** The code proves who renamed the company, not who asked for it; see VerificationService in the backend. */

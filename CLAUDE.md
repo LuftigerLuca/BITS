@@ -31,7 +31,8 @@ The reasons behind the architecture are in [docs/adr](docs/adr/README.md), the b
   logs in. The bot calls the backend via REST (`BackendClient`), the backend reaches the bot via events in Redis
   (`EventPublisher`). No shortcuts.
 - The bot's API under `/api/**` is protected by the service token only; the dashboard uses `/auth/**` and
-  `/web/**` with a session cookie. nginx forwards only the latter.
+  `/web/**` with a session cookie; third parties read `/external/v1/**` with API tokens, each endpoint with its own
+  scope (`@ExternalEndpoint`). nginx forwards these three, never `/api/**`.
 - Backend modules use each other only through `api/`. Never import another module's `domain/` or `internal/`;
   `ModulithStructureTest` fails on it.
 - Change the database schema only with a new Flyway migration. Never touch existing migrations.

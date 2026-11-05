@@ -28,6 +28,11 @@ colours; result images are still drawn with the colours saved, and the preview u
 takes each voter's country from the last role sync and loads from WarEra only the voters the sync could not load, so
 after a restart of the backend, before the first sync, it loads everybody, 50 users per call.
 
+The third-party API under `/external/v1/` reads only Postgres. Without Postgres, every request is answered with 401,
+since no token can be checked; without Redis, requests are not limited per token; without the bot, WarEra or Discord,
+it answers with the data as last stored. The backend being down takes it down as well, while the documentation under
+`/external/docs` is served by the backend too.
+
 Whether a member may manage votes in the dashboard follows the roles in the bot's last member list, so losing or gaining
 a manager role counts within seconds. Only until the bot has sent its list since the backend started, e.g. while the bot
 is down, does the dashboard use the roles the member had at login.

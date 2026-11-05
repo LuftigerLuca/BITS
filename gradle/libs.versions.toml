@@ -13,6 +13,7 @@ lettuce = "7.9.0.RELEASE"
 logback = "1.5.18"
 mockk = "1.14.9"
 testcontainers = "2.0.5"
+springdoc = "3.1.1"
 
 [libraries]
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
@@ -31,6 +32,7 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 lettuce-core = { module = "io.lettuce:lettuce-core", version.ref = "lettuce" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+springdoc-openapi-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 [plugins]

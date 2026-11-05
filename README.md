@@ -20,6 +20,8 @@ Login ins Dashboard ruft das Backend Discord im Namen des Nutzers auf (OAuth2).
   (`BackendClient`).
 - **Dashboard → Backend:** `/auth/**` und `/web/**` über denselben Origin (nginx bzw. Vite-Dev-Proxy), mit
   der Sitzung als HttpOnly-Cookie. `/api/**` des Bots ist von außen nicht erreichbar.
+- **Andere Tools → Backend:** nur lesend unter `/external/v1/**`, mit einem API-Token aus dem Dashboard als
+  `Authorization: Bearer <token>`; die Dokumentation liegt öffentlich unter `/external/docs`.
 - **Backend → Bot:** Events im Redis Stream `bits:events` (`EventPublisher`). Der Bot liest sie über die
   Consumer Groups `bot` und, für Role-Syncs, `bot-role-sync` und bestätigt jedes verarbeitete Event mit `XACK`.
 
@@ -54,6 +56,7 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Name des Mitglieds bei Abgleich oder Lösen       | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |
+| Name des Admins, der ein API-Token anlegt        | `api_token`                | API-Tokens im Dashboard             | bis zum Widerruf des Tokens                                                 |
 | Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot               | 7 Tage                                                                      |
 | Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                         | im Deployment höchstens 5 × 10 MB pro Dienst                                |
 | alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                   | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
@@ -68,6 +71,11 @@ Auskunft holt sich jedes Mitglied selbst unter „Mein Account“: Der Download 
 seine Discord-ID betreffen, aus dem System-Log aber nur seine eigene Seite eines Eintrags und aus dem Audit-Log nur, was
 es selbst als Admin geändert hat. Events in Redis, Container-Logs und Backups enthält er nicht. Wie Admins Auskunft
 geben oder für jemanden löschen, steht in [deploy/README.md](deploy/README.md#data-protection-requests).
+
+Andere Tools lesen über die API unter `/external/v1` nur mit einem API-Token, das ein Admin unter „API-Tokens“ anlegt,
+und nur, was dessen Scopes erlauben: Verknüpfungen (Discord-ID, WarEra-ID und -Name, Zeitpunkt), die Kennzahlen pro
+Tag, die DSKs und Abstimmungen mit dem Ergebnis nach der Auswertung, nie einzelne Stimmen oder Namen. Was ein Tool
+gelesen hat, liegt außerhalb von BITS; `/unverify` löscht es dort nicht. Der Hinweis in `/verify` sagt das ebenfalls.
 
 Verifiziert sich ein anderer Discord-Account für einen schon verknüpften WarEra-Account, ersetzt die neue
 Verknüpfung die alte. Der vorherige Account bekommt dann eine Direktnachricht vom Bot, falls er welche annimmt.

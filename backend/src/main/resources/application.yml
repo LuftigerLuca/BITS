@@ -53,6 +53,9 @@ bits:
   vote:
     # Ends votes within a minute of their end and tries stuck results again.
     cron: "0 * * * * *"
+  external-api:
+    # Per API token; the API reads only the database, the limit keeps a faulty client from keeping it busy.
+    requests-per-minute: 60
   auth:
     public-url: ${BITS_PUBLIC_URL:http://localhost:5173}
     jwt-secret: ${BITS_JWT_SECRET:}
@@ -63,6 +66,20 @@ bits:
     admin:
       username: ${BITS_ADMIN_USERNAME:}
       password-hash: ${BITS_ADMIN_PASSWORD_HASH:}
+
+# The public documentation of the third-party API. Everything stays under /external/, the only prefix nginx forwards
+# for it: the page at /external/docs, its files at /external/swagger-ui/ and the OpenAPI document at
+# /external/docs/openapi. The endpoints of the dashboard and the bot are left out.
+springdoc:
+  paths-to-match: /external/v1/**
+  api-docs:
+    path: /external/docs/openapi
+  swagger-ui:
+    path: /external/docs
+    # Would load a badge from validator.swagger.io, which the CSP blocks anyway.
+    validator-url: none
+    operations-sorter: alpha
+    tags-sorter: alpha
 
 server:
   # The dashboard reaches the backend through nginx; the client IP for the login lockout comes from X-Forwarded-For.
