@@ -12,11 +12,12 @@ export default defineConfig({
     },
   },
   // Like nginx in production: the dashboard and its backend endpoints share one origin, so the session
-  // cookie works without CORS. The bot's /api is not forwarded.
+  // cookie works without CORS. The bot's /api is not forwarded; /external is the third-party API and its docs.
   server: {
     proxy: {
       '/auth': 'http://localhost:8080',
       '/web': 'http://localhost:8080',
+      '/external': 'http://localhost:8080',
     },
   },
   // Tests render components in jsdom against a stubbed fetch, without a backend.

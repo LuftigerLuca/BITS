@@ -7,6 +7,7 @@ import {
   GaugeIcon,
   HistoryIcon,
   HouseIcon,
+  KeyRoundIcon,
   LandmarkIcon,
   LogOutIcon,
   SettingsIcon,
@@ -130,6 +131,9 @@ export function Layout() {
                       {/* Only the page itself, so the pages below it in the path do not mark it as well. */}
                       <NavItem to="/admin" end icon={<SettingsIcon />}>
                         Verwaltung
+                      </NavItem>
+                      <NavItem to="/admin/api-tokens" icon={<KeyRoundIcon />}>
+                        API-Tokens
                       </NavItem>
                       <NavItem to="/admin/audit-log" icon={<HistoryIcon />}>
                         Audit-Log

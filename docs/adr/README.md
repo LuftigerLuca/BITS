@@ -15,6 +15,7 @@ them are in [CLAUDE.md](../../CLAUDE.md) and [CONTRIBUTING.md](../../CONTRIBUTIN
 | [0008](0008-embassy-thread-creation.md)  | The bot creates embassy threads, also on its own                 |
 | [0009](0009-event-lanes.md)              | The bot reads role syncs in a lane of their own                  |
 | [0010](0010-system-status-in-memory.md)  | The system status is kept in memory, the bot reports a heartbeat |
+| [0011](0011-third-party-api.md)          | Third parties read through a separate API with scoped tokens     |
 
 How BITS behaves when one of its parts or services is down is described in [failure-modes.md](../failure-modes.md).
 

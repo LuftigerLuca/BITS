@@ -34,6 +34,8 @@ export type AuditAction =
   | 'BOT_PRESENCE_CHANGED'
   | 'HONEYPOT_CHANNEL_CHANGED'
   | 'HONEYPOT_KICKS_RESUMED'
+  | 'API_TOKEN_CREATED'
+  | 'API_TOKEN_REVOKED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'

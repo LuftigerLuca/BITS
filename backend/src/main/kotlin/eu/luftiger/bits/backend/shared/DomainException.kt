@@ -13,6 +13,11 @@ class InvalidInputException(
     reason: String,
 ) : DomainException(reason)
 
+/** 403: the caller is known, but may not do this, e.g. an API token without the scope of the endpoint. */
+class ForbiddenException(
+    reason: String,
+) : DomainException(reason)
+
 /** 404: what the request refers to does not exist (any more). */
 class NotFoundException(
     reason: String? = null,

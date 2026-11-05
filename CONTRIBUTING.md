@@ -69,7 +69,8 @@ The body explains what changed and why, not how.
   module, since the bot does not use them.
 - The prefix of a controller's path decides its protection: `/api/` the service token, `/web/` the session,
   `/web/admin/` the role `ADMIN` (admin controllers also carry `@PreAuthorize("hasRole('ADMIN')")`), `/auth/`
-  none. Everything else is denied. `EndpointPathTest` fails for other prefixes and for new paths under `/auth/`,
+  none, `/external/v1/` an API token with the scope the endpoint names in `@ExternalEndpoint` (GET only, see
+  [ADR 0011](docs/adr/0011-third-party-api.md)), `/external/docs` none. Everything else is denied. `EndpointPathTest` fails for other prefixes and for new paths under `/auth/`,
   which have to be added to its list on purpose.
 - Requests to `/auth/**` and `/web/**` that change state must come from the dashboard's origin
   (`BITS_PUBLIC_URL`); `SameOriginFilter` rejects others.

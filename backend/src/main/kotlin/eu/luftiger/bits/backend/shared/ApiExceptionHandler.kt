@@ -12,7 +12,7 @@ import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 
 /**
- * Answers every error under `/web` and `/api` with a problem detail (RFC 9457): the [DomainException]s of the
+ * Answers every error under `/web`, `/api` and `/external` with a problem detail (RFC 9457): the [DomainException]s of the
  * services, WarEra being unreachable, and through [ResponseEntityExceptionHandler] what Spring MVC rejects itself
  * (unreadable bodies, failed validation, a `ResponseStatusException` of a controller).
  */
@@ -26,6 +26,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         val status =
             when (e) {
                 is InvalidInputException -> HttpStatus.BAD_REQUEST
+                is ForbiddenException -> HttpStatus.FORBIDDEN
                 is NotFoundException -> HttpStatus.NOT_FOUND
                 is ConflictException -> HttpStatus.CONFLICT
                 is GoneException -> HttpStatus.GONE

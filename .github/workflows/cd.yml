@@ -196,10 +196,23 @@ jobs:
             exit 1
           fi
 
+          # The third-party API asks for a token, its documentation is open.
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://$PUBLIC_BIND:$PUBLIC_PORT/external/v1/dsks" || echo 000)
+          if [ "$code" != "401" ]; then
+            echo "the third-party API answered $code instead of 401 to /external/v1/dsks without token"
+            docker compose logs --tail=60 frontend backend
+            exit 1
+          fi
+          curl -fsS -o /dev/null "http://$PUBLIC_BIND:$PUBLIC_PORT/external/docs/openapi" || {
+            echo "the documentation of the third-party API is not reachable"
+            exit 1
+          }
+
           # The bot's API must stay out of reach through nginx, also for paths that only turn into /api after
           # normalization. The token filter's 401 is the only one without WWW-Authenticate: the session chain sends
           # `Bearer`, the default deny a 403. --path-as-is keeps curl from normalizing the paths itself.
-          for path in /api/ping /web/../api/ping //api/ping /web/me/..\;/..\;/api/ping /%61pi/ping /web/%2e%2e/api/ping; do
+          for path in /api/ping /web/../api/ping //api/ping /web/me/..\;/..\;/api/ping /%61pi/ping /web/%2e%2e/api/ping \
+            /external/../api/ping /external/v1/..\;/..\;/api/ping /external/%2e%2e/api/ping; do
             headers=$(curl -s --path-as-is -o /dev/null -D - -X POST "http://$PUBLIC_BIND:$PUBLIC_PORT$path" || echo "HTTP/1.1 000")
             code=$(echo "$headers" | head -1 | cut -d' ' -f2)
             if [ "$code" = "401" ] && ! echo "$headers" | grep -qi '^www-authenticate:'; then
