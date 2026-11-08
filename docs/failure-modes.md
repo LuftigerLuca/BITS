@@ -79,6 +79,13 @@ while the bot is down are not looked at later. If Discord refuses the message de
 the other steps still run and the system log says what failed. Without the backend, the direct message is in German. A pause of the kicks survives a restart, since the
 backend keeps it; if the bot cannot report it before stopping, its count starts over.
 
+The message with the button to verify works like the honeypot's warning: the bot asks the backend for the channel every
+30 seconds and keeps the last answer while the backend is down. If it cannot report a message it just posted or removed,
+it reports it again with the next poll that reaches the backend, so the message is neither posted twice nor forgotten. After a start it changes
+nothing until the backend has answered once. If Discord refuses to post or delete the message, the system log says so
+once per channel and cause; a message that cannot be deleted in the previous channel stays there. The button itself
+needs the backend like `/verify` and answers that BITS is not reachable while it is down.
+
 `/topclose` and `/topopen` ask the backend whether the member may and which tag a closed post gets, so they answer that
 BITS is not reachable while the backend is down, and change nothing. Once the bot has changed the post, it reports
 that for the audit log; if the backend does not take the report, the post stays changed, the audit entry is missing and

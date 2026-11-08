@@ -11,6 +11,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import net.dv8tion.jda.api.events.GenericEvent
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
@@ -140,6 +141,30 @@ class FeatureGateTest {
 
             assertEquals(listOf<GenericEvent>(other), delegated)
             verify { check.reply(FeatureGate.disabledMessage(Language.GERMAN)) }
+        }
+
+    @Test
+    fun `gates the modals of the feature`() =
+        runTest {
+            val gate =
+                FeatureGate(
+                    features(FeatureStates(verification = false)),
+                    { it.verification },
+                    "verify",
+                    buttonPrefix = "verify:",
+                    languages = Languages(mockk()),
+                    delegate = delegate,
+                )
+            val name =
+                mockk<ModalInteractionEvent>(relaxed = true) {
+                    every { modalId } returns "verify:name"
+                    every { userLocale } returns DiscordLocale.GERMAN
+                }
+
+            gate.onEvent(name)
+
+            assertEquals(emptyList<GenericEvent>(), delegated)
+            verify { name.reply(FeatureGate.disabledMessage(Language.GERMAN)) }
         }
 
     @Test

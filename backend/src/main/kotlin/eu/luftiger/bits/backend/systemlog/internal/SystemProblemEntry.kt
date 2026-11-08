@@ -24,6 +24,8 @@ fun entryOf(
             )
         is SystemProblem.HoneypotWarningFailed ->
             SystemLogEntry(now, EntryKind.HONEYPOT_WARNING_FAILED, message = problem.reason)
+        is SystemProblem.VerifyPanelFailed ->
+            SystemLogEntry(now, EntryKind.VERIFY_PANEL_FAILED, message = problem.reason)
         is SystemProblem.WareraUsersUnavailable ->
             SystemLogEntry(
                 now,

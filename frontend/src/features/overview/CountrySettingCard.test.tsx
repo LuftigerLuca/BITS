@@ -22,6 +22,7 @@ function stub(overview: Overview, setCountry: (init?: RequestInit) => Response) 
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/honeypot': () => json({ channelId: null, kicksPaused: false, channels: [] }),
+    'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),
     'PUT /web/admin/overview/country': setCountry,
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),

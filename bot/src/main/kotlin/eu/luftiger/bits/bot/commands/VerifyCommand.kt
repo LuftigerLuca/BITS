@@ -14,6 +14,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import net.dv8tion.jda.api.components.actionrow.ActionRow
 import net.dv8tion.jda.api.components.buttons.Button
+import net.dv8tion.jda.api.components.label.Label
+import net.dv8tion.jda.api.components.textinput.TextInput
+import net.dv8tion.jda.api.components.textinput.TextInputStyle
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
@@ -24,13 +28,15 @@ import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
 import net.dv8tion.jda.api.interactions.commands.build.OptionData
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
+import net.dv8tion.jda.api.modals.Modal
 import net.dv8tion.jda.api.utils.MarkdownSanitizer
 import org.slf4j.LoggerFactory
 import java.time.Duration
 
 /**
- * `/verify <name>` links the Discord account to a WarEra account: the user puts a one-time code into the name of
- * one of their companies and confirms with the check button.
+ * `/verify <name>`, or the button of the message in the channel for new members with a modal for the name, links the
+ * Discord account to a WarEra account: the user puts a one-time code into the name of one of their companies and
+ * confirms with the check button.
  *
  * The button carries the code, so it keeps working after a restart of the bot, and the backend can tell an old
  * button from the current one. The backend looks for the code in the background, since WarEra may be slow, and sends
@@ -55,17 +61,39 @@ class VerifyCommand(
 
     override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
         if (event.name != NAME) return
-        val username = event.getOption(OPTION_NAME)?.asString.orEmpty()
         event.deferReply(true).queue()
-        respond(event, event.hook) { language ->
-            when (val response = backend.startVerification(event.user.id, username)) {
+        start(event, event.hook, event.getOption(OPTION_NAME)?.asString.orEmpty())
+    }
+
+    /** The button of the message in the channel for new members asks for the name, as the option of `/verify` does. */
+    override fun onModalInteraction(event: ModalInteractionEvent) {
+        if (event.modalId != NAME_MODAL) return
+        event.deferReply(true).queue()
+        start(
+            event,
+            event.hook,
+            event
+                .getValue(OPTION_NAME)
+                ?.asString
+                ?.trim()
+                .orEmpty(),
+        )
+    }
+
+    private fun start(
+        interaction: Interaction,
+        hook: InteractionHook,
+        username: String,
+    ) {
+        respond(interaction, hook) { language ->
+            when (val response = backend.startVerification(interaction.user.id, username)) {
                 is StartVerificationResponse.Started ->
-                    event.hook
+                    hook
                         .sendMessage(startedMessage(response, language))
                         .addComponents(ActionRow.of(Button.primary(CHECK_BUTTON_PREFIX + response.code, checkLabel(language))))
                         .queue()
                 StartVerificationResponse.UserNotFound ->
-                    event.hook
+                    hook
                         .sendMessage(
                             language.text(
                                 "Ich habe keinen WarEra-Account mit dem Namen **${escape(username)}** gefunden. Prüfe die Schreibweise.",
@@ -73,7 +101,7 @@ class VerifyCommand(
                             ),
                         ).queue()
                 is StartVerificationResponse.NoCompany ->
-                    event.hook
+                    hook
                         .sendMessage(
                             language.text(
                                 "**${escape(response.wareraUsername)}** hat keine Firma. Zum Verifizieren brauchst du mindestens eine " +
@@ -87,6 +115,11 @@ class VerifyCommand(
     }
 
     override fun onButtonInteraction(event: ButtonInteractionEvent) {
+        if (event.componentId == PANEL_BUTTON) {
+            // A modal must be the first answer, so there is no time to ask the backend for the member's language.
+            event.replyModal(nameModal(languages.cachedOf(event))).queue()
+            return
+        }
         val code = event.componentId.removePrefix(CHECK_BUTTON_PREFIX).takeIf { it != event.componentId } ?: return
         event.deferReply(true).queue()
         respond(event, event.hook, onFailure = { pendingChecks.complete(code) }) { language ->
@@ -152,11 +185,31 @@ class VerifyCommand(
         private const val MAX_NAME_LENGTH = 32
         const val CHECK_BUTTON_PREFIX = "verify:check:"
 
+        /** What the buttons and the modal of the verification start with, so a switched-off feature catches them all. */
+        const val COMPONENT_PREFIX = "verify:"
+
+        /** The button of the message in the channel for new members, see [eu.luftiger.bits.bot.verifypanel.VerifyPanel]. */
+        const val PANEL_BUTTON = "verify:panel"
+        const val NAME_MODAL = "verify:name"
+
         /**
          * Longest wait for the result of a check. The backend needs a few WarEra calls; even with throttling and
          * retries they rarely take a minute. Discord accepts replies for 15 minutes.
          */
         private val CHECK_RESULT_TIMEOUT: Duration = Duration.ofMinutes(2)
+
+        internal fun nameModal(language: Language): Modal =
+            Modal
+                .create(NAME_MODAL, language.text("WarEra-Account verknüpfen", "Link your WarEra account"))
+                .addComponents(
+                    Label.of(
+                        language.text("Dein Name in WarEra", "Your name in WarEra"),
+                        TextInput
+                            .create(OPTION_NAME, TextInputStyle.SHORT)
+                            .setRequiredRange(1, MAX_NAME_LENGTH)
+                            .build(),
+                    ),
+                ).build()
 
         private fun checkLabel(language: Language) = language.text("Prüfen", "Check")
 

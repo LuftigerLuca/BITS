@@ -23,6 +23,7 @@ function stub() {
       }),
     'GET /web/admin/bot-presence': () => json({ status: 'ONLINE', activity: { type: 'PLAYING', text: 'WarEra' } }),
     'GET /web/admin/honeypot': () => json({ channelId: null, channels: [], kicksPaused: false }),
+    'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),
     'GET /web/votes/options': () =>
       json({
         roles: [{ id: 'r1', name: 'Bürger', color: null }],
@@ -71,7 +72,7 @@ describe('admin page', () => {
     expect(visibleCards()).toEqual(['Funktionen'])
 
     await userEvent.click(screen.getByRole('tab', { name: 'Server' }))
-    expect(visibleCards()).toEqual(['Startseite', 'Bot-Status', 'Honeypot'])
+    expect(visibleCards()).toEqual(['Startseite', 'Bot-Status', 'Verifizierungs-Kanal', 'Honeypot'])
     expect(router.state.location.search).toBe('?tab=server')
 
     await userEvent.click(screen.getByRole('tab', { name: 'Abstimmungen' }))

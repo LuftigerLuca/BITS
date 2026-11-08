@@ -26,6 +26,7 @@ function stub(data: Honeypot, routes: Record<string, (init?: RequestInit) => Res
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/honeypot': () => json(data),
+    'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),
     ...routes,
   })
 }
