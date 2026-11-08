@@ -4,6 +4,7 @@ import { DsksCard } from '@/features/military-units/DsksCard'
 import { ERROR_MESSAGE } from '@/features/military-units/labels'
 import { useMilitaryUnits } from '@/features/military-units/queries'
 import { PageHeader } from '@/components/PageHeader'
+import { AdminTabLink } from '@/components/AdminTabLink'
 
 export function MilitaryUnitsPage() {
   const militaryUnits = useMilitaryUnits()
@@ -12,7 +13,7 @@ export function MilitaryUnitsPage() {
       <PageHeader title="Militäreinheiten" />
       <FeatureOffNotice feature="ROLE_SYNC">
         Der Rollen-Sync pausiert: Du kannst die DSKs weiter bearbeiten, aber BITS vergibt und entzieht ihre Rollen erst
-        wieder, wenn er unter „Verwaltung“ eingeschaltet ist.
+        wieder, wenn er unter <AdminTabLink tab="funktionen" /> eingeschaltet ist.
       </FeatureOffNotice>
       {militaryUnits.isPending ? (
         <LoadingState label="Militäreinheiten werden geladen …" />

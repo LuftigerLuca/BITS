@@ -44,7 +44,7 @@ export function errorMessage(error: unknown, cannotView = CANNOT_VIEW.roles): st
     }
     if (error.status === 404) return 'Den Thread oder das Mitglied gibt es nicht mehr. Bitte lade die Seite neu.'
     if (error.status === 400) {
-      return 'Die Angaben passen nicht, z. B. weil der Thread oder der Botschafts-Kanal fehlt oder das Land unter „Verwaltung“ eingestellt ist.'
+      return 'Die Angaben passen nicht, z. B. weil der Thread oder der Botschafts-Kanal fehlt oder das Land unter „Verwaltung › Server“ eingestellt ist.'
     }
   }
   return 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'

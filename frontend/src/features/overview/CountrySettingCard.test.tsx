@@ -55,7 +55,7 @@ describe('country of the start page', () => {
         return json({ id: current, name: 'France' })
       },
     )
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     expect(await screen.findByText('Germany', { selector: '[data-slot=searchable-select-value]' })).toBeInTheDocument()
     expect(saveButton()).toBeDisabled()
@@ -72,7 +72,7 @@ describe('country of the start page', () => {
 
   it('says when WarEra cannot be reached', async () => {
     stub({ members: null, verifiedMembers: null, country: null }, () => status(503))
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     await screen.findByText('Land wählen')
     await chooseCountry('Germany')

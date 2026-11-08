@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
+import { adminTabPath } from '@/lib/adminTabs'
 import type { CountryOverview } from './api'
 import { ERROR_MESSAGE, formatCount } from './labels'
 import { useOverview } from './queries'
@@ -42,7 +43,7 @@ function CitizensTile({ country }: { country: CountryOverview | null }) {
     return (
       <Tile icon={FlagIcon} title="Bürger" value={null} placeholder="kein Land">
         Noch kein Land eingestellt.{' '}
-        <Link to="/admin" className="underline underline-offset-4">
+        <Link to={adminTabPath('server')} className="underline underline-offset-4">
           In der Verwaltung einstellen
         </Link>
       </Tile>

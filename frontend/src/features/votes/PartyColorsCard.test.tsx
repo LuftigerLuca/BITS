@@ -46,7 +46,7 @@ describe('party colours', () => {
         return status(204)
       },
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const colors = within(await card())
     expect(await colors.findByText('Parteien in Germany')).toBeInTheDocument()
@@ -73,7 +73,7 @@ describe('party colours', () => {
 
   it('asks for a country instead of listing parties', async () => {
     stub(() => json({ countryName: null, parties: [], noPartyColor: null }))
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const colors = within(await card())
     expect(
@@ -86,7 +86,7 @@ describe('party colours', () => {
     stub(() => json({ countryName: 'Germany', parties: [], noPartyColor: null }), {
       'PUT /web/admin/votes/result-settings/party-colors': () => status(409),
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const colors = within(await card())
     await userEvent.click(await colors.findByRole('checkbox', { name: 'Eigene Farbe' }))
@@ -98,7 +98,7 @@ describe('party colours', () => {
 
   it('says when WarEra cannot be reached', async () => {
     stub(() => status(503))
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const colors = within(await card())
     expect(

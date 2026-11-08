@@ -47,7 +47,7 @@ describe('honeypot', () => {
         return status(204)
       },
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     await open()
     expect(screen.queryByRole('option', { name: /gesperrt/ })).not.toBeInTheDocument()
@@ -74,7 +74,7 @@ describe('honeypot', () => {
         },
       },
     )
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     await open()
     await userEvent.click(await screen.findByRole('option', { name: 'Kein Honeypot' }))
@@ -95,7 +95,7 @@ describe('honeypot', () => {
         },
       },
     )
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     await screen.findByText('Kicks pausiert')
     await userEvent.click(within(card()).getByRole('button', { name: 'Kicks fortsetzen' }))
@@ -106,7 +106,7 @@ describe('honeypot', () => {
 
   it('says when the bot lacks the permissions', async () => {
     stub(honeypot, { 'PUT /web/admin/honeypot': () => status(422) })
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     await open()
     await userEvent.click(await screen.findByRole('option', { name: '#falle (Sonstiges)' }))
@@ -118,7 +118,7 @@ describe('honeypot', () => {
 
   it('has no accessibility violations axe can find', async () => {
     stub({ ...honeypot, channelId: 'c-1', kicksPaused: true })
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
     await screen.findByText('Kicks pausiert')
     await expectNoAxeViolations()
   })

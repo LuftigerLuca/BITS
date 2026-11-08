@@ -35,7 +35,7 @@ describe('roles that may manage votes', () => {
         return status(204)
       },
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const card = (await screen.findByText('Wer Abstimmungen verwalten darf')).closest('[data-slot=card]') as HTMLElement
     const congress = await within(card).findByRole('checkbox', { name: 'Kongress' })

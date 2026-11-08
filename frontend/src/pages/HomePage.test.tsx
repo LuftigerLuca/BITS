@@ -96,6 +96,8 @@ describe('home page', () => {
     await userEvent.click(screen.getByRole('link', { name: 'In der Verwaltung einstellen' }))
     expect(await screen.findByRole('heading', { name: 'Verwaltung' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/admin')
+    expect(router.state.location.search).toBe('?tab=server')
+    expect(screen.getByRole('tab', { name: 'Server' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('keeps the Discord figures when WarEra cannot be reached', async () => {
