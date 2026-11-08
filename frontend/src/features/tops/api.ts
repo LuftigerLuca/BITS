@@ -28,6 +28,33 @@ export interface TopSettings {
   selected: TopForumSetting[]
 }
 
+export interface TopRole {
+  id: string
+  name: string
+  color: number | null
+}
+
+export interface TopManagerRoles {
+  /** The roles of the guild, highest first. */
+  roles: TopRole[]
+  /** The roles whose members may manage TOPs besides the admins. */
+  roleIds: string[]
+}
+
+const TOP_MANAGER_ROLES = `${TOPS}/manager-roles`
+
+export async function getTopManagerRoles(): Promise<TopManagerRoles> {
+  return (await request(TOP_MANAGER_ROLES)).json()
+}
+
+export async function setTopManagerRoles(roleIds: string[]): Promise<void> {
+  await request(TOP_MANAGER_ROLES, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roleIds }),
+  })
+}
+
 export async function getTopSettings(): Promise<TopSettings> {
   return (await request(TOPS)).json()
 }

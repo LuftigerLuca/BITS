@@ -4,8 +4,8 @@ import eu.luftiger.bits.bot.backend.TopBackend
 import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.TopAction
 import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionResponse
-import eu.luftiger.bits.shared.VoteActor
 import kotlinx.coroutines.CancellationException
 import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel
 import org.slf4j.LoggerFactory
@@ -23,7 +23,7 @@ class Tops(
     /** Posts the closing message, sets the done tag, locks the post and, with [archive], archives it. */
     suspend fun close(
         post: TopPost,
-        actor: VoteActor,
+        actor: TopActor,
         mention: String,
         reason: String?,
         archive: Boolean,
@@ -65,7 +65,7 @@ class Tops(
     /** Unarchives and unlocks the post, removes the done tag and posts that it is open again. */
     suspend fun reopen(
         post: TopPost,
-        actor: VoteActor,
+        actor: TopActor,
         mention: String,
         language: Language,
     ): String {
@@ -124,8 +124,8 @@ class Tops(
         private fun forbiddenMessage(language: Language): String =
             language.text(
                 "TOPs schließen und wieder öffnen dürfen nur Admins und Mitglieder der Rollen, die im Dashboard für " +
-                    "Abstimmungen freigegeben sind.",
-                "Only admins and members of the roles allowed to manage votes in the dashboard may close and reopen agenda items.",
+                    "TOPs freigegeben sind.",
+                "Only admins and members of the roles allowed to manage agenda items in the dashboard may close and reopen them.",
             )
 
         private fun missingPermissionsMessage(language: Language): String =

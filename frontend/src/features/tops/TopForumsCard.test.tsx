@@ -31,6 +31,7 @@ function stub(data: TopSettings, routes: Record<string, (init?: RequestInit) => 
   return stubFetch({
     'GET /web/me': () => json(admin),
     'GET /web/votes/access': () => json({ canManage: false }),
+    'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
     'GET /web/admin/tops': () => json(data),
     ...routes,
   })
@@ -52,7 +53,7 @@ describe('TOP forums', () => {
         return status(204)
       },
     })
-    renderApp('/admin?tab=abstimmungen')
+    renderApp('/admin?tab=tops')
 
     await userEvent.click(await screen.findByRole('checkbox', { name: '#tops (Kongress)' }, LOADED))
     expect(within(card()).queryByText(/gesperrt/)).not.toBeInTheDocument()
@@ -76,7 +77,7 @@ describe('TOP forums', () => {
         },
       },
     )
-    renderApp('/admin?tab=abstimmungen')
+    renderApp('/admin?tab=tops')
 
     const forum = await screen.findByRole('checkbox', { name: '#gesperrt – Bot fehlen Rechte' }, LOADED)
     expect(within(card()).getByRole('button', { name: 'Speichern' })).toBeDisabled()
@@ -88,7 +89,7 @@ describe('TOP forums', () => {
 
   it('says how to get a forum when there is none', async () => {
     stub({ forums: [], selected: [] })
-    renderApp('/admin?tab=abstimmungen')
+    renderApp('/admin?tab=tops')
 
     expect(await screen.findByText('Keine Foren verfügbar', {}, LOADED)).toBeInTheDocument()
     await expectNoAxeViolations()
@@ -96,7 +97,7 @@ describe('TOP forums', () => {
 
   it('explains a forum the bot may no longer manage', async () => {
     stub(settings, { 'PUT /web/admin/tops': () => status(422) })
-    renderApp('/admin?tab=abstimmungen')
+    renderApp('/admin?tab=tops')
 
     await userEvent.click(await screen.findByRole('checkbox', { name: '#tops (Kongress)' }, LOADED))
     await userEvent.click(within(card()).getByRole('button', { name: 'Speichern' }))

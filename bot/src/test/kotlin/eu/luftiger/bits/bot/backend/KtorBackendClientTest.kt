@@ -21,9 +21,9 @@ import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionResponse
 import eu.luftiger.bits.shared.UnlinkAccountResponse
-import eu.luftiger.bits.shared.VoteActor
 import eu.luftiger.bits.shared.VoteChoice
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -306,7 +306,7 @@ class KtorBackendClientTest {
             client.reportForums(listOf(DiscordForumDto("1", "tops", null, 0, true, listOf(ForumTagDto("2", "Erledigt")))))
             assertEquals(
                 TopPermissionResponse.Allowed("2"),
-                client.topPermission(VoteActor("42", "Chair", null, emptyList(), administrator = false), "1"),
+                client.topPermission(TopActor("42", "Chair", null, emptyList(), administrator = false), "1"),
             )
         }
 

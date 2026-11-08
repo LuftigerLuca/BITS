@@ -29,13 +29,25 @@ data class ForumTagDto(
     val name: String,
 )
 
+/** The member who uses `/topclose` or `/topopen`, as the backend needs them to decide whether they may. */
+@Serializable
+data class TopActor(
+    val discordUserId: String,
+    /** As Discord shows the member, for the audit log. */
+    val name: String,
+    val avatarUrl: String?,
+    val roleIds: List<String>,
+    /** Owner of the guild or holder of the Administrator permission. */
+    val administrator: Boolean,
+)
+
 /**
- * Asks whether [actor] may close or reopen a post of the forum [forumId] as a TOP. Who may is the same as for managing
- * votes, see [VoteActor].
+ * Asks whether [actor] may close or reopen a post of the forum [forumId] as a TOP: admins always, others with one of the
+ * roles set for TOPs in the dashboard.
  */
 @Serializable
 data class TopPermissionRequest(
-    val actor: VoteActor,
+    val actor: TopActor,
     val forumId: String,
 )
 
@@ -68,7 +80,7 @@ enum class TopAction {
 /** What the bot did to a TOP post after [TopPermissionRequest] allowed it, for the audit log. */
 @Serializable
 data class TopActionReport(
-    val actor: VoteActor,
+    val actor: TopActor,
     val forumId: String,
     val threadId: String,
     val threadName: String,

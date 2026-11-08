@@ -46,7 +46,7 @@ class TopTest {
         jdbc.awaitOutbox()
         syncTrigger.awaitIdle()
         jdbc.awaitOutbox()
-        jdbc.execute("TRUNCATE top_forum, discord_forum, vote_manager_role, discord_role, audit_entry CASCADE")
+        jdbc.execute("TRUNCATE top_forum, top_manager_role, discord_forum, vote_manager_role, discord_role, audit_entry CASCADE")
         bot(
             "/api/discord-roles",
             """{"roles":[{"id":"r-chair","name":"Präsidium","color":null,"position":1,"assignable":true}]}""",
@@ -97,20 +97,41 @@ class TopTest {
     }
 
     @Test
-    fun `only admins and members of the vote manager roles may close TOPs, and only in TOP forums`() {
+    fun `only admins and members of the TOP manager roles may close TOPs, and only in TOP forums`() {
         set("""[{"forumId":"f-1","doneTagId":"11"}]""")
 
         assertEquals(TopPermissionResponse.NotTopForum, permission("f-2", administrator = true))
         assertEquals(TopPermissionResponse.Forbidden, permission("f-1", roles = listOf("r-chair")))
         assertEquals(TopPermissionResponse.Allowed("11"), permission("f-1", administrator = true))
 
-        mockMvc
-            .put("/web/admin/votes/manager-roles") {
-                cookie(admin)
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"roleIds":["r-chair"]}"""
-            }.andExpect { status { isNoContent() } }
+        setManagerRoles("/web/admin/tops/manager-roles", "r-chair").andExpect { status { isNoContent() } }
         assertEquals(TopPermissionResponse.Allowed("11"), permission("f-1", roles = listOf("r-chair")))
+    }
+
+    @Test
+    fun `the roles for votes and for TOPs do not affect each other`() {
+        set("""[{"forumId":"f-1","doneTagId":null}]""")
+
+        setManagerRoles("/web/admin/votes/manager-roles", "r-chair").andExpect { status { isNoContent() } }
+        assertEquals(TopPermissionResponse.Forbidden, permission("f-1", roles = listOf("r-chair")))
+
+        setManagerRoles("/web/admin/tops/manager-roles", "r-chair")
+        setManagerRoles("/web/admin/votes/manager-roles")
+        assertEquals(TopPermissionResponse.Allowed(null), permission("f-1", roles = listOf("r-chair")))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM top_manager_role", Int::class.java))
+    }
+
+    @Test
+    fun `admins see the roles to pick from and set the TOP manager roles, which the audit log records`() {
+        setManagerRoles("/web/admin/tops/manager-roles", "r-chair").andExpect { status { isNoContent() } }
+        setManagerRoles("/web/admin/tops/manager-roles", "r-unknown").andExpect { status { isBadRequest() } }
+
+        val view = mockMvc.get("/web/admin/tops/manager-roles") { cookie(admin) }.andExpect { status { isOk() } }
+        assertEquals(listOf("Präsidium"), view.read("$.roles[*].name"))
+        assertEquals(listOf("r-chair"), view.read("$.roleIds"))
+        val log = mockMvc.get("/web/admin/audit-log") { cookie(admin) }
+        assertEquals(listOf("TOP_MANAGER_ROLES_CHANGED"), log.read("$.entries[*].action"))
+        assertEquals(listOf("TOPs verwalten: @Präsidium"), log.read("$.entries[*].description"))
     }
 
     @Test
@@ -135,11 +156,13 @@ class TopTest {
     }
 
     @Test
-    fun `only admins see and set the TOP forums, the bot needs the service token`() {
+    fun `only admins see and set the TOP forums and roles, the bot needs the service token`() {
         val user = session(SessionUser.discord("42", "Luca", "https://avatar", Role.USER))
 
         mockMvc.get("/web/admin/tops") { cookie(user) }.andExpect { status { isForbidden() } }
         set("[]", user).andExpect { status { isForbidden() } }
+        mockMvc.get("/web/admin/tops/manager-roles") { cookie(user) }.andExpect { status { isForbidden() } }
+        setManagerRoles("/web/admin/tops/manager-roles", session = user).andExpect { status { isForbidden() } }
         mockMvc.post("/api/tops/permission").andExpect { status { isUnauthorized() } }
     }
 
@@ -172,6 +195,17 @@ class TopTest {
             cookie(session)
             contentType = MediaType.APPLICATION_JSON
             content = """{"forums":$forums}"""
+        }
+
+    private fun setManagerRoles(
+        path: String,
+        vararg roleIds: String,
+        session: Cookie = admin,
+    ): ResultActionsDsl =
+        mockMvc.put(path) {
+            cookie(session)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roleIds":[${roleIds.joinToString(",") { "\"$it\"" }}]}"""
         }
 
     private fun permission(

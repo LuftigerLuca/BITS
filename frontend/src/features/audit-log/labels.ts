@@ -37,6 +37,7 @@ export const ACTIONS: Record<AuditAction, string> = {
   TOP_FORUMS_CHANGED: 'TOP-Foren geändert',
   TOP_CLOSED: 'TOP geschlossen',
   TOP_REOPENED: 'TOP wieder geöffnet',
+  TOP_MANAGER_ROLES_CHANGED: 'Rollen für TOPs geändert',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

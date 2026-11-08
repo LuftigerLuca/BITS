@@ -1,4 +1,4 @@
-import { SettingsIcon, UsersIcon, VoteIcon, type LucideIcon } from 'lucide-react'
+import { ListChecksIcon, SettingsIcon, UsersIcon, VoteIcon, type LucideIcon } from 'lucide-react'
 
 /**
  * The user manual at /docs: its pages in reading order, each with the topics it explains. A topic has a title,
@@ -189,11 +189,11 @@ export const MANUAL_PAGES: ManualPage[] = [
     slug: 'abstimmungen',
     icon: VoteIcon,
     title: 'Abstimmungen leiten',
-    summary: 'Abstimmungen starten, vorzeitig beenden oder abbrechen, TOPs schließen.',
+    summary: 'Abstimmungen starten, vorzeitig beenden oder abbrechen.',
     intro:
       'Abstimmungen starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins unter „Verwaltung › ' +
       'Abstimmungen“ dafür freigeben. Das geht in Discord und im Dashboard unter „Abstimmungen“ im Bereich „Admin“ der ' +
-      'Seitenleiste. Dieselben Rollen schließen in Discord auch Tagesordnungspunkte (TOPs).',
+      'Seitenleiste.',
     buildsOn: ['mitglieder'],
     topics: [
       {
@@ -248,12 +248,23 @@ export const MANUAL_PAGES: ManualPage[] = [
             'Details und das Ergebnis zu sehen.',
         ],
       },
+    ],
+  },
+  {
+    slug: 'tops',
+    icon: ListChecksIcon,
+    title: 'TOPs leiten',
+    summary: 'Tagesordnungspunkte in Discord schließen und wieder öffnen.',
+    intro:
+      'Tagesordnungspunkte (TOPs) laufen als Posts in den Foren, die Admins unter „Verwaltung › TOPs“ als TOP-Foren ' +
+      'festlegen. Schließen und wieder öffnen dürfen sie Admins und die Rollen, die Admins dort dafür freigeben, ' +
+      'unabhängig davon, wer Abstimmungen leitet. TOPs leitest du nur in Discord.',
+    buildsOn: ['mitglieder'],
+    topics: [
       {
         id: 'tops',
         title: 'TOPs schließen und wieder öffnen',
-        intro:
-          'Tagesordnungspunkte laufen als Posts in den Foren, die Admins unter „Verwaltung › Abstimmungen“ als ' +
-          'TOP-Foren festlegen. Einen erledigten TOP schließt du mit /topclose, direkt im Post.',
+        intro: 'Einen erledigten TOP schließt du mit /topclose, direkt in seinem Post.',
         steps: [
           'Öffne den Post des TOPs und gib /topclose ein.',
           'Gib optional einen Grund an; er steht in der Abschlussnachricht.',
@@ -283,9 +294,9 @@ export const MANUAL_PAGES: ManualPage[] = [
     intro:
       'Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, ist im Dashboard Admin und sieht in ' +
       'der Seitenleiste die Bereiche „Admin“ mit Rollen, Mitgliedern, Botschaften und Abstimmungen und „System“ mit ' +
-      'Verwaltung und den Logs. Die Verwaltung gliedert sich in die Tabs „Funktionen“, „Server“ und ' +
-      '„Abstimmungen“.',
-    buildsOn: ['mitglieder', 'abstimmungen'],
+      'Verwaltung und den Logs. Die Verwaltung gliedert sich in die Tabs „Funktionen“, „Server“, „Abstimmungen“ ' +
+      'und „TOPs“.',
+    buildsOn: ['mitglieder', 'abstimmungen', 'tops'],
     topics: [
       {
         id: 'overview',
@@ -537,17 +548,18 @@ export const MANUAL_PAGES: ManualPage[] = [
       },
       {
         id: 'top-forums',
-        title: 'TOP-Foren',
+        title: 'Einstellungen für TOPs',
         intro:
-          'In der Karte „TOP-Foren“ unter „Verwaltung › Abstimmungen“ legst du fest, in welchen Foren /topclose ' +
-          'und /topopen funktionieren, und pro Forum optional ein Erledigt-Tag.',
+          'Unter „Verwaltung › TOPs“ legst du in der Karte „TOP-Foren“ fest, in welchen Foren /topclose und /topopen ' +
+          'funktionieren, und pro Forum optional ein Erledigt-Tag.',
         points: [
           'Wählbar sind nur Foren, in denen der Bot „Threads verwalten“, „Nachrichten in Threads senden“ und „Links ' +
             'einbetten“ darf. ' +
             'Verliert er die Rechte später, bleibt das Forum gewählt, bis du es abwählst.',
           'Das Erledigt-Tag ist eines der Tags des Forums, die du in Discord anlegst. Löschst du es dort, schließt ' +
             'der Bot TOPs ohne Tag.',
-          'TOPs schließen dürfen dieselben Rollen wie Abstimmungen, siehe „Wer Abstimmungen verwalten darf“.',
+          '„Wer TOPs verwalten darf“: die Rollen, die TOPs schließen und wieder öffnen dürfen. Admins dürfen das ' +
+            'immer. Die Rollen sind unabhängig von denen für Abstimmungen.',
           'Jede Änderung steht im Audit-Log.',
         ],
       },

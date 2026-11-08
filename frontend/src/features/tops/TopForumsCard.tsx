@@ -25,8 +25,8 @@ export function TopForumsCard() {
       <CardHeader>
         <CardTitle>TOP-Foren</CardTitle>
         <CardDescription>
-          In den Posts dieser Foren schließen Admins und die Rollen, die Abstimmungen verwalten dürfen, Tagesordnungspunkte
-          mit /topclose und öffnen sie mit /topopen wieder.
+          In den Posts dieser Foren schließen Admins und die Rollen, die TOPs verwalten dürfen, Tagesordnungspunkte mit
+          /topclose und öffnen sie mit /topopen wieder.
         </CardDescription>
       </CardHeader>
       <CardContent>
