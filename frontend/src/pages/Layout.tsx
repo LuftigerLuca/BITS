@@ -4,6 +4,7 @@ import {
   BookOpenIcon,
   ChevronsUpDownIcon,
   CircleUserIcon,
+  GavelIcon,
   GaugeIcon,
   HistoryIcon,
   HouseIcon,
@@ -110,6 +111,9 @@ export function Layout() {
                           </NavItem>
                           <NavItem to="/admin/embassies" icon={<LandmarkIcon />}>
                             Botschaften
+                          </NavItem>
+                          <NavItem to="/admin/reprimands" icon={<GavelIcon />}>
+                            Rügen
                           </NavItem>
                         </>
                       )}

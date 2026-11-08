@@ -4,6 +4,8 @@ import eu.luftiger.bits.backend.account.api.AccountSelfService
 import eu.luftiger.bits.backend.audit.api.AuditEntries
 import eu.luftiger.bits.backend.embassy.api.EmbassyMemberships
 import eu.luftiger.bits.backend.ping.api.PingLogs
+import eu.luftiger.bits.backend.reprimand.api.ReprimandRecords
+import eu.luftiger.bits.backend.reprimand.api.dto.ReprimandRecord
 import eu.luftiger.bits.backend.rolesync.api.RoleExplanations
 import eu.luftiger.bits.backend.systemlog.api.SystemLogRecords
 import eu.luftiger.bits.shared.ManagedRoleOutcome
@@ -20,6 +22,7 @@ class AccountPageService(
     private val pings: PingLogs,
     private val audit: AuditEntries,
     private val embassies: EmbassyMemberships,
+    private val reprimands: ReprimandRecords,
     private val clock: Clock,
 ) {
     fun account(discordUserId: String): AccountResponse =
@@ -63,6 +66,7 @@ class AccountPageService(
         val stored = accounts.storedData(discordUserId)
         val log = systemLog.recordsAbout(discordUserId)
         val embassyRecords = embassies.recordsAbout(discordUserId)
+        val reprimandRecords = reprimands.recordsAbout(discordUserId)
         return DataExport(
             discordUserId = discordUserId,
             exportedAt = clock.instant().toString(),
@@ -89,6 +93,11 @@ class AccountPageService(
                                 it.reason,
                             )
                         },
+                ),
+            reprimands =
+                ExportedReprimands(
+                    received = reprimandRecords.received.map(::exported),
+                    given = reprimandRecords.given.map(::exported),
                 ),
             systemLog =
                 ExportedSystemLog(
@@ -123,6 +132,16 @@ class AccountPageService(
                 },
         )
     }
+
+    private fun exported(reprimand: ReprimandRecord) =
+        ExportedReprimand(
+            reprimand.memberName,
+            reprimand.actorName,
+            reprimand.reason,
+            reprimand.createdAt.toString(),
+            reprimand.timeoutUntil?.toString(),
+            reprimand.withdrawnAt?.toString(),
+        )
 
     private companion object {
         /** The session subject of Discord users, see `SessionUser` in the auth module. */

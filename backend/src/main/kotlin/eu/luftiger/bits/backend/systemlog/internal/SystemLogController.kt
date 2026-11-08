@@ -189,6 +189,7 @@ enum class LogEntryType {
     HONEYPOT_KICKS_PAUSED,
     HONEYPOT_WARNING_FAILED,
     VERIFY_PANEL_FAILED,
+    REPRIMAND_TIMEOUT_FAILED,
     ;
 
     companion object {
@@ -219,6 +220,7 @@ enum class LogEntryType {
                 EntryKind.HONEYPOT_KICKS_PAUSED -> HONEYPOT_KICKS_PAUSED
                 EntryKind.HONEYPOT_WARNING_FAILED -> HONEYPOT_WARNING_FAILED
                 EntryKind.VERIFY_PANEL_FAILED -> VERIFY_PANEL_FAILED
+                EntryKind.REPRIMAND_TIMEOUT_FAILED -> REPRIMAND_TIMEOUT_FAILED
             }
     }
 }

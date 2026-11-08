@@ -31,6 +31,12 @@ export const FEATURES: Record<Feature, { label: string; description: string }> =
     label: 'TOPs',
     description: '/topclose und /topopen in den TOP-Foren. Geschlossene Posts bleiben, wie sie sind.',
   },
+  REPRIMANDS: {
+    label: 'Rügen',
+    description:
+      '/reprimand mit Timeout für das gerügte Mitglied; startet ausgeschaltet. Bestehende Rügen zählen weiter und ' +
+      'lassen sich unter „Rügen“ zurücknehmen.',
+  },
 }
 
 export const ERROR_MESSAGE = 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'

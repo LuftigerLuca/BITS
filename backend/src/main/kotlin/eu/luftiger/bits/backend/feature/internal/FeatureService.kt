@@ -25,12 +25,12 @@ class FeatureService(
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
 ) : FeatureToggles {
-    override fun isEnabled(feature: BitsFeature): Boolean = repository.findByIdOrNull(feature)?.enabled ?: true
+    override fun isEnabled(feature: BitsFeature): Boolean = repository.findByIdOrNull(feature)?.enabled ?: feature.enabledByDefault
 
     /** All features in the order of [BitsFeature]. */
     fun all(): Map<BitsFeature, Boolean> {
         val stored = repository.findAll().associate { it.feature to it.enabled }
-        return BitsFeature.entries.associateWith { stored[it] ?: true }
+        return BitsFeature.entries.associateWith { stored[it] ?: it.enabledByDefault }
     }
 
     /** Switching a feature to the state it has already changes nothing and records nothing. */
@@ -41,7 +41,7 @@ class FeatureService(
     ) {
         transactionTemplate.executeWithoutResult {
             val setting = repository.findByIdOrNull(feature)
-            if ((setting?.enabled ?: true) == enabled) return@executeWithoutResult
+            if ((setting?.enabled ?: feature.enabledByDefault) == enabled) return@executeWithoutResult
             if (setting == null) {
                 repository.save(FeatureSetting(feature, enabled, clock.instant()))
             } else {
@@ -68,6 +68,7 @@ class FeatureService(
                 BitsFeature.VOTES to "Abstimmungen",
                 BitsFeature.EMBASSIES to "Botschaften",
                 BitsFeature.TOPS to "TOPs",
+                BitsFeature.REPRIMANDS to "Rügen",
             )
     }
 }
