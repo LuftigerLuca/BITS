@@ -28,6 +28,7 @@ function stub(save: (init?: RequestInit) => Response) {
     'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
     'GET /web/admin/bot-presence': () => json({}),
     'GET /web/admin/honeypot': () => json({ channelId: null, kicksPaused: false, channels: [] }),
+    'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
