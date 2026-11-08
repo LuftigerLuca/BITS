@@ -3,6 +3,7 @@ package eu.luftiger.bits.bot.members
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordChannelDto
+import eu.luftiger.bits.shared.DiscordForumDto
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
@@ -218,6 +219,8 @@ class MemberReporterTest {
         var attempts = 0
 
         override suspend fun reportChannels(channels: List<DiscordChannelDto>) = TODO()
+
+        override suspend fun reportForums(forums: List<DiscordForumDto>) = TODO()
 
         override suspend fun reportMembers(members: List<ReportedMember>) {
             attempts++

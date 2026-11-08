@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.audit.api.AuditActor
 import eu.luftiger.bits.backend.audit.api.AuditLog
 import eu.luftiger.bits.backend.rolesync.api.GuildRoles
 import eu.luftiger.bits.backend.shared.InvalidInputException
+import eu.luftiger.bits.backend.vote.api.VoteManagers
 import eu.luftiger.bits.backend.vote.domain.VoteManagerRole
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -16,11 +17,16 @@ class VoteManagerRoles(
     private val guildRoles: GuildRoles,
     private val auditLog: AuditLog,
     private val transactionTemplate: TransactionTemplate,
-) {
-    fun mayManage(manager: VoteManager): Boolean {
-        if (manager.admin) return true
+) : VoteManagers {
+    fun mayManage(manager: VoteManager): Boolean = mayManage(manager.admin, manager.roleIds)
+
+    override fun mayManage(
+        admin: Boolean,
+        roleIds: Collection<String>,
+    ): Boolean {
+        if (admin) return true
         val managerRoles = managerRoleRepository.findAll().mapTo(HashSet()) { it.roleId }
-        return manager.roleIds.any { it in managerRoles }
+        return roleIds.any { it in managerRoles }
     }
 
     fun managerRoleIds(): List<String> = managerRoleRepository.findAll().map { it.roleId }.sorted()

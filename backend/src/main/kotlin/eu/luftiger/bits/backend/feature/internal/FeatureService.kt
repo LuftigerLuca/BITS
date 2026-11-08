@@ -67,6 +67,7 @@ class FeatureService(
                 BitsFeature.PROFILE to "Profil",
                 BitsFeature.VOTES to "Abstimmungen",
                 BitsFeature.EMBASSIES to "Botschaften",
+                BitsFeature.TOPS to "TOPs",
             )
     }
 }

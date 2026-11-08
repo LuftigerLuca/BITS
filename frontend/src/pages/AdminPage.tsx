@@ -2,6 +2,7 @@ import { BotPresenceCard } from '@/features/bot-presence/BotPresenceCard'
 import { FeaturesCard } from '@/features/feature-toggles/FeaturesCard'
 import { HoneypotCard } from '@/features/honeypot/HoneypotCard'
 import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
+import { TopForumsCard } from '@/features/tops/TopForumsCard'
 import { ManagerRolesCard } from '@/features/votes/ManagerRolesCard'
 import { PartyColorsCard } from '@/features/votes/PartyColorsCard'
 import { ResultImageCard } from '@/features/votes/ResultImageCard'
@@ -18,6 +19,7 @@ export function AdminPage() {
       <ManagerRolesCard />
       <ResultImageCard />
       <PartyColorsCard />
+      <TopForumsCard />
     </div>
   )
 }

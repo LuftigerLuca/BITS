@@ -65,10 +65,10 @@ class FeatureTest {
         val features = mockMvc.get("/web/features") { cookie(user) }.andExpect { status { isOk() } }
 
         assertEquals(
-            listOf("VERIFICATION", "ROLE_SYNC", "NICKNAMES", "PROFILE", "VOTES", "EMBASSIES"),
+            listOf("VERIFICATION", "ROLE_SYNC", "NICKNAMES", "PROFILE", "VOTES", "EMBASSIES", "TOPS"),
             features.read("$[*].feature"),
         )
-        assertEquals(List(6) { true }, features.read("$[*].enabled"))
+        assertEquals(List(7) { true }, features.read("$[*].enabled"))
     }
 
     @Test

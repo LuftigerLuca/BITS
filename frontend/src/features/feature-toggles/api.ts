@@ -1,7 +1,7 @@
 import { request } from '@/lib/api'
 
 /** Parts of BITS an admin can switch off under "Verwaltung"; a feature is on until then. */
-export type Feature = 'VERIFICATION' | 'ROLE_SYNC' | 'NICKNAMES' | 'PROFILE' | 'VOTES' | 'EMBASSIES'
+export type Feature = 'VERIFICATION' | 'ROLE_SYNC' | 'NICKNAMES' | 'PROFILE' | 'VOTES' | 'EMBASSIES' | 'TOPS'
 
 export interface FeatureState {
   feature: Feature

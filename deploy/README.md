@@ -15,7 +15,8 @@ a test server, so testing never touches the real WarEra Discord.
    **Server Members Intent**; the role sync needs all members, and the bot does not start without it. Invite the
    bot to the test server via **OAuth2 → URL Generator** with the scopes `bot` and `applications.commands` and
    the permissions **Manage Roles**, **Manage Nicknames**, **Kick Members** and **Manage Messages**; the last two are
-   for the honeypot, and an existing bot needs them added to its role. The bot can only give roles below its own highest role
+   for the honeypot, and an existing bot needs them added to its role. For `/topclose` and `/topopen`, give it
+   **Manage Threads** and **Send Messages in Threads** in the TOP forums. The bot can only give roles below its own highest role
    and can only rename members below it, never the owner of the server. Copy the ID of
    the server (developer mode in Discord, right-click on the server → **Copy Server ID**). For the dashboard
    login, copy **Client ID** and **Client Secret** under **OAuth2** and add

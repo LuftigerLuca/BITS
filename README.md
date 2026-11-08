@@ -55,6 +55,7 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | Discord-ID, Zeitpunkt                            | `ping_log`                 | `/ping`                             | 30 Tage                                                                     |
 | Discord-ID, Name und Avatar von Admins, Änderung | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Name des Mitglieds bei Abgleich oder Lösen       | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
+| Discord-ID, Name, Avatar und Grund bei TOPs      | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |
 | Name des Admins, der ein API-Token anlegt        | `api_token`                | API-Tokens im Dashboard             | bis zum Widerruf des Tokens                                                 |
 | Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot               | 7 Tage                                                                      |

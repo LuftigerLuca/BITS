@@ -185,11 +185,11 @@ export const MANUAL_PAGES: ManualPage[] = [
     slug: 'abstimmungen',
     icon: VoteIcon,
     title: 'Abstimmungen leiten',
-    summary: 'Abstimmungen starten, vorzeitig beenden oder abbrechen.',
+    summary: 'Abstimmungen starten, vorzeitig beenden oder abbrechen, TOPs schließen.',
     intro:
       'Abstimmungen starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins unter „Verwaltung“ ' +
       'dafür freigeben. Das geht in Discord und im Dashboard unter „Abstimmungen“ im Bereich „Admin“ der ' +
-      'Seitenleiste.',
+      'Seitenleiste. Dieselben Rollen schließen in Discord auch Tagesordnungspunkte (TOPs).',
     buildsOn: ['mitglieder'],
     topics: [
       {
@@ -244,6 +244,31 @@ export const MANUAL_PAGES: ManualPage[] = [
             'Details und das Ergebnis zu sehen.',
         ],
       },
+      {
+        id: 'tops',
+        title: 'TOPs schließen und wieder öffnen',
+        intro:
+          'Tagesordnungspunkte laufen als Posts in den Foren, die Admins unter „Verwaltung“ als TOP-Foren festlegen. ' +
+          'Einen erledigten TOP schließt du mit /topclose, direkt im Post.',
+        steps: [
+          'Öffne den Post des TOPs und gib /topclose ein.',
+          'Gib optional einen Grund an; er steht in der Abschlussnachricht.',
+          'Wähle bei „archive“ True, wenn der Post auch archiviert werden soll. Standard ist False: Der Post bleibt ' +
+            'in der Liste des Forums sichtbar.',
+          'Der Bot postet „TOP geschlossen von @du“, setzt das Erledigt-Tag des Forums, falls eines gewählt ist, und ' +
+            'sperrt den Post.',
+        ],
+        points: [
+          '/topopen im geschlossenen Post öffnet ihn wieder: Der Bot holt ihn aus dem Archiv, entsperrt ihn, nimmt ' +
+            'das Erledigt-Tag ab und postet „TOP wieder geöffnet von @du“.',
+          'Ein gesperrter Post gilt als geschlossen. Einen geschlossenen TOP schließt /topclose nicht noch einmal, ' +
+            'einen offenen öffnet /topopen nicht.',
+          'Hat ein Post schon 5 Tags, das Maximum von Discord, schließt der Bot ihn ohne Erledigt-Tag und sagt dir das.',
+          'In einem gesperrten Post schreiben in Discord nur Mitglieder mit „Threads verwalten“. Wer das Recht nicht ' +
+            'hat, kann /topopen dort unter Umständen nicht aufrufen.',
+          'Fehlermeldungen sieht nur, wer den Befehl aufgerufen hat. Schließen und Wiederöffnen stehen im Audit-Log.',
+        ],
+      },
     ],
   },
   {
@@ -281,7 +306,7 @@ export const MANUAL_PAGES: ManualPage[] = [
         title: 'Funktionen ein- und ausschalten',
         intro:
           'Unter „Verwaltung“ schaltest du einzelne Funktionen aus: Verifizierung, Rollen-Sync, Nicknames, Profil, ' +
-          'Abstimmungen und Botschaften. Eine ausgeschaltete Funktion pausiert nur, gelöscht wird nichts.',
+          'Abstimmungen, Botschaften und TOPs. Eine ausgeschaltete Funktion pausiert nur, gelöscht wird nichts.',
         points: [
           'Ihre Befehle antworten in Discord mit „Diese Funktion ist gerade ausgeschaltet.“ Der Bot übernimmt eine ' +
             'Änderung innerhalb von 30 Sekunden.',
@@ -501,6 +526,21 @@ export const MANUAL_PAGES: ManualPage[] = [
             'im Dashboard, ohne sich neu anzumelden.',
           '„Parteifarben“: eigene Farben für die Parteien des eigenen Landes in der Grafik.',
           '„Bild der Auswertung“: ein eigener Hintergrund für die Grafik.',
+        ],
+      },
+      {
+        id: 'top-forums',
+        title: 'TOP-Foren',
+        intro:
+          'In der Karte „TOP-Foren“ unter „Verwaltung“ legst du fest, in welchen Foren /topclose und /topopen ' +
+          'funktionieren, und pro Forum optional ein Erledigt-Tag.',
+        points: [
+          'Wählbar sind nur Foren, in denen der Bot „Threads verwalten“ und „Nachrichten in Threads senden“ darf. ' +
+            'Verliert er die Rechte später, bleibt das Forum gewählt, bis du es abwählst.',
+          'Das Erledigt-Tag ist eines der Tags des Forums, die du in Discord anlegst. Löschst du es dort, schließt ' +
+            'der Bot TOPs ohne Tag.',
+          'TOPs schließen dürfen dieselben Rollen wie Abstimmungen, siehe „Wer Abstimmungen verwalten darf“.',
+          'Jede Änderung steht im Audit-Log.',
         ],
       },
       {

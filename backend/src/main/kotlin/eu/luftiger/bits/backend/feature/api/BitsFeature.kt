@@ -27,4 +27,7 @@ enum class BitsFeature {
 
     /** The sync of the embassy threads. */
     EMBASSIES,
+
+    /** `/topclose` and `/topopen` in the TOP forums. */
+    TOPS,
 }

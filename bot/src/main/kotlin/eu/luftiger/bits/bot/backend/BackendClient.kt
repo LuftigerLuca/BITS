@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.CheckVerificationResponse
 import eu.luftiger.bits.shared.DiscordChannelDto
+import eu.luftiger.bits.shared.DiscordForumDto
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
@@ -57,6 +58,9 @@ interface BackendClient {
 
     /** Replaces the text channels of the guild known to the backend. */
     suspend fun reportChannels(channels: List<DiscordChannelDto>)
+
+    /** Replaces the forum channels of the guild known to the backend. */
+    suspend fun reportForums(forums: List<DiscordForumDto>)
 
     /** Replaces the members of the guild known to the backend, which deletes the links of everybody missing. */
     suspend fun reportMembers(members: List<ReportedMember>)

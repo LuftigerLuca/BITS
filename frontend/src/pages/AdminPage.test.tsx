@@ -29,11 +29,17 @@ describe('admin page', () => {
         }),
       'GET /web/admin/votes/manager-roles': () => json({ roleIds: ['r1'] }),
       'GET /web/admin/votes/result-settings': () => json({ customBackground: false, updatedAt: null }),
+      'GET /web/admin/tops': () =>
+        json({
+          forums: [{ id: 'f1', name: 'tops', category: null, usable: true, tags: [{ id: 't1', name: 'Erledigt' }] }],
+          selected: [{ forumId: 'f1', doneTagId: 't1' }],
+        }),
       'GET /web/admin/votes/result-settings/party-colors': () =>
         json({ countryName: 'Germany', parties: [{ id: 'p1', name: 'Partei', color: '#ff0000' }], noPartyColor: null }),
     })
     renderApp('/admin')
     await screen.findByText('Partei')
+    await screen.findByLabelText('Erledigt-Tag in #tops')
     await expectNoAxeViolations()
 
     await userEvent.click(screen.getByLabelText('Land der Startseite'))

@@ -1,5 +1,7 @@
 package eu.luftiger.bits.bot.commands
 
+import eu.luftiger.bits.bot.tops.TopCloseCommand
+import eu.luftiger.bits.bot.tops.TopOpenCommand
 import eu.luftiger.bits.bot.votes.VoteCommand
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
 
@@ -14,4 +16,6 @@ val BOT_COMMANDS: List<SlashCommandData> =
         RolesCommand.data,
         LanguageCommand.data,
         VoteCommand.data,
+        TopCloseCommand.data,
+        TopOpenCommand.data,
     )

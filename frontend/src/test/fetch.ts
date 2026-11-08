@@ -3,7 +3,7 @@ import type { Feature } from '@/features/feature-toggles/api'
 
 type Handler = (init?: RequestInit) => Response | Promise<Response>
 
-const FEATURES: Feature[] = ['VERIFICATION', 'ROLE_SYNC', 'NICKNAMES', 'PROFILE', 'VOTES', 'EMBASSIES']
+const FEATURES: Feature[] = ['VERIFICATION', 'ROLE_SYNC', 'NICKNAMES', 'PROFILE', 'VOTES', 'EMBASSIES', 'TOPS']
 
 /** Every feature on, unless [off] names it. */
 export function features(...off: Feature[]): Response {

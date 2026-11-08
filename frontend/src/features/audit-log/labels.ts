@@ -34,6 +34,9 @@ export const ACTIONS: Record<AuditAction, string> = {
   HONEYPOT_KICKS_RESUMED: 'Honeypot-Kicks fortgesetzt',
   API_TOKEN_CREATED: 'API-Token angelegt',
   API_TOKEN_REVOKED: 'API-Token widerrufen',
+  TOP_FORUMS_CHANGED: 'TOP-Foren geändert',
+  TOP_CLOSED: 'TOP geschlossen',
+  TOP_REOPENED: 'TOP wieder geöffnet',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
