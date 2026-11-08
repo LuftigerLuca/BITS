@@ -13,4 +13,5 @@ data class FeatureStates(
     val nicknames: Boolean = true,
     val profile: Boolean = true,
     val votes: Boolean = true,
+    val tops: Boolean = true,
 )

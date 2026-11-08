@@ -16,6 +16,7 @@ object BotInput {
     const val MAX_ROLES = 250
     const val MAX_ROLE_NAME_LENGTH = 100
     const val MAX_CHANNELS = 500
+    private const val MAX_FORUM_TAGS = 20
 
     /** Active and archived private threads; far above what a guild keeps, a list beyond is a bug. */
     const val MAX_THREADS = 10_000
@@ -64,6 +65,11 @@ object BotInput {
     fun channelCount(count: Int) = check(count <= MAX_CHANNELS, "number of channels")
 
     fun threadCount(count: Int) = check(count <= MAX_THREADS, "number of threads")
+
+    /** Tags of a forum channel; Discord allows 20, with names of up to 20 characters. */
+    fun tagCount(count: Int) = check(count <= MAX_FORUM_TAGS, "number of tags")
+
+    fun tagId(value: String) = check(DISCORD_ID.matches(value), "tag id")
 
     fun messageId(value: String) = check(DISCORD_ID.matches(value), "message id")
 

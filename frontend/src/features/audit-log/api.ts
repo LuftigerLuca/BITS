@@ -36,6 +36,9 @@ export type AuditAction =
   | 'HONEYPOT_KICKS_RESUMED'
   | 'API_TOKEN_CREATED'
   | 'API_TOKEN_REVOKED'
+  | 'TOP_FORUMS_CHANGED'
+  | 'TOP_CLOSED'
+  | 'TOP_REOPENED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'

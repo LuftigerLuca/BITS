@@ -27,6 +27,10 @@ export const FEATURES: Record<Feature, { label: string; description: string }> =
     description:
       'Gleicht die Botschafts-Threads mit den Regierungen ab. Solange sie aus sind, bleiben die Threads, wie sie sind.',
   },
+  TOPS: {
+    label: 'TOPs',
+    description: '/topclose und /topopen in den TOP-Foren. Geschlossene Posts bleiben, wie sie sind.',
+  },
 }
 
 export const ERROR_MESSAGE = 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.'

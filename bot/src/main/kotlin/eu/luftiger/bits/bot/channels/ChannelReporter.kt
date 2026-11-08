@@ -3,15 +3,19 @@ package eu.luftiger.bits.bot.channels
 import eu.luftiger.bits.bot.backend.BackendClient
 import eu.luftiger.bits.bot.backend.DebouncedReport
 import eu.luftiger.bits.shared.DiscordChannelDto
+import eu.luftiger.bits.shared.DiscordForumDto
+import eu.luftiger.bits.shared.ForumTagDto
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
+import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
 import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel
 import net.dv8tion.jda.api.events.channel.ChannelCreateEvent
 import net.dv8tion.jda.api.events.channel.ChannelDeleteEvent
+import net.dv8tion.jda.api.events.channel.forum.GenericForumTagEvent
 import net.dv8tion.jda.api.events.channel.update.GenericChannelUpdateEvent
 import net.dv8tion.jda.api.events.guild.member.GenericGuildMemberEvent
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent
@@ -22,7 +26,7 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter
 
 /**
  * Tells the backend which text channels the guild has, in which of them the bot may post votes or create embassy
- * threads, and who may see them: on start, every
+ * threads, and who may see them, and which forums it has with their tags: on start, every
  * hour in case a gateway event got lost, and whenever a channel, its permissions or the bot's roles change. Reports go
  * through a [DebouncedReport].
  */
@@ -32,9 +36,12 @@ class ChannelReporter(
     private val scope: CoroutineScope,
 ) : ListenerAdapter() {
     private val reports = DebouncedReport(scope, "the channels", backend::reportChannels)
+    private val forumReports = DebouncedReport(scope, "the forums", backend::reportForums)
 
     fun report(guild: Guild) {
-        if (guild.id == guildId) reports.report { channels(guild) }
+        if (guild.id != guildId) return
+        reports.report { channels(guild) }
+        forumReports.report { forums(guild) }
     }
 
     /** Reports [guild] now and then every hour. */
@@ -54,6 +61,8 @@ class ChannelReporter(
     override fun onGenericChannelUpdate(event: GenericChannelUpdateEvent<*>) = report(event.guild)
 
     override fun onGenericPermissionOverride(event: GenericPermissionOverrideEvent) = report(event.guild)
+
+    override fun onGenericForumTag(event: GenericForumTagEvent) = report(event.channel.guild)
 
     /** The permissions of a role decide where the bot may post. */
     override fun onGenericRoleUpdate(event: GenericRoleUpdateEvent<*>) = report(event.guild)
@@ -98,6 +107,27 @@ class ChannelReporter(
                 Permission.MESSAGE_MANAGE,
                 Permission.KICK_MEMBERS,
             )
+
+        /** What the bot needs to close and reopen a TOP post: write in it, tag, lock and archive it. */
+        val TOP_PERMISSIONS =
+            listOf(
+                Permission.VIEW_CHANNEL,
+                Permission.MESSAGE_SEND_IN_THREADS,
+                Permission.MANAGE_THREADS,
+            )
+
+        /** Forum channels in the order of Discord's channel list. */
+        internal fun forums(guild: Guild): List<DiscordForumDto> =
+            guild.channels.filterIsInstance<ForumChannel>().mapIndexed { index, forum ->
+                DiscordForumDto(
+                    id = forum.id,
+                    name = forum.name,
+                    category = forum.parentCategory?.name,
+                    position = index,
+                    threadsManageable = guild.selfMember.hasPermission(forum, TOP_PERMISSIONS),
+                    tags = forum.availableTags.map { ForumTagDto(it.id, it.name) },
+                )
+            }
 
         /** Text and announcement channels in the order of Discord's channel list. */
         internal fun channels(guild: Guild): List<DiscordChannelDto> =

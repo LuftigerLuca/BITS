@@ -17,6 +17,7 @@ function stub(presence: unknown, setPresence: (init?: RequestInit) => Response =
     'GET /web/admin/role-sync/countries': () => json([]),
     'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
+    'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/votes/result-settings': () => json({ customBackground: false, updatedAt: null }),
     'GET /web/admin/votes/result-settings/party-colors': () => json({ countryName: null, parties: [], noPartyColor: null }),

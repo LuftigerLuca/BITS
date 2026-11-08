@@ -13,6 +13,8 @@ import eu.luftiger.bits.shared.CloseVoteRequest
 import eu.luftiger.bits.shared.CloseVoteResponse
 import eu.luftiger.bits.shared.DiscordChannelDto
 import eu.luftiger.bits.shared.DiscordChannelsReport
+import eu.luftiger.bits.shared.DiscordForumDto
+import eu.luftiger.bits.shared.DiscordForumsReport
 import eu.luftiger.bits.shared.DiscordMemberChange
 import eu.luftiger.bits.shared.DiscordMembersReport
 import eu.luftiger.bits.shared.DiscordRoleDto
@@ -51,6 +53,9 @@ import eu.luftiger.bits.shared.StartVerificationRequest
 import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
+import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopPermissionRequest
+import eu.luftiger.bits.shared.TopPermissionResponse
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.UnlinkAccountRequest
 import eu.luftiger.bits.shared.UnlinkAccountResponse
@@ -88,7 +93,7 @@ import kotlinx.coroutines.CancellationException
 import java.time.Duration
 
 /**
- * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
+ * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [TopBackend], [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
  * authenticate with the service token of the bot. [calls] counts every request and how it ended.
  */
 class KtorBackendClient(
@@ -102,6 +107,7 @@ class KtorBackendClient(
     EmbassyBackend,
     FeatureBackend,
     HoneypotBackend,
+    TopBackend,
     LanguageBackend,
     PresenceBackend,
     HeartbeatBackend,
@@ -181,6 +187,25 @@ class KtorBackendClient(
         http.put("api/discord-channels") {
             contentType(ContentType.Application.Json)
             setBody(DiscordChannelsReport(channels))
+        }
+    }
+
+    override suspend fun reportForums(forums: List<DiscordForumDto>) {
+        http.put("api/discord-forums") {
+            contentType(ContentType.Application.Json)
+            setBody(DiscordForumsReport(forums))
+        }
+    }
+
+    override suspend fun topPermission(
+        actor: VoteActor,
+        forumId: String,
+    ): TopPermissionResponse = post("api/tops/permission", TopPermissionRequest(actor, forumId))
+
+    override suspend fun reportTopAction(report: TopActionReport) {
+        http.post("api/tops/actions") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
         }
     }
 

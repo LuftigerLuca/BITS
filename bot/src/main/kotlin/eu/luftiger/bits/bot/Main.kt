@@ -35,6 +35,9 @@ import eu.luftiger.bits.bot.status.BackendCallCounter
 import eu.luftiger.bits.bot.status.DiscordRequestCounter
 import eu.luftiger.bits.bot.status.HeartbeatReporter
 import eu.luftiger.bits.bot.systemlog.SystemLogReporter
+import eu.luftiger.bits.bot.tops.TopCloseCommand
+import eu.luftiger.bits.bot.tops.TopOpenCommand
+import eu.luftiger.bits.bot.tops.Tops
 import eu.luftiger.bits.bot.votes.VoteButtons
 import eu.luftiger.bits.bot.votes.VoteCommand
 import eu.luftiger.bits.bot.votes.VoteEvents
@@ -63,6 +66,7 @@ import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.requests.GatewayIntent
 import net.dv8tion.jda.api.utils.ChunkingFilter
 import net.dv8tion.jda.api.utils.MemberCachePolicy
+import net.dv8tion.jda.api.utils.cache.CacheFlag
 import net.dv8tion.jda.internal.utils.IOUtil
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -92,6 +96,7 @@ fun main() {
     val verifyCommand = VerifyCommand(backend, scope, languages)
     val features = Features(backend, scope)
     features.refreshPeriodically()
+    val tops = Tops(backend)
 
     // The role sync and the member list need all members, which takes the privileged GUILD_MEMBERS intent. The honeypot
     // needs to see that a message was written, not what it says, so it does without MESSAGE_CONTENT.
@@ -100,6 +105,8 @@ fun main() {
             .createLight(config.discordToken)
             .enableIntents(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGES)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
+            // The tags of forums and their posts, for the TOP forums.
+            .enableCache(CacheFlag.FORUM_TAGS)
             .setChunkingFilter(ChunkingFilter.ALL)
             // The builder JDA would take itself, so its timeouts and pools stay, with the requests counted.
             .setHttpClientBuilder(IOUtil.newHttpClientBuilder().addInterceptor(discordRequests))
@@ -149,6 +156,20 @@ fun main() {
                     delegate = VoteCommand(backend, scope, languages),
                 ),
                 VoteButtons(backend, scope, languages),
+                FeatureGate(
+                    features,
+                    { it.tops },
+                    TopCloseCommand.NAME,
+                    languages = languages,
+                    delegate = TopCloseCommand(tops, scope, languages),
+                ),
+                FeatureGate(
+                    features,
+                    { it.tops },
+                    TopOpenCommand.NAME,
+                    languages = languages,
+                    delegate = TopOpenCommand(tops, scope, languages),
+                ),
                 roleReporter,
                 memberReporter,
                 channelReporter,

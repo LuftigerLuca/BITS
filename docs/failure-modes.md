@@ -79,6 +79,12 @@ while the bot is down are not looked at later. If Discord refuses the message de
 the other steps still run and the system log says what failed. Without the backend, the direct message is in German. A pause of the kicks survives a restart, since the
 backend keeps it; if the bot cannot report it before stopping, its count starts over.
 
+`/topclose` and `/topopen` ask the backend whether the member may and which tag a closed post gets, so they answer that
+BITS is not reachable while the backend is down, and change nothing. Once the bot has changed the post, it reports
+that for the audit log; if the backend does not take the report, the post stays changed, the audit entry is missing and
+the bot logs an error. If Discord refuses a step, the member is told so; a closing message posted before a refused
+lock stays.
+
 Which features an admin switched off under "Verwaltung" the bot asks the backend every 30 seconds. Until its first
 answer after a start everything is on; while the backend is down, the bot keeps the last answer, and the commands fail
 at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;

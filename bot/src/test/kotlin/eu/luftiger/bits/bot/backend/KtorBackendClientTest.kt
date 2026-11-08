@@ -8,9 +8,11 @@ import eu.luftiger.bits.shared.BotHeartbeat
 import eu.luftiger.bits.shared.BotPresence
 import eu.luftiger.bits.shared.BotStatus
 import eu.luftiger.bits.shared.CastVoteResponse
+import eu.luftiger.bits.shared.DiscordForumDto
 import eu.luftiger.bits.shared.DiscordRequestCount
 import eu.luftiger.bits.shared.DiscordRoleDto
 import eu.luftiger.bits.shared.FeatureStates
+import eu.luftiger.bits.shared.ForumTagDto
 import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.NicknamePreferenceResponse
 import eu.luftiger.bits.shared.OpenVote
@@ -19,7 +21,9 @@ import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.ReportedMember
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.StartVerificationResponse
+import eu.luftiger.bits.shared.TopPermissionResponse
 import eu.luftiger.bits.shared.UnlinkAccountResponse
+import eu.luftiger.bits.shared.VoteActor
 import eu.luftiger.bits.shared.VoteChoice
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -272,6 +276,38 @@ class KtorBackendClientTest {
             val client = KtorBackendClient("http://backend:8080", "secret", MockEngine { respond("", HttpStatusCode.InternalServerError) })
 
             assertFalse(assertFails { client.checkVerification("42", "BITS-ABC234") } is WareraUnavailableException)
+        }
+
+    @Test
+    fun `forums are reported with their tags, TOP permissions decoded by their type`() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    when (request.url.encodedPath) {
+                        "/api/discord-forums" -> {
+                            assertEquals(HttpMethod.Put, request.method)
+                            assertEquals(
+                                """{"forums":[{"id":"1","name":"tops","category":null,"position":0,"threadsManageable":true,""" +
+                                    """"tags":[{"id":"2","name":"Erledigt"}]}]}""",
+                                request.body.toByteArray().decodeToString(),
+                            )
+                            respond("", HttpStatusCode.NoContent)
+                        }
+                        "/api/tops/permission" ->
+                            respond(
+                                """{"type":"allowed","doneTagId":"2"}""",
+                                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        else -> error("Unexpected ${request.url}")
+                    }
+                }
+            val client = KtorBackendClient("http://backend:8080", "secret", engine)
+
+            client.reportForums(listOf(DiscordForumDto("1", "tops", null, 0, true, listOf(ForumTagDto("2", "Erledigt")))))
+            assertEquals(
+                TopPermissionResponse.Allowed("2"),
+                client.topPermission(VoteActor("42", "Chair", null, emptyList(), administrator = false), "1"),
+            )
         }
 
     @Test
