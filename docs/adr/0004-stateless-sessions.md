@@ -1,6 +1,6 @@
 # 0004: Dashboard sessions are signed tokens in a cookie
 
-Status: accepted
+Status: superseded by [0012](0012-sliding-sessions.md)
 
 ## Context
 

@@ -4,11 +4,34 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
+import java.net.URLEncoder
 
 class RestDiscordApi(
     private val restClient: RestClient,
+    private val clientId: String,
+    private val clientSecret: String,
 ) : DiscordApi {
+    override fun refreshTokens(refreshToken: String): DiscordTokens {
+        val form = "grant_type=refresh_token&refresh_token=${URLEncoder.encode(refreshToken, Charsets.UTF_8)}"
+        val body =
+            restClient
+                .post()
+                .uri("/oauth2/token")
+                .headers { it.setBasicAuth(clientId, clientSecret, Charsets.UTF_8) }
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                // Discord answers `invalid_grant` with 400 for a refresh token it no longer accepts.
+                .onStatus({ it.isSameCodeAs(HttpStatus.BAD_REQUEST) }) { _, response ->
+                    throw DiscordGrantRevokedException("Discord rejected the refresh token (${response.statusCode})")
+                }.body(String::class.java)
+                ?: error("Empty response from Discord for /oauth2/token")
+        return json.decodeFromString(DiscordTokens.serializer(), body)
+    }
+
     override fun getCurrentUser(accessToken: String): DiscordUser = get("/users/@me", accessToken, DiscordUser.serializer())
 
     override fun getCurrentUserGuilds(
@@ -36,7 +59,9 @@ class RestDiscordApi(
                 .uri(path)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
-                .body(String::class.java)
+                .onStatus({ it.isSameCodeAs(HttpStatus.UNAUTHORIZED) }) { _, _ ->
+                    throw DiscordGrantRevokedException("Discord rejected the access token for $path")
+                }.body(String::class.java)
                 ?: error("Empty response from Discord for $path")
         return json.decodeFromString(serializer, body)
     }

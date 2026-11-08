@@ -34,8 +34,8 @@ and either can be down at that moment.
   can see them; a database dump taken during a vote keeps them until it rotates out.
 - A party with a single voter, or a group where everybody voted the same, reveals how its members voted. That is a
   property of a result by party and is accepted.
-- The dashboard sees role changes only at the next login, so a member who lost a manager role can keep managing
-  votes there for up to the session's lifetime (8 hours). Discord commands always use the current roles.
+- The dashboard sees role changes when the session is checked again, so a member who lost a manager role can keep
+  managing votes there for up to an hour (ADR 0012). Discord commands always use the current roles.
 - If the bot posts the result but cannot confirm it, it may post the result twice.
 - A vote that ends by its threshold tells everybody, before the result, that the option got past it. That is what the
   threshold is for. Since the evaluation counts the members at the end, not at the check, the result can rarely lie

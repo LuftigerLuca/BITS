@@ -12,48 +12,94 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 /**
- * Issues the session of the dashboard: a signed JWT in an HttpOnly cookie, valid for [validity] without refresh.
+ * Starts the sessions of the dashboard and issues their tokens: a signed JWT in an HttpOnly cookie, valid for
+ * [TOKEN_VALIDITY]. The session itself is an entry in Redis ([SessionStore]) and lasts as long as it is used, up to
+ * [SessionStore.MAX_LIFETIME]. The cookie is kept by the browser for that long, so that an expired token can be
+ * renewed ([SessionRefresher]); the renewal checks the user's role and Discord roles again.
  *
- * Two things end a session before it expires, since the token itself cannot be changed once issued:
- * - **Logout** puts the token's ID (`jti`) on a denylist in Redis ([RevokedSessions]) until it would have expired,
- *   so a copied cookie stops working too.
- * - **Lost admin rights** are not seen by the token, which keeps the role from the login. ADMIN sessions therefore
- *   last only [ADMIN_VALIDITY]; the role is decided anew at the next login. The same goes for the member's Discord
- *   roles, which a USER session keeps for up to [USER_VALIDITY]. Checking Discord on every request would
- *   need the user's access token, which BITS does not keep.
- *
- * The last resort is rotating `BITS_JWT_SECRET`, which ends every session (see deploy/README.md).
+ * A session ends before that with its logout, which deletes the entry and puts the token's ID (`jti`) on a denylist
+ * ([RevokedSessions]), or when the check at the renewal fails. The last resort is rotating `BITS_JWT_SECRET`,
+ * which ends every session (see deploy/README.md).
  */
 @Component
 class SessionTokens(
     private val jwtEncoder: JwtEncoder,
     private val clock: Clock,
+    private val sessionStore: SessionStore,
+    private val secrets: SessionSecrets,
+    private val properties: AuthProperties,
 ) {
-    fun cookie(user: SessionUser): ResponseCookie {
+    /** Starts a session for [user]; [discordRefreshToken] is needed to renew it, unless it is the admin account. */
+    fun cookie(
+        user: SessionUser,
+        discordRefreshToken: String? = null,
+    ): ResponseCookie {
         val now = clock.instant()
-        val validity = validity(user.role)
+        val id = UUID.randomUUID().toString()
+        val expiresAt = now + SessionStore.MAX_LIFETIME
+        val tokenExpiresAt = now + TOKEN_VALIDITY
+        sessionStore.save(
+            id,
+            StoredSession(
+                subject = user.subject,
+                name = user.name,
+                avatarUrl = user.avatarUrl,
+                role = user.role.name,
+                discordRoleIds = user.discordRoleIds,
+                expiresAt = expiresAt.epochSecond,
+                refreshToken = discordRefreshToken?.let(secrets::encrypt),
+                adminFingerprint = if (user.discordUserId == null) secrets.fingerprint(properties.admin.passwordHash) else null,
+                tokenExpiresAt = tokenExpiresAt.epochSecond,
+            ),
+        )
+        return cookie(token(id, user, expiresAt, tokenExpiresAt), expiresAt)
+    }
+
+    /** A new token for an existing session, valid until [tokenExpiresAt]. */
+    fun cookie(
+        sessionId: String,
+        session: StoredSession,
+        tokenExpiresAt: Instant,
+    ): ResponseCookie {
+        val expiresAt = Instant.ofEpochSecond(session.expiresAt)
+        return cookie(token(sessionId, session.user, expiresAt, tokenExpiresAt), expiresAt)
+    }
+
+    fun clearedCookie(): ResponseCookie = cookie("", Duration.ZERO)
+
+    private fun token(
+        sessionId: String,
+        user: SessionUser,
+        sessionExpiresAt: Instant,
+        tokenExpiresAt: Instant,
+    ): String {
         val claims =
             JwtClaimsSet
                 .builder()
                 .id(UUID.randomUUID().toString())
                 .issuer(ISSUER)
                 .subject(user.subject)
-                .issuedAt(now)
-                .expiresAt(now + validity)
+                .issuedAt(clock.instant())
+                .expiresAt(minOf(tokenExpiresAt, sessionExpiresAt))
+                .claim(SESSION_ID_CLAIM, sessionId)
+                .claim(SESSION_EXPIRES_CLAIM, sessionExpiresAt.epochSecond)
                 .claim(NAME_CLAIM, user.name)
                 .claim(ROLE_CLAIM, user.role.name)
                 .apply { user.avatarUrl?.let { claim(AVATAR_CLAIM, it) } }
                 .apply { if (user.discordRoleIds.isNotEmpty()) claim(DISCORD_ROLES_CLAIM, user.discordRoleIds) }
                 .build()
         val header = JwsHeader.with(MacAlgorithm.HS256).build()
-        val token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).tokenValue
-        return cookie(token, validity)
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).tokenValue
     }
 
-    fun clearedCookie(): ResponseCookie = cookie("", Duration.ZERO)
+    private fun cookie(
+        token: String,
+        sessionExpiresAt: Instant,
+    ) = cookie(token, Duration.between(clock.instant(), sessionExpiresAt))
 
     private fun cookie(
         value: String,
@@ -71,22 +117,24 @@ class SessionTokens(
     companion object {
         const val COOKIE_NAME = "bits_session"
         const val ROLE_CLAIM = "role"
+        const val SESSION_ID_CLAIM = "sid"
+        private const val SESSION_EXPIRES_CLAIM = "session_exp"
         private const val ISSUER = "bits"
         private const val NAME_CLAIM = "name"
         private const val AVATAR_CLAIM = "avatar"
-
-        /** Missing in sessions from before the roles were kept, which end within [USER_VALIDITY]. */
         private const val DISCORD_ROLES_CLAIM = "discord_roles"
 
-        val USER_VALIDITY: Duration = Duration.ofHours(8)
+        /**
+         * How long a token is valid before the session is checked again: a Discord user who loses the Administrator
+         * permission, the guild or the app keeps the session as before for this long at most.
+         */
+        val TOKEN_VALIDITY: Duration = Duration.ofHours(1)
 
-        /** How long a Discord user keeps ADMIN after losing the Administrator permission, at most. */
-        val ADMIN_VALIDITY: Duration = Duration.ofHours(1)
-
-        fun validity(role: Role): Duration =
-            when (role) {
-                Role.USER -> USER_VALIDITY
-                Role.ADMIN -> ADMIN_VALIDITY
+        fun sessionExpiresAt(jwt: Jwt): Instant? =
+            when (val value = jwt.claims[SESSION_EXPIRES_CLAIM]) {
+                is Instant -> value
+                is Number -> Instant.ofEpochSecond(value.toLong())
+                else -> null
             }
 
         fun user(jwt: Jwt) =

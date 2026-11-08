@@ -29,7 +29,7 @@ and backend and the background jobs, since the start and over the last 24 hours.
 ## Consequences
 
 - After a restart of the backend all counts start from zero; the page says since when it counts.
-- The page cannot show an outage of Redis or of the backend: without them the dashboard does not open (0004).
+- The page cannot show an outage of Redis or of the backend: without them the dashboard does not open (0012).
 - Requests of the bot that reach no endpoint, e.g. without the token, are counted too, since the filter runs before
   Spring Security.
 - A new background job that calls WarEra should run through `BackgroundWork`, or its calls count as "Sonstiges".

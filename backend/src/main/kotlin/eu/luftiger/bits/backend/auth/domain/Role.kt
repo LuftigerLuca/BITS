@@ -1,6 +1,6 @@
 package eu.luftiger.bits.backend.auth.domain
 
-/** Decided once at login and kept in the session token until it expires. */
+/** Decided at login and again whenever the session's token is renewed, see `SessionRefresher`. */
 enum class Role {
     USER,
     ADMIN,

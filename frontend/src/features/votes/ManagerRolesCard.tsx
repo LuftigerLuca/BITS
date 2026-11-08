@@ -20,7 +20,7 @@ export function ManagerRolesCard() {
         <CardTitle>Wer Abstimmungen verwalten darf</CardTitle>
         <CardDescription>
           Admins dürfen immer. Mitglieder der gewählten Rollen dürfen Abstimmungen über Discord und das Dashboard
-          starten, beenden und abbrechen. Im Dashboard gelten neue Rollen erst nach dem nächsten Login.
+          starten, beenden und abbrechen. Im Dashboard gelten neue Rollen spätestens nach einer Stunde.
         </CardDescription>
       </CardHeader>
       <CardContent>

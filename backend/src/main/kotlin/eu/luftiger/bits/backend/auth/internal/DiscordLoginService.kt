@@ -17,7 +17,8 @@ import java.math.BigInteger
 /**
  * Turns a Discord login into a [SessionUser]. Only members of the configured guild get in; the guild's owner and
  * members with the Administrator permission become [Role.ADMIN]. The member's roles go into the session as well, for
- * permissions given to roles such as managing votes. The access token is used for these calls only and then dropped.
+ * permissions given to roles such as managing votes. The access token is used for these calls only and then dropped;
+ * the refresh token goes into the session ([SessionTokens]), which checks all this again with it every hour.
  */
 @Service
 class DiscordLoginService(
@@ -27,32 +28,41 @@ class DiscordLoginService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun loadUser(userRequest: OAuth2UserRequest): OAuth2User {
-        val accessToken = userRequest.accessToken.tokenValue
         try {
-            val user = discordApi.getCurrentUser(accessToken)
-            val guild = discordApi.findCurrentUserGuild(accessToken, properties.discord.guildId)
-            if (guild == null) {
-                log.info("Discord login of {} rejected: not a member of the guild", user.id)
+            val user = resolve(userRequest.accessToken.tokenValue)
+            if (user == null) {
+                log.info("Discord login rejected: not a member of the guild")
                 throw OAuth2AuthenticationException(OAuth2Error(NOT_MEMBER_ERROR))
             }
-            val member = discordApi.getCurrentUserGuildMember(accessToken, properties.discord.guildId)
-            val isAdmin = guild.owner || BigInteger(guild.permissions).testBit(ADMINISTRATOR_BIT)
-            val role = if (isAdmin) Role.ADMIN else Role.USER
-            log.info("Discord login of {} as {}", user.id, role)
-            return DiscordPrincipal(
-                SessionUser.discord(
-                    discordUserId = user.id,
-                    name = user.globalName ?: user.username,
-                    avatarUrl = avatarUrl(user),
-                    role = role,
-                    discordRoleIds = member.roles,
-                ),
-            )
+            log.info("Discord login of {} as {}", user.discordUserId, user.role)
+            return DiscordPrincipal(user)
         } catch (e: RestClientException) {
             // The message names the URL and status, never the access token, which only travels in a header.
             log.warn("Discord login failed: Discord not reachable ({})", e.message)
             throw OAuth2AuthenticationException(OAuth2Error(DISCORD_UNAVAILABLE_ERROR), e)
+        } catch (e: DiscordGrantRevokedException) {
+            log.warn("Discord login failed: {}", e.message)
+            throw OAuth2AuthenticationException(OAuth2Error(GENERIC_ERROR), e)
         }
+    }
+
+    /**
+     * The user behind [accessToken] with the role and the Discord roles they have now, or `null` if they are not a
+     * member of the guild. Used at the login and again whenever a session is renewed. Throws a `RestClientException`
+     * if Discord cannot be reached and [DiscordGrantRevokedException] if it rejects the access token.
+     */
+    fun resolve(accessToken: String): SessionUser? {
+        val user = discordApi.getCurrentUser(accessToken)
+        val guild = discordApi.findCurrentUserGuild(accessToken, properties.discord.guildId) ?: return null
+        val member = discordApi.getCurrentUserGuildMember(accessToken, properties.discord.guildId)
+        val isAdmin = guild.owner || BigInteger(guild.permissions).testBit(ADMINISTRATOR_BIT)
+        return SessionUser.discord(
+            discordUserId = user.id,
+            name = user.globalName ?: user.username,
+            avatarUrl = avatarUrl(user),
+            role = if (isAdmin) Role.ADMIN else Role.USER,
+            discordRoleIds = member.roles,
+        )
     }
 
     private fun avatarUrl(user: DiscordUser): String =
@@ -77,6 +87,7 @@ class DiscordLoginService(
     companion object {
         const val NOT_MEMBER_ERROR = "not_member"
         const val DISCORD_UNAVAILABLE_ERROR = "discord_unavailable"
+        const val GENERIC_ERROR = "discord"
         private const val ADMINISTRATOR_BIT = 3
     }
 }
