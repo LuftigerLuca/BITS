@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import org.springframework.modulith.NamedInterface
 
 /**
- * What an admin, or a member allowed to manage votes or TOPs, did. Stored by name and part of the dashboard API, so existing
+ * What an admin, or a member allowed to manage votes or TOPs or to reprimand, did. Stored by name and part of the dashboard API, so existing
  * names stay as they are; the dashboard spells them out in `frontend/src/lib/api.ts`.
  */
 @NamedInterface("api")
@@ -50,4 +50,7 @@ enum class AuditAction {
     TOP_CLOSED,
     TOP_REOPENED,
     TOP_MANAGER_ROLES_CHANGED,
+    REPRIMAND_GIVEN,
+    REPRIMAND_WITHDRAWN,
+    REPRIMAND_SETTINGS_CHANGED,
 }

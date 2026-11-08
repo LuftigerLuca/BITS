@@ -92,8 +92,14 @@ that for the audit log; if the backend does not take the report, the post stays 
 the bot logs an error. If Discord refuses a step, the member is told so; a closing message posted before a refused
 lock stays.
 
+`/reprimand` asks the backend first, so it changes nothing while the backend is down. Once the reprimand is stored, the
+timeout, the direct message and the public message are each tried on their own: a timeout Discord refuses, e.g. for a
+member above the bot, leaves the reprimand counted, tells the member who gave it and is sent to the system log with
+backoff for about an hour. Withdrawing a reprimand sends the remaining timeout to the bot as an event, which waits in
+the stream while the bot is down; a member who left by then is skipped, and a refused change goes to the system log.
+
 Which features an admin switched off under "Verwaltung" the bot asks the backend every 30 seconds. Until its first
-answer after a start everything is on; while the backend is down, the bot keeps the last answer, and the commands fail
+answer after a start everything but reprimands is on; while the backend is down, the bot keeps the last answer, and the commands fail
 at the backend anyway. Account changes while the role sync or the embassies are off are not synced on their own;
 switching them on again syncs everybody.
 

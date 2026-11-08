@@ -17,6 +17,7 @@ function stub(settings: () => ResultSettings, routes: Record<string, (init?: Req
     'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
     'GET /web/admin/bot-presence': () => json({}),
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
+    'GET /web/admin/reprimands/settings': () => json({ roles: [], roleIds: [], timeoutMinutes: 10 }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/honeypot': () => json({ channelId: null, kicksPaused: false, channels: [] }),
     'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),

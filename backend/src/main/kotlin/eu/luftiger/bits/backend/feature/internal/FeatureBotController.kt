@@ -20,6 +20,7 @@ class FeatureBotController(
             profile = features.getValue(BitsFeature.PROFILE),
             votes = features.getValue(BitsFeature.VOTES),
             tops = features.getValue(BitsFeature.TOPS),
+            reprimands = features.getValue(BitsFeature.REPRIMANDS),
         )
     }
 }

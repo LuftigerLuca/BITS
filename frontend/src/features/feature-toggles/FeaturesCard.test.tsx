@@ -20,6 +20,7 @@ function stub(off: Feature[], setFeature: (init?: RequestInit) => Response = () 
     'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
+    'GET /web/admin/reprimands/settings': () => json({ roles: [], roleIds: [], timeoutMinutes: 10 }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/votes/result-settings': () => json({ customBackground: false, updatedAt: null }),
@@ -41,7 +42,7 @@ describe('features', () => {
     renderApp('/admin')
 
     const votes = await screen.findByRole('switch', { name: 'Abstimmungen' })
-    expect(within(card()).getAllByRole('switch')).toHaveLength(7)
+    expect(within(card()).getAllByRole('switch')).toHaveLength(8)
     expect(votes).toBeChecked()
 
     await userEvent.click(votes)

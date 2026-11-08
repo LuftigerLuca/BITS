@@ -30,6 +30,7 @@ const KINDS: Record<LogEntryType, string> = {
   HONEYPOT_KICKS_PAUSED: 'Honeypot-Kicks pausiert',
   HONEYPOT_WARNING_FAILED: 'Honeypot-Warnung nicht möglich',
   VERIFY_PANEL_FAILED: 'Verifizierungs-Nachricht nicht möglich',
+  REPRIMAND_TIMEOUT_FAILED: 'Timeout einer Rüge nicht möglich',
 }
 
 /** One line on what happened to the member, in German. */

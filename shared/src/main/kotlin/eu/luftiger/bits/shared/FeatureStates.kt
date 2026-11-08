@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Which features with Discord commands an admin left on. Every field defaults to on, so a feature the other side does
- * not know yet stays usable.
+ * not know yet stays usable, except [reprimands], which starts off.
  */
 @Serializable
 data class FeatureStates(
@@ -14,4 +14,6 @@ data class FeatureStates(
     val profile: Boolean = true,
     val votes: Boolean = true,
     val tops: Boolean = true,
+    /** Off until an admin switches it on, as reprimands time members out. */
+    val reprimands: Boolean = false,
 )

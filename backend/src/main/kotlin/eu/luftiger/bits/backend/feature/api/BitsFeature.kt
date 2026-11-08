@@ -9,7 +9,10 @@ import org.springframework.modulith.NamedInterface
  */
 @NamedInterface("api")
 @Serializable
-enum class BitsFeature {
+enum class BitsFeature(
+    /** What a feature without a stored setting is; most start on. */
+    val enabledByDefault: Boolean = true,
+) {
     /** `/verify` and the button that checks the code. Unlinking always works, since it is about the member's data. */
     VERIFICATION,
 
@@ -30,4 +33,7 @@ enum class BitsFeature {
 
     /** `/topclose` and `/topopen` in the TOP forums. */
     TOPS,
+
+    /** `/reprimand`; starts off, as reprimands time members out. */
+    REPRIMANDS(enabledByDefault = false),
 }

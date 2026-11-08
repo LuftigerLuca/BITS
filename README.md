@@ -58,6 +58,8 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 | Discord-ID, Name, Avatar und Grund bei TOPs      | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Discord-ID und -Name, WarEra-Name, Rollen        | `system_log_*`             | System-Log im Dashboard             | 30 Tage                                                                     |
 | Name des Admins, der ein API-Token anlegt        | `api_token`                | API-Tokens im Dashboard             | bis zum Widerruf des Tokens                                                 |
+| Discord-IDs und Namen beider, Grund, Zeitpunkt   | `reprimand`                | Rügen und ihre Anzahl               | unbegrenzt, auch nach Rücknahme oder Verlassen des Servers                  |
+| Discord-ID, Name, Avatar und Grund bei Rügen     | `audit_entry`              | Audit-Log im Dashboard              | unbegrenzt                                                                  |
 | Events mit Discord-IDs                           | Redis-Stream `bits:events` | Zustellung an den Bot               | 7 Tage                                                                      |
 | Logs mit Discord- und WarEra-IDs                 | Container-Logs             | Fehlersuche                         | im Deployment höchstens 5 × 10 MB pro Dienst                                |
 | alles aus der Datenbank                          | Dumps in `BACKUP_PATH`     | Wiederherstellung                   | bis zu 4 Wochen, siehe [deploy/README.md](deploy/README.md#backups)         |
@@ -65,7 +67,8 @@ BITS speichert nur, was es für die Verknüpfung, die Rollen und die Abstimmunge
 WarEra-Daten der Nutzer hält das Backend nur im Speicher. Ein Hinweis in `/verify` sagt, was gespeichert wird.
 Mit `/unverify` oder unter „Mein Account“ im Dashboard löscht ein Nutzer seine Verknüpfung und einen offenen Code, ein
 Admin ebenso unter „Mitglieder“; die Rollen, die BITS verwaltet, verliert der Nutzer beim folgenden Abgleich. Wer den
-Server verlässt, verliert beides ebenso, spätestens beim nächsten Start des Bots. Abgelaufene Codes und alte Pings löscht
+Server verlässt, verliert beides ebenso, spätestens beim nächsten Start des Bots. Rügen bleiben dagegen, sonst ließe
+sich ihre Anzahl durch Austreten zurücksetzen. Abgelaufene Codes und alte Pings löscht
 ein Job jede Stunde.
 
 Auskunft holt sich jedes Mitglied selbst unter „Mein Account“: Der Download enthält alle Zeilen der Tabellen oben, die

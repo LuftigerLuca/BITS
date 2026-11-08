@@ -18,6 +18,7 @@ data class DataExport(
     val pings: List<String>,
     val embassies: ExportedEmbassies,
     val systemLog: ExportedSystemLog,
+    val reprimands: ExportedReprimands,
     /** What the member changed as admin in the dashboard. */
     val auditLog: List<ExportedAuditEntry>,
 )
@@ -65,6 +66,25 @@ data class ExportedThreadMembership(
     val threadName: String,
     val memberName: String,
     val reason: String,
+)
+
+@Serializable
+data class ExportedReprimands(
+    /** Reprimands the member got, withdrawn ones too. */
+    val received: List<ExportedReprimand>,
+    /** Reprimands the member gave with `/reprimand`. */
+    val given: List<ExportedReprimand>,
+)
+
+@Serializable
+data class ExportedReprimand(
+    val memberName: String,
+    val actorName: String,
+    val reason: String,
+    val createdAt: String,
+    val timeoutUntil: String?,
+    /** `null` while it counts. */
+    val withdrawnAt: String?,
 )
 
 @Serializable

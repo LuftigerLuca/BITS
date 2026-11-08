@@ -1,5 +1,6 @@
 package eu.luftiger.bits.bot.commands
 
+import eu.luftiger.bits.bot.reprimands.ReprimandCommand
 import eu.luftiger.bits.bot.tops.TopCloseCommand
 import eu.luftiger.bits.bot.tops.TopOpenCommand
 import eu.luftiger.bits.bot.votes.VoteCommand
@@ -18,4 +19,5 @@ val BOT_COMMANDS: List<SlashCommandData> =
         VoteCommand.data,
         TopCloseCommand.data,
         TopOpenCommand.data,
+        ReprimandCommand.data,
     )
