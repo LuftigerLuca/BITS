@@ -37,7 +37,7 @@ describe('bot presence', () => {
   it('shows online without activity until something is set, and saves status and activity', async () => {
     // The backend leaves out the defaults.
     const fetch = stub({})
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     expect(await screen.findByText('Online', { selector: '[data-slot=select-value]' })).toBeInTheDocument()
     expect(within(card()).getByText('Keine', { selector: '[data-slot=select-value]' })).toBeInTheDocument()
@@ -64,7 +64,7 @@ describe('bot presence', () => {
 
   it('shows a custom status and removes the activity', async () => {
     const fetch = stub({ status: 'DO_NOT_DISTURB', activity: { type: 'CUSTOM', text: 'Wartung' } })
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     expect(await screen.findByLabelText('Status-Text')).toHaveValue('Wartung')
     expect(within(card()).getByText('Bitte nicht stören', { selector: '[data-slot=select-value]' })).toBeInTheDocument()
@@ -81,7 +81,7 @@ describe('bot presence', () => {
 
   it('says in a toast when the text is refused', async () => {
     stub({}, () => status(400))
-    renderApp('/admin')
+    renderApp('/admin?tab=server')
 
     await screen.findByText('Online', { selector: '[data-slot=select-value]' })
     await choose('Aktivität', 'Spielt …')

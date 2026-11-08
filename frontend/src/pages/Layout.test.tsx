@@ -33,6 +33,19 @@ describe('layout', () => {
     expect(within(navigation).getByRole('link', { name: 'Start' })).not.toHaveAttribute('aria-current')
   })
 
+  it.each(['funktionen', 'server', 'abstimmungen'])('marks the admin page on its tab %s too', async (tab) => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/overview': () => json({ members: null, verifiedMembers: null, country: null }),
+      'GET /web/admin/role-sync/countries': () => json([]),
+    })
+
+    renderApp(`/admin?tab=${tab}`)
+
+    const navigation = await screen.findByRole('navigation', { name: 'Hauptnavigation' })
+    expect(within(navigation).getByRole('link', { name: 'Verwaltung' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('marks only the roles page when it is open, not the admin area above it', async () => {
     stubFetch({
       'GET /web/me': () => json(admin),

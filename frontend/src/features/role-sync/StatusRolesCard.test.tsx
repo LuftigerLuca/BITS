@@ -1,7 +1,9 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
+import { AuthContext, type AuthState } from '@/auth/context'
 import { Toaster } from '@/components/ui/sonner'
 import type { Feature } from '@/features/feature-toggles/api'
 import { createQueryClient } from '@/lib/queryClient'
@@ -20,6 +22,14 @@ function role(id: string, name: string, fields: Partial<DiscordRole> = {}): Disc
     statusRole: false,
     ...fields,
   }
+}
+
+const auth: AuthState = {
+  user: { name: 'Luca', avatarUrl: null, role: 'ADMIN', wareraUsername: null, discordUser: true },
+  unavailable: false,
+  sessionExpired: false,
+  refresh: async () => {},
+  logout: async () => {},
 }
 
 const roles = [
@@ -44,7 +54,11 @@ function renderCard(
   queryClient.setDefaultOptions({ queries: { retry: false } })
   render(
     <QueryClientProvider client={queryClient}>
-      <StatusRolesCard />
+      <AuthContext value={auth}>
+        <MemoryRouter>
+          <StatusRolesCard />
+        </MemoryRouter>
+      </AuthContext>
       <Toaster />
     </QueryClientProvider>,
   )
@@ -128,6 +142,10 @@ describe('status roles', () => {
       }),
     ).toBeInTheDocument()
     expect(screen.getByText(/BITS ändert an den Statusrollen nichts/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Verwaltung › Funktionen' })).toHaveAttribute(
+      'href',
+      '/admin?tab=funktionen',
+    )
   })
 
   it('tells why saving failed', async () => {

@@ -5,6 +5,7 @@ import { FeatureOffNotice } from '@/features/feature-toggles/FeatureOffNotice'
 import { ERROR_MESSAGE } from '@/features/embassies/labels'
 import { useEmbassies } from '@/features/embassies/queries'
 import { PageHeader } from '@/components/PageHeader'
+import { AdminTabLink } from '@/components/AdminTabLink'
 
 export function EmbassiesPage() {
   const embassies = useEmbassies()
@@ -13,7 +14,7 @@ export function EmbassiesPage() {
       <PageHeader title="Botschaften" />
       <FeatureOffNotice feature="EMBASSIES">
         Die Botschaften pausieren: Du kannst die Einstellungen weiter ändern, aber BITS gleicht die Threads erst wieder
-        ab, wenn sie unter „Verwaltung“ eingeschaltet sind.
+        ab, wenn sie unter <AdminTabLink tab="funktionen" /> eingeschaltet sind.
       </FeatureOffNotice>
       {embassies.isPending ? (
         <LoadingState label="Botschaften werden geladen …" />

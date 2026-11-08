@@ -191,8 +191,8 @@ export const MANUAL_PAGES: ManualPage[] = [
     title: 'Abstimmungen leiten',
     summary: 'Abstimmungen starten, vorzeitig beenden oder abbrechen, TOPs schließen.',
     intro:
-      'Abstimmungen starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins unter „Verwaltung“ ' +
-      'dafür freigeben. Das geht in Discord und im Dashboard unter „Abstimmungen“ im Bereich „Admin“ der ' +
+      'Abstimmungen starten, beenden und abbrechen dürfen Admins und die Rollen, die Admins unter „Verwaltung › ' +
+      'Abstimmungen“ dafür freigeben. Das geht in Discord und im Dashboard unter „Abstimmungen“ im Bereich „Admin“ der ' +
       'Seitenleiste. Dieselben Rollen schließen in Discord auch Tagesordnungspunkte (TOPs).',
     buildsOn: ['mitglieder'],
     topics: [
@@ -252,8 +252,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'tops',
         title: 'TOPs schließen und wieder öffnen',
         intro:
-          'Tagesordnungspunkte laufen als Posts in den Foren, die Admins unter „Verwaltung“ als TOP-Foren festlegen. ' +
-          'Einen erledigten TOP schließt du mit /topclose, direkt im Post.',
+          'Tagesordnungspunkte laufen als Posts in den Foren, die Admins unter „Verwaltung › Abstimmungen“ als ' +
+          'TOP-Foren festlegen. Einen erledigten TOP schließt du mit /topclose, direkt im Post.',
         steps: [
           'Öffne den Post des TOPs und gib /topclose ein.',
           'Gib optional einen Grund an; er steht in der Abschlussnachricht.',
@@ -283,7 +283,8 @@ export const MANUAL_PAGES: ManualPage[] = [
     intro:
       'Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, ist im Dashboard Admin und sieht in ' +
       'der Seitenleiste die Bereiche „Admin“ mit Rollen, Mitgliedern, Botschaften und Abstimmungen und „System“ mit ' +
-      'Verwaltung und den Logs.',
+      'Verwaltung und den Logs. Die Verwaltung gliedert sich in die Tabs „Funktionen“, „Server“ und ' +
+      '„Abstimmungen“.',
     buildsOn: ['mitglieder', 'abstimmungen'],
     topics: [
       {
@@ -292,7 +293,7 @@ export const MANUAL_PAGES: ManualPage[] = [
         intro: 'Die Startseite zeigt Admins Kennzahlen des Servers und des eigenen Landes.',
         points: [
           'wie viele Mitglieder der Server ohne Bots hat und wie viele davon verifiziert sind',
-          'wie viele Bürger, gesamt und aktiv, das Land hat, das du unter „Verwaltung“ einstellst',
+          'wie viele Bürger, gesamt und aktiv, das Land hat, das du unter „Verwaltung › Server“ einstellst',
           'unter „Verlauf“, wie sich Mitglieder, Verifizierte und Bürger Tag für Tag entwickelt haben, über 30 Tage ' +
             'oder ein Jahr',
         ],
@@ -300,7 +301,7 @@ export const MANUAL_PAGES: ManualPage[] = [
           'BITS hält die Kennzahlen einmal am Tag fest, ab dem Tag, an dem der Verlauf eingeführt wurde. Konnte BITS ' +
             'einen Wert den ganzen Tag nicht lesen, etwa weil WarEra nicht erreichbar war, bleibt im Verlauf eine ' +
             'Lücke. Nach einem Wechsel des Landes zeigt er die Bürger erst ab dem Wechsel.',
-          'Das Land unter „Verwaltung“ bekommt auch keinen Botschafts-Thread.',
+          'Das Land unter „Verwaltung › Server“ bekommt auch keinen Botschafts-Thread.',
           'Lange Auswahllisten wie Rollen, Kanäle, Länder und Parteien haben oben ein Suchfeld: Tippe einen Teil des ' +
             'Namens, Groß- und Kleinschreibung und Akzente spielen keine Rolle.',
         ],
@@ -309,8 +310,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'features',
         title: 'Funktionen ein- und ausschalten',
         intro:
-          'Unter „Verwaltung“ schaltest du einzelne Funktionen aus: Verifizierung, Rollen-Sync, Nicknames, Profil, ' +
-          'Abstimmungen, Botschaften und TOPs. Eine ausgeschaltete Funktion pausiert nur, gelöscht wird nichts.',
+          'Unter „Verwaltung › Funktionen“ schaltest du einzelne Funktionen aus: Verifizierung, Rollen-Sync, ' +
+          'Nicknames, Profil, Abstimmungen, Botschaften und TOPs. Eine ausgeschaltete Funktion pausiert nur, gelöscht wird nichts.',
         points: [
           'Ihre Befehle antworten in Discord mit „Diese Funktion ist gerade ausgeschaltet.“ Der Bot übernimmt eine ' +
             'Änderung innerhalb von 30 Sekunden.',
@@ -328,8 +329,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'bot-presence',
         title: 'Status des Bots',
         intro:
-          'Unter „Verwaltung“ legst du fest, wie Discord den Bot in der Mitgliederliste zeigt: Online, Abwesend, Bitte ' +
-          'nicht stören oder Unsichtbar, dazu auf Wunsch eine Aktivität.',
+          'Unter „Verwaltung › Server“ legst du fest, wie Discord den Bot in der Mitgliederliste zeigt: Online, ' +
+          'Abwesend, Bitte nicht stören oder Unsichtbar, dazu auf Wunsch eine Aktivität.',
         points: [
           'Aktivitäten sind „Spielt …“, „Schaut …“, „Hört …“, „Tritt an in …“ oder ein eigener Status-Text, jeweils bis ' +
             '128 Zeichen.',
@@ -523,7 +524,9 @@ export const MANUAL_PAGES: ManualPage[] = [
       {
         id: 'votes',
         title: 'Einstellungen für Abstimmungen',
-        intro: 'Unter „Verwaltung“ stellst du ein, wer Abstimmungen leiten darf und wie das Ergebnis aussieht.',
+        intro:
+          'Unter „Verwaltung › Abstimmungen“ stellst du ein, wer Abstimmungen leiten darf und wie das Ergebnis ' +
+          'aussieht.',
         points: [
           '„Wer Abstimmungen verwalten darf“: die Rollen, die Abstimmungen starten, beenden und abbrechen dürfen. ' +
             'Admins dürfen das immer. Nimmst du jemandem die Rolle in Discord, verliert er das Recht sofort, auch ' +
@@ -536,8 +539,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'top-forums',
         title: 'TOP-Foren',
         intro:
-          'In der Karte „TOP-Foren“ unter „Verwaltung“ legst du fest, in welchen Foren /topclose und /topopen ' +
-          'funktionieren, und pro Forum optional ein Erledigt-Tag.',
+          'In der Karte „TOP-Foren“ unter „Verwaltung › Abstimmungen“ legst du fest, in welchen Foren /topclose ' +
+          'und /topopen funktionieren, und pro Forum optional ein Erledigt-Tag.',
         points: [
           'Wählbar sind nur Foren, in denen der Bot „Threads verwalten“, „Nachrichten in Threads senden“ und „Links ' +
             'einbetten“ darf. ' +
@@ -615,15 +618,15 @@ export const MANUAL_PAGES: ManualPage[] = [
         id: 'honeypot',
         title: 'Honeypot gegen Spam-Bots',
         intro:
-          'Spam-Bots schreiben oft wahllos in alle Kanäle. Lege unter „Verwaltung“ einen Kanal als Honeypot fest, in dem ' +
-          'Menschen nichts schreiben: Wer dort schreibt, wird automatisch gekickt.',
+          'Spam-Bots schreiben oft wahllos in alle Kanäle. Lege unter „Verwaltung › Server“ einen Kanal als Honeypot ' +
+          'fest, in dem Menschen nichts schreiben: Wer dort schreibt, wird automatisch gekickt.',
         steps: [
           'Lege in Discord einen eigenen Kanal an, den alle sehen und in dem alle schreiben dürfen. Wähle nie einen ' +
             'Kanal, der genutzt wird.',
           'Gib dem Bot die Rechte „Mitglieder kicken“ und, im Kanal, „Nachrichten verwalten“, „Nachrichten senden“, ' +
             '„Links einbetten“ und „Nachrichtenverlauf lesen“. Sonst steht der Kanal nicht zur Auswahl.',
-          'Wähle den Kanal unter „Verwaltung“ in der Karte „Honeypot“ und bestätige. Innerhalb von 30 Sekunden postet ' +
-            'der Bot dort eine Warnung und stellt sie wieder her, falls sie gelöscht wird.',
+          'Wähle den Kanal unter „Verwaltung › Server“ in der Karte „Honeypot“ und bestätige. Innerhalb von 30 ' +
+            'Sekunden postet der Bot dort eine Warnung und stellt sie wieder her, falls sie gelöscht wird.',
         ],
         points: [
           'Der Bot löscht die Nachricht, schickt eine Direktnachricht mit dem Grund und kickt den Account. Der Account ' +

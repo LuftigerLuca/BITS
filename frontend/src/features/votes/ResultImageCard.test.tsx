@@ -49,7 +49,7 @@ describe('background of the result image', () => {
         return status(204)
       },
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const result = within(await card())
     expect(await result.findByText('Hintergrund: BITS-Adler')).toBeInTheDocument()
@@ -73,7 +73,7 @@ describe('background of the result image', () => {
 
   it('rejects files that are too large before sending them', async () => {
     const fetch = stub(() => ({ customBackground: false, updatedAt: null }))
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const result = within(await card())
     await userEvent.upload(await result.findByLabelText('Hintergrundbild'), png(5 * 1024 * 1024 + 1))
@@ -86,7 +86,7 @@ describe('background of the result image', () => {
     stub(() => ({ customBackground: false, updatedAt: null }), {
       'PUT /web/admin/votes/result-settings/background': () => status(400),
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const result = within(await card())
     await userEvent.upload(await result.findByLabelText('Hintergrundbild'), png(10))

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AdminTabLink } from '@/components/AdminTabLink'
 import { ErrorState, LoadingState } from '@/components/QueryState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +31,7 @@ export function StatusRolesCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <FeatureOffNotice feature="VERIFICATION">
-          Die Verifizierung ist ausgeschaltet: BITS ändert an den Statusrollen nichts, bis sie unter „Verwaltung“ wieder
+          Die Verifizierung ist ausgeschaltet: BITS ändert an den Statusrollen nichts, bis sie unter <AdminTabLink tab="funktionen" /> wieder
           eingeschaltet ist.
         </FeatureOffNotice>
         {statusRoles.isPending || roles.isPending ? (

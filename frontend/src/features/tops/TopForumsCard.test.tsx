@@ -52,7 +52,7 @@ describe('TOP forums', () => {
         return status(204)
       },
     })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     await userEvent.click(await screen.findByRole('checkbox', { name: '#tops (Kongress)' }, LOADED))
     expect(within(card()).queryByText(/gesperrt/)).not.toBeInTheDocument()
@@ -76,7 +76,7 @@ describe('TOP forums', () => {
         },
       },
     )
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     const forum = await screen.findByRole('checkbox', { name: '#gesperrt – Bot fehlen Rechte' }, LOADED)
     expect(within(card()).getByRole('button', { name: 'Speichern' })).toBeDisabled()
@@ -88,7 +88,7 @@ describe('TOP forums', () => {
 
   it('says how to get a forum when there is none', async () => {
     stub({ forums: [], selected: [] })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     expect(await screen.findByText('Keine Foren verfügbar', {}, LOADED)).toBeInTheDocument()
     await expectNoAxeViolations()
@@ -96,7 +96,7 @@ describe('TOP forums', () => {
 
   it('explains a forum the bot may no longer manage', async () => {
     stub(settings, { 'PUT /web/admin/tops': () => status(422) })
-    renderApp('/admin')
+    renderApp('/admin?tab=abstimmungen')
 
     await userEvent.click(await screen.findByRole('checkbox', { name: '#tops (Kongress)' }, LOADED))
     await userEvent.click(within(card()).getByRole('button', { name: 'Speichern' }))

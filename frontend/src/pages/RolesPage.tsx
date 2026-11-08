@@ -6,6 +6,7 @@ import { RemovalLimitCard } from '@/features/role-sync/RemovalLimitCard'
 import { RoleRulesCard } from '@/features/role-sync/RoleRulesCard'
 import { StatusRolesCard } from '@/features/role-sync/StatusRolesCard'
 import { PageHeader } from '@/components/PageHeader'
+import { AdminTabLink } from '@/components/AdminTabLink'
 
 export function RolesPage() {
   /** The rule whose role the form above the list edits. */
@@ -15,7 +16,7 @@ export function RolesPage() {
       <PageHeader title="Rollen" />
       <FeatureOffNotice feature="ROLE_SYNC">
         Der Rollen-Sync pausiert: Du kannst die Regeln weiter bearbeiten, aber BITS vergibt und entzieht keine Rollen,
-        bis er unter „Verwaltung“ wieder eingeschaltet ist. Dann gleicht BITS sofort alle Mitglieder ab.
+        bis er unter <AdminTabLink tab="funktionen" /> wieder eingeschaltet ist. Dann gleicht BITS sofort alle Mitglieder ab.
       </FeatureOffNotice>
       <StatusRolesCard />
       <RemovalLimitCard />

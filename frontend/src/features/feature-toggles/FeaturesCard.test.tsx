@@ -27,7 +27,7 @@ function stub(off: Feature[], setFeature: (init?: RequestInit) => Response = () 
 }
 
 function card() {
-  return screen.getByText('Funktionen').closest('[data-slot=card]') as HTMLElement
+  return screen.getByRole('heading', { name: 'Funktionen' }).closest('[data-slot=card]') as HTMLElement
 }
 
 describe('features', () => {
