@@ -20,7 +20,7 @@ export function NewRuleCard({
   const rules = useRoleRules()
   const card = useRef<HTMLDivElement>(null)
 
-  // The card is below the list of rules, where editing starts.
+  // Editing starts in the list of rules below, so scroll up to the form.
   useEffect(() => {
     if (editing) card.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }, [editing])

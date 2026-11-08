@@ -30,6 +30,27 @@ describe('roles page', () => {
     expect(router.state.location.pathname).toBe('/admin/roles')
   })
 
+  it('puts the settings and the form above the list of rules', async () => {
+    stubFetch({
+      'GET /web/me': () => json(admin),
+      'GET /web/admin/role-sync/countries': () => json([]),
+      'GET /web/admin/role-sync/roles': () => json([]),
+      'GET /web/admin/role-sync/rules': () => json([]),
+      'GET /web/admin/role-sync/status-roles': () => json({ verified: null, unverified: null }),
+      'GET /web/admin/role-sync/removal-limit': () => json({ enabled: true }),
+    })
+    renderApp('/admin/roles')
+    await screen.findByText('Noch keine Regeln angelegt')
+
+    const main = screen.getByRole('main')
+    expect(within(main).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Statusrollen',
+      'Schutz vor Massenentzug',
+      'Neue Regel',
+      'Automatische Rollen',
+    ])
+  })
+
   it('keeps members out', async () => {
     stubFetch({ 'GET /web/me': () => json({ ...admin, role: 'USER' }) })
 

@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Toaster } from '@/components/ui/sonner'
 import { createQueryClient } from '@/lib/queryClient'
 import { json, status, stubFetch } from '@/test/fetch'
@@ -76,8 +76,8 @@ function RolesCards() {
   const [editing, setEditing] = useState<RoleRule | null>(null)
   return (
     <>
-      <RoleRulesCard onEdit={setEditing} />
       <NewRuleCard editing={editing} onEdit={setEditing} onDone={() => setEditing(null)} />
+      <RoleRulesCard onEdit={setEditing} />
     </>
   )
 }
@@ -461,6 +461,26 @@ describe('rule form', () => {
 
     expect(await screen.findByText('Regel für Veteran bearbeiten')).toBeInTheDocument()
     expect(screen.getByLabelText('Level ab')).toHaveValue(10)
+  })
+
+  it('scrolls up to the form when editing starts in the list below it', async () => {
+    // jsdom does not lay out, so it has no scrollIntoView of its own.
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      renderCard([level10])
+      const edit = await screen.findByRole('button', { name: 'Regel „Level ab 10“ bearbeiten' })
+      const form = screen.getByRole('heading', { name: 'Neue Regel' })
+      expect(form.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+      await userEvent.click(edit)
+
+      const heading = await screen.findByRole('heading', { name: 'Regel für Veteran bearbeiten' })
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+      expect(scrollIntoView.mock.contexts.at(-1)).toContainElement(heading)
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
   })
 
   it('edits a rule as a whole after confirmation, starting from its blocks', async () => {
