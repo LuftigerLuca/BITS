@@ -100,6 +100,9 @@ enum class EntryKind(
     WARERA_USERS_UNAVAILABLE(Category.ERROR),
     GOVERNMENT_UNAVAILABLE(Category.ERROR),
 
+    /** A government lists ministers with titles that BITS does not know. */
+    UNKNOWN_MINISTER_TITLES(Category.ERROR),
+
     /** The parties of a country could not be loaded for a sync. */
     PARTIES_UNAVAILABLE(Category.ERROR),
 

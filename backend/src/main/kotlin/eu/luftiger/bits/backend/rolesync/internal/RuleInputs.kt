@@ -1,6 +1,7 @@
 package eu.luftiger.bits.backend.rolesync.internal
 
 import eu.luftiger.bits.backend.rolesync.api.DskRoles
+import eu.luftiger.bits.backend.rolesync.api.MinisterTitleCheck
 import eu.luftiger.bits.backend.rolesync.api.dto.DskRole
 import eu.luftiger.bits.backend.rolesync.domain.ConditionType
 import eu.luftiger.bits.backend.rolesync.domain.RoleRule
@@ -24,6 +25,7 @@ class RuleInputs(
     private val roleRepository: DiscordRoleRepository,
     private val dskRoles: DskRoles,
     private val wareraClient: WareraClient,
+    private val ministerTitleCheck: MinisterTitleCheck,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -72,7 +74,9 @@ class RuleInputs(
             .mapNotNull { condition ->
                 val countryId = requireNotNull(condition.countryId)
                 try {
-                    countryId to wareraClient.getGovernment(countryId)
+                    val government = wareraClient.getGovernment(countryId)
+                    ministerTitleCheck.check(government, condition.targetName ?: countryId)
+                    countryId to government
                 } catch (e: WareraApiException) {
                     log.warn("Government of country {} could not be loaded, its office conditions are undecided", countryId, e)
                     onUnavailable(SystemProblem.GovernmentUnavailable(countryId, condition.targetName))

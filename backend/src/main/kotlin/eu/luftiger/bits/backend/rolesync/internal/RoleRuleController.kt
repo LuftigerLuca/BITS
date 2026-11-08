@@ -286,6 +286,10 @@ enum class Office {
     MINISTER_OF_ECONOMY,
     MINISTER_OF_DEFENSE,
     MINISTER_OF_FOREIGN_AFFAIRS,
+    MINISTER_OF_INTERIOR,
+    MINISTER_OF_COMMUNICATION,
+    CHIEF_OF_STAFF,
+    ADVISOR,
     CONGRESS,
 }
 
@@ -297,6 +301,10 @@ val Office.office: GovernmentOffice
             Office.MINISTER_OF_ECONOMY -> GovernmentOffice.MINISTER_OF_ECONOMY
             Office.MINISTER_OF_DEFENSE -> GovernmentOffice.MINISTER_OF_DEFENSE
             Office.MINISTER_OF_FOREIGN_AFFAIRS -> GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS
+            Office.MINISTER_OF_INTERIOR -> GovernmentOffice.MINISTER_OF_INTERIOR
+            Office.MINISTER_OF_COMMUNICATION -> GovernmentOffice.MINISTER_OF_COMMUNICATION
+            Office.CHIEF_OF_STAFF -> GovernmentOffice.CHIEF_OF_STAFF
+            Office.ADVISOR -> GovernmentOffice.ADVISOR
             Office.CONGRESS -> GovernmentOffice.CONGRESS
         }
 
@@ -308,6 +316,10 @@ val GovernmentOffice.apiOffice: Office
             GovernmentOffice.MINISTER_OF_ECONOMY -> Office.MINISTER_OF_ECONOMY
             GovernmentOffice.MINISTER_OF_DEFENSE -> Office.MINISTER_OF_DEFENSE
             GovernmentOffice.MINISTER_OF_FOREIGN_AFFAIRS -> Office.MINISTER_OF_FOREIGN_AFFAIRS
+            GovernmentOffice.MINISTER_OF_INTERIOR -> Office.MINISTER_OF_INTERIOR
+            GovernmentOffice.MINISTER_OF_COMMUNICATION -> Office.MINISTER_OF_COMMUNICATION
+            GovernmentOffice.CHIEF_OF_STAFF -> Office.CHIEF_OF_STAFF
+            GovernmentOffice.ADVISOR -> Office.ADVISOR
             GovernmentOffice.CONGRESS -> Office.CONGRESS
         }
 

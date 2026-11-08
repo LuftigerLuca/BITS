@@ -88,19 +88,27 @@ class RestWareraClientTest {
     }
 
     @Test
-    fun `government lists the office holders`() {
+    fun `government lists the office holders and ignores the outdated minister fields`() {
         server
             .expect(requestTo("https://warera.test/trpc/government.getByCountryId?input=%7B%22countryId%22%3A%22c1%22%7D"))
             .andRespond(
                 withSuccess(
-                    """{"result":{"data":{"_id":"g1","country":"c1","president":"u1","minOfDefense":"u2",""" +
+                    """{"result":{"data":{"_id":"g1","country":"c1","president":"u1","minOfDefense":"u9",""" +
+                        """"ministers":[{"user":"u2","title":"minOfDefense","customTitle":"Kriegsminister",""" +
+                        """"rights":["setOrders"],"appointedAt":"2026-11-07T15:19:11.485Z"},""" +
+                        """{"user":"u4","title":"minOfInterior","rights":[],"appointedAt":"2026-11-07T15:19:11.485Z"}],""" +
                         """"congressMembers":["u1","u3"]}}}""",
                     MediaType.APPLICATION_JSON,
                 ),
             )
 
         assertEquals(
-            WareraGovernment(country = "c1", president = "u1", minOfDefense = "u2", congressMembers = listOf("u1", "u3")),
+            WareraGovernment(
+                country = "c1",
+                president = "u1",
+                ministers = listOf(WareraMinister("u2", "minOfDefense"), WareraMinister("u4", "minOfInterior")),
+                congressMembers = listOf("u1", "u3"),
+            ),
             client.getGovernment("c1"),
         )
         server.verify()

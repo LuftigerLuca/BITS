@@ -32,6 +32,7 @@ import eu.luftiger.bits.shared.ThreadRenameFailure
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.decodeEvent
 import eu.luftiger.bits.warera.WareraGovernment
+import eu.luftiger.bits.warera.WareraMinister
 import eu.luftiger.bits.warera.WareraUser
 import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
@@ -103,7 +104,8 @@ class EmbassyTest {
         warera.users["w3"] = WareraUser("w3", "Minister", country = "fr")
         warera.users["w4"] = WareraUser("w4", "Deputy", country = "fr")
         warera.users["w5"] = WareraUser("w5", "Guest", country = "fr")
-        warera.governments["fr"] = WareraGovernment("fr", minOfForeignAffairs = "w3", congressMembers = listOf("w4"))
+        warera.governments["fr"] =
+            WareraGovernment("fr", ministers = listOf(WareraMinister("w3", "minOfForeignAffairs")), congressMembers = listOf("w4"))
         clock.now = Instant.parse("2026-01-01T12:00:00Z")
         reportRoles(
             """{"id":"r-amb","name":"Botschafter","color":null,"position":2,"assignable":true}""",

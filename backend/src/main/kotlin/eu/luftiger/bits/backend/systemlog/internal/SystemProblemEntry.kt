@@ -40,6 +40,15 @@ fun entryOf(
                     "Die Regierung von ${problem.countryName ?: problem.countryId} konnte nicht geladen werden. " +
                         "Regeln für Regierungsämter dieses Landes wurden übersprungen.",
             )
+        is SystemProblem.UnknownMinisterTitles ->
+            SystemLogEntry(
+                now,
+                EntryKind.UNKNOWN_MINISTER_TITLES,
+                message =
+                    "Die Regierung von ${problem.countryName} hat Minister mit Ämtern, die BITS nicht kennt: " +
+                        "${problem.titles.joinToString(", ")}. Sie zählen für Rollen-Regeln und Botschaften nicht " +
+                        "als Regierungsamt, bis BITS die Ämter kennt.",
+            )
         is SystemProblem.PartiesUnavailable ->
             SystemLogEntry(
                 now,

@@ -26,6 +26,10 @@ export const OFFICES: Record<GovernmentOffice, string> = {
   MINISTER_OF_ECONOMY: 'Wirtschaftsminister',
   MINISTER_OF_DEFENSE: 'Verteidigungsminister',
   MINISTER_OF_FOREIGN_AFFAIRS: 'Außenminister',
+  MINISTER_OF_INTERIOR: 'Innenminister',
+  MINISTER_OF_COMMUNICATION: 'Kommunikationsminister',
+  CHIEF_OF_STAFF: 'Stabschef',
+  ADVISOR: 'Berater',
   CONGRESS: 'Kongressmitglied',
 }
 

@@ -5,6 +5,7 @@ import eu.luftiger.bits.backend.embassy.domain.EmbassySetting
 import eu.luftiger.bits.backend.embassy.domain.EmbassyThread
 import eu.luftiger.bits.backend.event.api.EventPublisher
 import eu.luftiger.bits.backend.rolesync.api.MemberCountries
+import eu.luftiger.bits.backend.rolesync.api.MinisterTitleCheck
 import eu.luftiger.bits.backend.systemlog.api.SyncTrigger
 import eu.luftiger.bits.backend.systemlog.api.SystemLog
 import eu.luftiger.bits.backend.systemlog.api.SystemProblem
@@ -43,6 +44,7 @@ class EmbassySyncService(
     private val memberCountries: MemberCountries,
     private val creationService: EmbassyThreadCreationService,
     private val wareraClient: WareraClient,
+    private val ministerTitleCheck: MinisterTitleCheck,
     private val eventPublisher: EventPublisher,
     private val systemLog: SystemLog,
     private val transactionTemplate: TransactionTemplate,
@@ -133,7 +135,7 @@ class EmbassySyncService(
 
     private fun government(thread: EmbassyThread): WareraGovernment? =
         try {
-            wareraClient.getGovernment(thread.countryId)
+            wareraClient.getGovernment(thread.countryId).also { ministerTitleCheck.check(it, thread.countryName) }
         } catch (e: WareraApiException) {
             log.warn("Government of country {} could not be loaded, its embassy thread loses nobody", thread.countryId, e)
             systemLog.recordProblem(SystemProblem.EmbassyGovernmentUnavailable(thread.countryId, thread.countryName))

@@ -332,7 +332,10 @@ export const MANUAL_PAGES: ManualPage[] = [
             'zwischen „und“ und „oder“ umstellen. Vor dem Speichern zeigt die Vorschau wieder, wer die Rolle ' +
             'bekommt und wer sie verliert.',
           'Beim Regierungsamt kannst du mehrere Ämter ankreuzen; eines davon genügt, etwa „Präsident oder ' +
-            'Vizepräsident in Germany“.',
+            'Vizepräsident in Germany“. Zur Wahl stehen Präsident, Vizepräsident, Wirtschafts-, Verteidigungs-, ' +
+            'Außen-, Innen- und Kommunikationsminister, Stabschef, Berater und Kongressmitglied. Hat ein Land ' +
+            'mehrere Minister mit demselben Amt, zählt jeder von ihnen. Eigene Amtstitel aus WarEra spielen keine ' +
+            'Rolle, nur das Amt dahinter.',
           'MU-Führung hat die Stufen Kommandeur, Manager und Besitzer; höhere Stufen zählen mit, „Kommandeur“ gilt ' +
             'also auch für Manager und Besitzer. Ohne gewählte MU zählt die Führung der eigenen MU, ohne gewählte ' +
             'Partei der Vorsitz jeder Partei des Landes.',
