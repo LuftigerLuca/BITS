@@ -21,8 +21,8 @@ export function EmbassiesPage() {
         <ErrorState message={ERROR_MESSAGE} onRetry={() => embassies.refetch()} />
       ) : (
         <>
-          <EmbassyThreadsCard embassies={embassies.data} />
           <EmbassySettingsCard embassies={embassies.data} />
+          <EmbassyThreadsCard embassies={embassies.data} />
         </>
       )}
     </div>

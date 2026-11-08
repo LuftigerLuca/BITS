@@ -113,6 +113,18 @@ describe('embassies', () => {
     expect(screen.getByRole('button', { name: 'Italy 0 Mitglieder' })).toBeInTheDocument()
   })
 
+  it('puts the settings above the threads', async () => {
+    stub()
+    renderApp('/admin/embassies')
+    await screen.findByRole('heading', { name: 'Botschafts-Threads (1)' })
+
+    const main = screen.getByRole('main')
+    expect(within(main).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Einstellungen',
+      'Botschafts-Threads (1)',
+    ])
+  })
+
   it('keeps an opened embassy open when a member is added', async () => {
     stub({
       'GET /web/admin/embassies/member-search': () => json([{ discordUserId: '7', name: 'Diplomat' }]),
