@@ -16,6 +16,7 @@ them are in [CLAUDE.md](../../CLAUDE.md) and [CONTRIBUTING.md](../../CONTRIBUTIN
 | [0009](0009-event-lanes.md)              | The bot reads role syncs in a lane of their own                  |
 | [0010](0010-system-status-in-memory.md)  | The system status is kept in memory, the bot reports a heartbeat |
 | [0011](0011-third-party-api.md)          | Third parties read through a separate API with scoped tokens     |
+| [0012](0012-sliding-sessions.md)         | Dashboard sessions slide with use and are checked hourly         |
 
 How BITS behaves when one of its parts or services is down is described in [failure-modes.md](../failure-modes.md).
 

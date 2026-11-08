@@ -50,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyUser(null)
     })
     refresh()
-    // The session expires after 8 hours without refresh; checking again when the tab comes back to the
-    // foreground sends a user with an expired session to the login page.
+    // The session ends after a day without use or a week after the login, or when Discord no longer confirms the
+    // member; checking again when the tab comes back to the foreground sends such a user to the login page.
     const onVisible = () => {
       if (document.visibilityState === 'visible') refresh()
     }

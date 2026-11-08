@@ -4,10 +4,17 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * The few Discord endpoints the login needs, called with the access token of the user who logs in. Everything else
- * that talks to Discord is the bot's job.
+ * The few Discord endpoints the login needs, called with the access token of the user who logs in, and the refresh of
+ * that token to check a session again. Everything else that talks to Discord is the bot's job.
  */
 interface DiscordApi {
+    /**
+     * Swaps the refresh token of a login for new tokens. Throws [DiscordGrantRevokedException] if Discord no longer
+     * accepts it (the app was deauthorized or the token is invalid) and a `RestClientException` if Discord cannot be
+     * reached or answers with an error of its own.
+     */
+    fun refreshTokens(refreshToken: String): DiscordTokens
+
     fun getCurrentUser(accessToken: String): DiscordUser
 
     /** The guilds of the user, one page of up to [limit] after the guild ID [after], sorted by ID. */
@@ -41,6 +48,20 @@ interface DiscordApi {
         const val MAX_GUILDS_PER_PAGE = 200
     }
 }
+
+@Serializable
+data class DiscordTokens(
+    @SerialName("access_token")
+    val accessToken: String,
+    /** Discord rotates the refresh token; the old one is spent once the new one is issued. */
+    @SerialName("refresh_token")
+    val refreshToken: String? = null,
+)
+
+/** Discord no longer accepts the refresh token or the access token of a user, so the session has to end. */
+class DiscordGrantRevokedException(
+    message: String,
+) : RuntimeException(message)
 
 @Serializable
 data class DiscordUser(

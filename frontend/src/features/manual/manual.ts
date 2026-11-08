@@ -164,8 +164,12 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Du landest auf der Startseite des Dashboards.',
         ],
         tips: [
-          'Die Sitzung gilt 8 Stunden, für Admins 1 Stunde, und wird nicht verlängert. Neue Rollen auf dem Server ' +
-            'zählen im Dashboard erst nach dem nächsten Login.',
+          'Solange du das Dashboard nutzt, bleibst du angemeldet. Nach 24 Stunden ohne Nutzung oder spätestens 7 Tage ' +
+            'nach dem Login musst du dich neu anmelden.',
+          'BITS prüft jede Stunde bei Discord, ob du noch auf dem Server bist und welche Rechte und Rollen du hast. ' +
+            'Neue Rollen zählen im Dashboard deshalb spätestens nach einer Stunde. Wer den Server verlässt oder BITS in ' +
+            'Discord die Berechtigung entzieht, wird abgemeldet.',
+          'Ist Discord gerade nicht erreichbar, bleibst du mit deinen bisherigen Rechten angemeldet.',
         ],
       },
       {

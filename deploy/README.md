@@ -46,7 +46,8 @@ a test server, so testing never touches the real WarEra Discord.
    | `POSTGRES_PASSWORD`        | secret   | Random secret; keep it, the database is created with it on the first run                            |
 
 The dashboard sets its session cookie with `Secure`, so it has to be served over HTTPS (a TLS proxy in front of
-`PUBLIC_BIND:PUBLIC_PORT`); only `localhost` works without. Changing `BITS_JWT_SECRET` logs everybody out.
+`PUBLIC_BIND:PUBLIC_PORT`); only `localhost` works without. Changing `BITS_JWT_SECRET` logs everybody out, and
+changing `BITS_ADMIN_PASSWORD_HASH` ends the sessions of the admin account within an hour.
 
 The TLS proxy has to:
 
@@ -92,9 +93,11 @@ docker compose ps
 docker compose logs -f bot backend
 ```
 
-To end every dashboard session at once, e.g. after a leaked cookie or when someone lost the admin rights, set a
-new `BITS_JWT_SECRET` in the environment and deploy again. A single session ends with its logout, ADMIN sessions
-on their own after one hour.
+To end every dashboard session at once, e.g. after a leaked cookie, set a new `BITS_JWT_SECRET` in the environment
+and deploy again: the session tokens lose their signature and the Discord refresh tokens kept in Redis, which are
+encrypted with a key derived from it, can no longer be read. A single session ends with its logout. Without either,
+a session ends after 24 hours without use or 7 days after the login; who loses the admin rights in Discord is a
+plain user within an hour, who leaves the guild is logged out within an hour.
 
 To roll back, set the image tags in `.env` to the previous commit (`docker images 'bits-staging-*'`) and run
 `docker compose up -d`. A migration that already ran is not undone by that; restore the dump taken before the
@@ -103,7 +106,7 @@ deployment for it, see below.
 ## Backups
 
 Postgres holds everything that is hard to get back: the linked accounts and the role rules. Redis only holds
-events and lockouts that expire anyway and needs no backup. The dumps (`pg_dump -Fc`) land in `BACKUP_PATH`,
+events, lockouts and dashboard sessions that expire anyway and needs no backup; losing it logs everybody out. The dumps (`pg_dump -Fc`) land in `BACKUP_PATH`,
 readable only by the runner's user:
 
 - `daily/`: the `backup` service of the stack dumps once a day and keeps the newest 7,

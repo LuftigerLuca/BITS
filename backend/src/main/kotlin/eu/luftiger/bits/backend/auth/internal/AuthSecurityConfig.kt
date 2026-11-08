@@ -3,7 +3,6 @@ package eu.luftiger.bits.backend.auth.internal
 import com.nimbusds.jose.jwk.source.ImmutableSecret
 import com.nimbusds.jose.proc.SecurityContext
 import jakarta.servlet.http.HttpServletRequest
-import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
@@ -13,10 +12,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.config.http.SessionCreationPolicy
-import org.springframework.security.core.Authentication
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClient
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient
@@ -26,7 +23,6 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers
-import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator
@@ -40,6 +36,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
 import org.springframework.security.web.csrf.CsrfFilter
@@ -47,15 +44,14 @@ import org.springframework.security.web.savedrequest.NullRequestCache
 import org.springframework.web.client.RestClient
 import java.time.Clock
 import java.time.Duration
-import javax.crypto.SecretKey
-import javax.crypto.spec.SecretKeySpec
 
 /**
  * Security of the dashboard, kept apart from the bot's API under `/api/`:
  *
  * - `/auth/` is open and handles the logins. The Discord login is the OAuth2 authorization code flow; the HTTP
  *   session holds its state only until Discord redirects back.
- * - `/web/` requires the session cookie issued by [SessionTokens], and `/web/admin/` the role ADMIN.
+ * - `/web/` requires the session cookie issued by [SessionTokens], and `/web/admin/` the role ADMIN. An expired token
+ *   of a session that goes on is renewed on the way by [SessionRefreshFilter].
  *
  * CSRF tokens are not needed: the session cookie is `SameSite=Strict`, so the browser never sends it with requests
  * started by another site. Other origins of the same site, such as a neighbouring subdomain, are kept out by
@@ -89,8 +85,8 @@ class AuthSecurityConfig {
             authorizeHttpRequests { authorize(anyRequest, permitAll) }
             oauth2Login {
                 clientRegistrationRepository = clientRegistrations
-                // Discord's access token is not kept after the login.
-                authorizedClientRepository = DiscardingAuthorizedClientRepository
+                // Discord's access token is not kept after the login, its refresh token goes into the session.
+                authorizedClientRepository = DiscordTokenHandover
                 loginPage = "/login"
                 authorizationEndpoint {
                     authorizationRequestResolver =
@@ -114,11 +110,18 @@ class AuthSecurityConfig {
         http: HttpSecurity,
         jwtDecoder: JwtDecoder,
         properties: AuthProperties,
+        sessionTokenReader: SessionTokenReader,
+        sessionRefresher: SessionRefresher,
+        sessionTokens: SessionTokens,
+        clock: Clock,
     ): SecurityFilterChain {
         http {
             securityMatcher("/web/**")
             csrf { disable() }
             addFilterBefore<CsrfFilter>(SameOriginFilter(properties.publicUrl))
+            addFilterBefore<BearerTokenAuthenticationFilter>(
+                SessionRefreshFilter(sessionTokenReader, sessionRefresher, sessionTokens, clock),
+            )
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             requestCache { requestCache = NullRequestCache() }
             authorizeHttpRequests {
@@ -172,35 +175,41 @@ class AuthSecurityConfig {
         }
 
     @Bean
-    fun discordApi(builder: RestClient.Builder): DiscordApi = RestDiscordApi(builder.baseUrl(DISCORD_API_URL).build())
+    fun discordApi(
+        builder: RestClient.Builder,
+        properties: AuthProperties,
+    ): DiscordApi = RestDiscordApi(builder.baseUrl(DISCORD_API_URL).build(), properties.discord.clientId, properties.discord.clientSecret)
 
     @Bean
-    fun jwtEncoder(properties: AuthProperties): JwtEncoder = NimbusJwtEncoder(ImmutableSecret<SecurityContext>(signingKey(properties)))
+    fun jwtEncoder(properties: AuthProperties): JwtEncoder = NimbusJwtEncoder(ImmutableSecret<SecurityContext>(properties.signingKey()))
 
     /**
-     * Checks the signature, the expiry against the injected [Clock] (backend and token share a clock, so no skew) and
-     * the denylist of logged-out sessions.
+     * Checks the signature, the expiry against the injected [Clock] (backend and token share a clock, so no skew), the
+     * denylist of logged-out tokens and whether the session is still active.
      */
     @Bean
     fun jwtDecoder(
         properties: AuthProperties,
         clock: Clock,
         revokedSessions: RevokedSessions,
+        sessionStore: SessionStore,
     ): JwtDecoder =
         NimbusJwtDecoder
-            .withSecretKey(signingKey(properties))
+            .withSecretKey(properties.signingKey())
             .macAlgorithm(MacAlgorithm.HS256)
             .build()
             .apply {
                 setJwtValidator(
-                    DelegatingOAuth2TokenValidator(JwtTimestampValidator(Duration.ZERO).apply { setClock(clock) }, revokedSessions),
+                    DelegatingOAuth2TokenValidator(
+                        JwtTimestampValidator(Duration.ZERO).apply { setClock(clock) },
+                        revokedSessions,
+                        sessionStore,
+                    ),
                 )
             }
 
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
-
-    private fun signingKey(properties: AuthProperties): SecretKey = SecretKeySpec(properties.jwtSecret.toByteArray(), "HmacSHA256")
 
     private fun sessionAuthenticationConverter() =
         JwtAuthenticationConverter().apply {
@@ -212,35 +221,9 @@ class AuthSecurityConfig {
             )
         }
 
-    /** Reads the token from the session cookie instead of the `Authorization` header. */
+    /** Reads the token from the session cookie instead of the `Authorization` header, or the one just renewed. */
     private object SessionCookieTokenResolver : BearerTokenResolver {
-        override fun resolve(request: HttpServletRequest): String? =
-            request.cookies
-                ?.firstOrNull { it.name == SessionTokens.COOKIE_NAME }
-                ?.value
-                ?.takeIf { it.isNotEmpty() }
-    }
-
-    private object DiscardingAuthorizedClientRepository : OAuth2AuthorizedClientRepository {
-        override fun <T : OAuth2AuthorizedClient> loadAuthorizedClient(
-            clientRegistrationId: String,
-            principal: Authentication,
-            request: HttpServletRequest,
-        ): T? = null
-
-        override fun saveAuthorizedClient(
-            authorizedClient: OAuth2AuthorizedClient,
-            principal: Authentication,
-            request: HttpServletRequest,
-            response: HttpServletResponse,
-        ) = Unit
-
-        override fun removeAuthorizedClient(
-            clientRegistrationId: String,
-            principal: Authentication,
-            request: HttpServletRequest,
-            response: HttpServletResponse,
-        ) = Unit
+        override fun resolve(request: HttpServletRequest): String? = SessionRefreshFilter.sessionCookie(request)
     }
 
     private companion object {

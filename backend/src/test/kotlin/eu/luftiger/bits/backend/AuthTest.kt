@@ -1,9 +1,12 @@
 package eu.luftiger.bits.backend
 
 import eu.luftiger.bits.backend.auth.internal.DiscordApi
+import eu.luftiger.bits.backend.auth.internal.DiscordGrantRevokedException
 import eu.luftiger.bits.backend.auth.internal.DiscordGuild
 import eu.luftiger.bits.backend.auth.internal.DiscordGuildMember
+import eu.luftiger.bits.backend.auth.internal.DiscordTokens
 import eu.luftiger.bits.backend.auth.internal.DiscordUser
+import eu.luftiger.bits.backend.auth.internal.SessionStore
 import eu.luftiger.bits.backend.auth.internal.SessionTokens
 import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
@@ -14,6 +17,8 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.core.env.Environment
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -230,11 +235,11 @@ class AuthTest {
     }
 
     @Test
-    fun `session cookie is HttpOnly, Secure and SameSite Strict for 8 hours, for admins 1 hour`() {
+    fun `session cookie is HttpOnly, Secure and SameSite Strict for the 7 days a session can last`() {
         val userHeader = discordLogin().andReturn().response.getHeader(HttpHeaders.SET_COOKIE)!!
         val adminHeader = adminLogin("admin", PASSWORD).andReturn().response.getHeader(HttpHeaders.SET_COOKIE)!!
 
-        for ((header, maxAge) in listOf(userHeader to "Max-Age=28800", adminHeader to "Max-Age=3600")) {
+        for ((header, maxAge) in listOf(userHeader to "Max-Age=604800", adminHeader to "Max-Age=604800")) {
             assertTrue(header.startsWith("bits_session="), header)
             listOf("Path=/", maxAge, "Secure", "HttpOnly", "SameSite=Strict").forEach {
                 assertTrue(it in header.split("; "), "$it missing in $header")
@@ -243,23 +248,190 @@ class AuthTest {
     }
 
     @Test
-    fun `session expires after 8 hours`() {
-        val session = discordLogin().sessionCookie()
+    fun `an active session is renewed beyond the hour`() {
+        val browser = Browser(discordLogin().sessionCookie())
 
-        clock.advance(Duration.ofHours(8))
-        me(session).andExpect { status { isOk() } }
-        clock.advance(Duration.ofSeconds(1))
-        me(session).andExpect { status { isUnauthorized() } }
+        repeat(6) {
+            clock.advance(Duration.ofMinutes(50))
+            browser.me().andExpect { status { isOk() } }
+        }
+        // Renewed at 100, 200 and 300 minutes, each time with the refresh token issued by the renewal before.
+        assertEquals(3, discord.refreshes.get())
     }
 
     @Test
-    fun `admin session expires after 1 hour`() {
-        val session = adminLogin("admin", PASSWORD).sessionCookie()
+    fun `a renewed token is valid for an hour and the cookie for the rest of the session`() {
+        val browser = Browser(discordLogin().sessionCookie())
+        clock.advance(Duration.ofHours(2))
 
-        clock.advance(Duration.ofHours(1))
-        me(session).andExpect { status { isOk() } }
-        clock.advance(Duration.ofSeconds(1))
-        me(session).andExpect { status { isUnauthorized() } }
+        val header =
+            browser
+                .me()
+                .andReturn()
+                .response
+                .getHeader(HttpHeaders.SET_COOKIE)!!
+
+        assertTrue("Max-Age=597600" in header.split("; "), header)
+        assertEquals(clock.now + Duration.ofHours(1), jwtDecoder.decode(browser.cookie.value).expiresAt)
+    }
+
+    @Test
+    fun `a session ends after 24 hours without requests`() {
+        val session = discordLogin().sessionCookie()
+        clock.advance(Duration.ofHours(24))
+        Browser(session).me().andExpect { status { isOk() } }
+
+        val idle = discordLogin().sessionCookie()
+        clock.advance(Duration.ofHours(24).plusSeconds(1))
+        Browser(idle).me().andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `a session ends 7 days after the login however active it is`() {
+        val browser = Browser(discordLogin().sessionCookie())
+
+        repeat(8) {
+            clock.advance(Duration.ofHours(20))
+            browser.me().andExpect { status { isOk() } }
+        }
+        clock.advance(Duration.ofHours(8))
+        browser.me().andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `losing the Administrator permission makes the session USER within an hour`() {
+        discord.guilds = listOf(DiscordGuild(id = "100", owner = true))
+        val browser = Browser(discordLogin().sessionCookie())
+        discord.guilds = listOf(DiscordGuild(id = "100", permissions = "0"))
+
+        clock.advance(Duration.ofMinutes(59))
+        browser.me().andExpect { jsonPath("$.role") { value("ADMIN") } }
+        clock.advance(Duration.ofMinutes(2))
+        browser.me().andExpect { jsonPath("$.role") { value("USER") } }
+        mockMvc.get("/web/admin/anything") { cookie(browser.cookie) }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `the Discord roles are checked again at the renewal`() {
+        discord.memberRoles = listOf("r-congress")
+        val browser = Browser(discordLogin().sessionCookie())
+        discord.memberRoles = listOf("r-citizen")
+
+        clock.advance(Duration.ofMinutes(61))
+        browser.me().andExpect { status { isOk() } }
+
+        assertEquals(listOf("r-citizen"), SessionTokens.user(jwtDecoder.decode(browser.cookie.value)).discordRoleIds)
+    }
+
+    @Test
+    fun `leaving the guild ends the session within an hour`() {
+        val browser = Browser(discordLogin().sessionCookie())
+        discord.guilds = listOf(DiscordGuild(id = "7"))
+
+        clock.advance(Duration.ofMinutes(61))
+        browser.me().andExpect { status { isUnauthorized() } }
+        assertEquals("", browser.cookie.value)
+        assertTrue(redisTemplate.keys("bits:auth:session:*").isEmpty())
+    }
+
+    @Test
+    fun `deauthorizing the app in Discord ends the session within an hour`() {
+        val session = discordLogin().sessionCookie()
+        discord.revoked = true
+
+        clock.advance(Duration.ofMinutes(61))
+        Browser(session).me().andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `the session goes on with the last role while Discord is down`() {
+        discord.guilds = listOf(DiscordGuild(id = "100", owner = true))
+        val browser = Browser(discordLogin().sessionCookie())
+        discord.down = true
+
+        clock.advance(Duration.ofMinutes(61))
+        browser.me().andExpect { jsonPath("$.role") { value("ADMIN") } }
+        // Tried again a minute later, not on every request.
+        clock.advance(Duration.ofSeconds(30))
+        browser.me().andExpect { status { isOk() } }
+        clock.advance(Duration.ofSeconds(31))
+        discord.down = false
+        discord.guilds = listOf(DiscordGuild(id = "100", permissions = "0"))
+        browser.me().andExpect { jsonPath("$.role") { value("USER") } }
+        assertEquals(1, discord.refreshes.get())
+    }
+
+    @Test
+    fun `a session ends after 24 hours without requests even while Discord is down`() {
+        val browser = Browser(discordLogin().sessionCookie())
+        discord.down = true
+
+        clock.advance(Duration.ofHours(20))
+        browser.me().andExpect { status { isOk() } }
+        clock.advance(Duration.ofHours(24).plusSeconds(1))
+        browser.me().andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `parallel requests with an expired token check Discord once`() {
+        val session = discordLogin().sessionCookie()
+        clock.advance(Duration.ofMinutes(61))
+
+        val pool = Executors.newFixedThreadPool(10)
+        val start = CountDownLatch(1)
+        val statuses =
+            (1..10)
+                .map { pool.submit<Int> { start.await().let { me(session).andReturn().response.status } } }
+                .also { start.countDown() }
+                .map { it.get() }
+        pool.shutdown()
+
+        assertEquals(List(10) { 200 }, statuses)
+        assertEquals(1, discord.refreshes.get())
+    }
+
+    @Test
+    fun `the refresh token is kept in Redis only encrypted`() {
+        discordLogin().sessionCookie()
+
+        val stored = redisTemplate.opsForHash<String, String>().get(redisTemplate.keys("bits:auth:session:*").single(), "data")!!
+        assertTrue("refreshToken" in stored, stored)
+        assertTrue(REFRESH_TOKEN !in stored, stored)
+    }
+
+    @Test
+    fun `the admin account is renewed without Discord`() {
+        val browser = Browser(adminLogin("admin", PASSWORD).sessionCookie())
+
+        repeat(6) {
+            clock.advance(Duration.ofMinutes(50))
+            browser.me().andExpect { jsonPath("$.role") { value("ADMIN") } }
+        }
+        assertEquals(0, discord.refreshes.get())
+    }
+
+    @Test
+    fun `a new admin password hash ends the sessions of the admin account`() {
+        val session = adminLogin("admin", PASSWORD).sessionCookie()
+        // As if the session had been started with another hash than the one configured now.
+        val key = redisTemplate.keys("bits:auth:session:*").single()
+        val data = redisTemplate.opsForHash<String, String>().get(key, "data")!!
+        redisTemplate.opsForHash<String, String>().put(
+            key,
+            "data",
+            data.replace(Regex(""""adminFingerprint":"[^"]+""""), """"adminFingerprint":"old""""),
+        )
+
+        clock.advance(Duration.ofMinutes(61))
+        Browser(session).me().andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `without Redis the session is rejected`() {
+        val session = adminLogin("admin", PASSWORD).sessionCookie()
+        val store = SessionStore(brokenRedis(), clock)
+
+        assertTrue(store.validate(jwtDecoder.decode(session.value)).hasErrors())
     }
 
     @Test
@@ -302,6 +474,9 @@ class AuthTest {
         mockMvc.post("/auth/logout") { cookie(session) }.andExpect { status { isNoContent() } }
 
         me(session).andExpect { status { isUnauthorized() } }
+        clock.advance(Duration.ofMinutes(41))
+        Browser(session).me().andExpect { status { isUnauthorized() } }
+        assertTrue(redisTemplate.keys("bits:auth:session:*").isEmpty())
         val key = redisTemplate.keys("bits:auth:revoked-session:*").single()
         val ttl = redisTemplate.getExpire(key)
         assertTrue(ttl in 39 * 60..40 * 60, "TTL was $ttl")
@@ -407,6 +582,29 @@ class AuthTest {
 
     private fun me(session: Cookie) = mockMvc.get("/web/me") { cookie(session) }
 
+    /** Keeps the session cookie the way a browser does, taking over what the responses set. */
+    private inner class Browser(
+        var cookie: Cookie,
+    ) {
+        fun me(): ResultActionsDsl =
+            me(cookie).also { result ->
+                result
+                    .andReturn()
+                    .response
+                    .getCookie(SessionTokens.COOKIE_NAME)
+                    ?.let { cookie = Cookie(it.name, it.value) }
+            }
+    }
+
+    /** A Redis that cannot be reached: the connection fails on every call. */
+    private fun brokenRedis() =
+        StringRedisTemplate(
+            LettuceConnectionFactory(RedisStandaloneConfiguration("localhost", 1)).apply {
+                afterPropertiesSet()
+                start()
+            },
+        )
+
     private fun ResultActionsDsl.sessionCookie(): Cookie {
         val cookie = andReturn().response.getCookie("bits_session")
         assertNotNull(cookie, "no session cookie set")
@@ -420,13 +618,29 @@ class AuthTest {
         var guilds = emptyList<DiscordGuild>()
         var memberRoles = emptyList<String>()
         var down = false
+        var revoked = false
         val requestedPages = mutableListOf<String?>()
+
+        /** The only refresh token Discord accepts; each refresh spends it and issues the next one. */
+        var refreshToken = REFRESH_TOKEN
+        val refreshes = AtomicInteger()
 
         fun reset() {
             guilds = listOf(DiscordGuild(id = "7"), DiscordGuild(id = "100", permissions = "0"))
             memberRoles = emptyList()
             down = false
+            revoked = false
             requestedPages.clear()
+            refreshToken = REFRESH_TOKEN
+            refreshes.set(0)
+        }
+
+        @Synchronized
+        override fun refreshTokens(refreshToken: String): DiscordTokens {
+            if (down) throw ResourceAccessException("down")
+            if (revoked || refreshToken != this.refreshToken) throw DiscordGrantRevokedException("invalid_grant")
+            this.refreshToken = "refresh-${refreshes.incrementAndGet()}"
+            return DiscordTokens(ACCESS_TOKEN, this.refreshToken)
         }
 
         override fun getCurrentUser(accessToken: String) =
@@ -472,6 +686,7 @@ class AuthTest {
                     .withToken(ACCESS_TOKEN)
                     .tokenType(OAuth2AccessToken.TokenType.BEARER)
                     .expiresIn(3600)
+                    .refreshToken(REFRESH_TOKEN)
                     .build()
             }
 
@@ -499,6 +714,7 @@ class AuthTest {
     companion object {
         const val PASSWORD = "richtig-geheim"
         const val ACCESS_TOKEN = "discord-access-token"
+        const val REFRESH_TOKEN = "discord-refresh-token"
 
         @JvmStatic
         @DynamicPropertySource

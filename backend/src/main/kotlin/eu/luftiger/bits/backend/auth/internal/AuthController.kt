@@ -8,7 +8,6 @@ import kotlinx.serialization.Serializable
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.web.bind.annotation.CookieValue
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -26,8 +25,9 @@ class AuthController(
     private val adminLoginService: AdminLoginService,
     private val sessionTokens: SessionTokens,
     private val properties: AuthProperties,
-    private val jwtDecoder: JwtDecoder,
+    private val sessionTokenReader: SessionTokenReader,
     private val revokedSessions: RevokedSessions,
+    private val sessionStore: SessionStore,
 ) {
     @GetMapping("/options")
     fun options() = AuthOptionsResponse(adminLogin = properties.admin.enabled)
@@ -48,15 +48,21 @@ class AuthController(
             AdminLoginResult.Disabled -> ResponseEntity.notFound().build()
         }
 
-    /** Revokes the session, if the request carries a valid one, so that a copy of the cookie stops working too. */
+    /**
+     * Ends the session, if the request carries one, so that copies of the cookie stop working too: its entry is
+     * deleted, which also prevents renewing it, and the token is put on the denylist.
+     */
     @PostMapping("/logout")
     fun logout(
         @CookieValue(SessionTokens.COOKIE_NAME, required = false) token: String?,
     ): ResponseEntity<Unit> {
         token
             ?.takeIf { it.isNotEmpty() }
-            ?.let { runCatching { jwtDecoder.decode(it) }.getOrNull() }
-            ?.let(revokedSessions::revoke)
+            ?.let(sessionTokenReader::readIgnoringExpiry)
+            ?.let { jwt ->
+                revokedSessions.revoke(jwt)
+                jwt.getClaimAsString(SessionTokens.SESSION_ID_CLAIM)?.let(sessionStore::delete)
+            }
         return ResponseEntity
             .noContent()
             .header(HttpHeaders.SET_COOKIE, sessionTokens.clearedCookie().toString())

@@ -2,6 +2,8 @@ package eu.luftiger.bits.backend.auth.internal
 
 import eu.luftiger.bits.backend.shared.Secrets
 import org.springframework.boot.context.properties.ConfigurationProperties
+import javax.crypto.SecretKey
+import javax.crypto.spec.SecretKeySpec
 
 @ConfigurationProperties("bits.auth")
 data class AuthProperties(
@@ -16,6 +18,9 @@ data class AuthProperties(
         require(publicUrl.isNotBlank()) { "bits.auth.public-url must not be blank" }
         Secrets.requireStrong(jwtSecret, "BITS_JWT_SECRET (bits.auth.jwt-secret)")
     }
+
+    /** The key the session tokens are signed with. */
+    fun signingKey(): SecretKey = SecretKeySpec(jwtSecret.toByteArray(), "HmacSHA256")
 
     /** OAuth2 client of the Discord application; only members of [guildId] may log in. */
     data class Discord(
