@@ -5,6 +5,7 @@ import { HoneypotCard } from '@/features/honeypot/HoneypotCard'
 import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
 import { TopForumsCard } from '@/features/tops/TopForumsCard'
 import { TopManagerRolesCard } from '@/features/tops/TopManagerRolesCard'
+import { VerifyPanelCard } from '@/features/verify-panel/VerifyPanelCard'
 import { ManagerRolesCard } from '@/features/votes/ManagerRolesCard'
 import { PartyColorsCard } from '@/features/votes/PartyColorsCard'
 import { ResultImageCard } from '@/features/votes/ResultImageCard'
@@ -45,6 +46,7 @@ export function AdminPage() {
         <TabsContent value="server" keepMounted className="flex flex-col gap-4">
           <CountrySettingCard />
           <BotPresenceCard />
+          <VerifyPanelCard />
           <HoneypotCard />
         </TabsContent>
         <TabsContent value="abstimmungen" keepMounted className="flex flex-col gap-4">

@@ -8,6 +8,7 @@ import io.mockk.mockk
 import net.dv8tion.jda.api.components.MessageTopLevelComponent
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
 import net.dv8tion.jda.api.interactions.DiscordLocale
@@ -102,5 +103,22 @@ fun buttonClick(
     every { event.userLocale } returns DiscordLocale.GERMAN
     every { event.member!!.effectiveName } returns "Luca"
     every { event.hook } returns replies.hook
+    return event
+}
+
+/** Submit of the modal [modalId] by user 42 with [values] by the ID of their input. */
+fun modalSubmit(
+    modalId: String,
+    replies: Replies,
+    values: Map<String, String> = emptyMap(),
+): ModalInteractionEvent {
+    val event = mockk<ModalInteractionEvent>(relaxed = true)
+    every { event.modalId } returns modalId
+    every { event.user.id } returns "42"
+    every { event.userLocale } returns DiscordLocale.GERMAN
+    every { event.hook } returns replies.hook
+    every { event.getValue(any<String>()) } answers {
+        values[firstArg()]?.let { value -> mockk { every { asString } returns value } }
+    }
     return event
 }

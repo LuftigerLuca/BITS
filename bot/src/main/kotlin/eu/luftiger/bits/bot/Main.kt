@@ -38,6 +38,9 @@ import eu.luftiger.bits.bot.systemlog.SystemLogReporter
 import eu.luftiger.bits.bot.tops.TopCloseCommand
 import eu.luftiger.bits.bot.tops.TopOpenCommand
 import eu.luftiger.bits.bot.tops.Tops
+import eu.luftiger.bits.bot.verifypanel.JdaVerifyPanelGuild
+import eu.luftiger.bits.bot.verifypanel.VerifyPanel
+import eu.luftiger.bits.bot.verifypanel.VerifyPanelListener
 import eu.luftiger.bits.bot.votes.VoteButtons
 import eu.luftiger.bits.bot.votes.VoteCommand
 import eu.luftiger.bits.bot.votes.VoteEvents
@@ -120,7 +123,7 @@ fun main() {
                     features,
                     { it.verification },
                     VerifyCommand.NAME,
-                    buttonPrefix = VerifyCommand.CHECK_BUTTON_PREFIX,
+                    buttonPrefix = VerifyCommand.COMPONENT_PREFIX,
                     languages = languages,
                     delegate = verifyCommand,
                 ),
@@ -205,6 +208,9 @@ fun main() {
         )
     jda.addEventListener(HoneypotListener(config.guildId, honeypot, scope))
     honeypot.refreshPeriodically(scope)
+    val verifyPanel = VerifyPanel(backend, JdaVerifyPanelGuild(jda, config.guildId), systemLog::send)
+    jda.addEventListener(VerifyPanelListener(verifyPanel))
+    verifyPanel.refreshPeriodically(scope)
     val votes = VoteEvents(jda, config.guildId, backend)
     val embassyGuild = JdaEmbassyGuild(jda, config.guildId)
     val embassies = EmbassySyncHandler(embassyGuild, systemLog::reportEmbassySync)

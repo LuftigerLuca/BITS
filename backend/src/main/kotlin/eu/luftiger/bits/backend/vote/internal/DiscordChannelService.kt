@@ -36,6 +36,15 @@ class DiscordChannelService(
 
     override fun all(): List<GuildChannel> =
         channelRepository.findAll().sortedBy { it.position }.map {
-            GuildChannel(it.id, it.name, it.category, it.threadsCreatable, it.honeypotUsable, it.everyoneCanView, it.viewerRoleIds)
+            GuildChannel(
+                it.id,
+                it.name,
+                it.category,
+                it.postable,
+                it.threadsCreatable,
+                it.honeypotUsable,
+                it.everyoneCanView,
+                it.viewerRoleIds,
+            )
         }
 }

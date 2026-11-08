@@ -32,6 +32,7 @@ export const ACTIONS: Record<AuditAction, string> = {
   MEMBER_UNLINKED: 'Verknüpfung eines Mitglieds gelöst',
   HONEYPOT_CHANNEL_CHANGED: 'Honeypot-Kanal geändert',
   HONEYPOT_KICKS_RESUMED: 'Honeypot-Kicks fortgesetzt',
+  VERIFY_PANEL_CHANNEL_CHANGED: 'Verifizierungs-Kanal geändert',
   API_TOKEN_CREATED: 'API-Token angelegt',
   API_TOKEN_REVOKED: 'API-Token widerrufen',
   TOP_FORUMS_CHANGED: 'TOP-Foren geändert',

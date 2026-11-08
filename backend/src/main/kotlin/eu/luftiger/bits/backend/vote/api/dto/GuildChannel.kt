@@ -8,6 +8,8 @@ data class GuildChannel(
     val name: String,
     /** `null` for none. */
     val category: String?,
+    /** Whether the bot may post messages with embeds and buttons there. */
+    val postable: Boolean,
     /** Whether the bot may create private threads there and manage them. */
     val threadsCreatable: Boolean,
     /** Whether the bot may watch the channel as a honeypot. */

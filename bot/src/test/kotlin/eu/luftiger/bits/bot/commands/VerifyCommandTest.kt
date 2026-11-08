@@ -8,6 +8,7 @@ import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -167,6 +168,27 @@ class VerifyCommandTest {
 
             assertEquals(listOf(VerifyCommand.checkMessage(CheckVerificationResponse.TooEarly(4), Language.GERMAN)), replies.messages)
         }
+
+    @Test
+    fun `the button of the panel asks for the name, which starts the same flow as the command`() =
+        runTest {
+            coEvery { backend.startVerification("42", "Luftiger") } returns started
+            val command = command()
+            val click = buttonClick(VerifyCommand.PANEL_BUTTON, replies)
+
+            command.onButtonInteraction(click)
+            verify { click.replyModal(match { it.id == VerifyCommand.NAME_MODAL }) }
+
+            command.onModalInteraction(modalSubmit(VerifyCommand.NAME_MODAL, replies, mapOf("name" to " Luftiger ")))
+            runCurrent()
+
+            assertEquals(listOf(VerifyCommand.startedMessage(started, Language.GERMAN)), replies.messages)
+        }
+
+    @Test
+    fun `the name modal asks in the language of the member`() {
+        assertEquals("Link your WarEra account", VerifyCommand.nameModal(Language.ENGLISH).title)
+    }
 
     @Test
     fun `buttons of other features are ignored`() =

@@ -60,6 +60,9 @@ import eu.luftiger.bits.shared.TopPermissionResponse
 import eu.luftiger.bits.shared.UndeliveredEventReport
 import eu.luftiger.bits.shared.UnlinkAccountRequest
 import eu.luftiger.bits.shared.UnlinkAccountResponse
+import eu.luftiger.bits.shared.VerifyPanelProblemReport
+import eu.luftiger.bits.shared.VerifyPanelReport
+import eu.luftiger.bits.shared.VerifyPanelState
 import eu.luftiger.bits.shared.VoteActor
 import eu.luftiger.bits.shared.VoteChoice
 import eu.luftiger.bits.shared.VoteDto
@@ -94,7 +97,8 @@ import kotlinx.coroutines.CancellationException
 import java.time.Duration
 
 /**
- * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [TopBackend], [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
+ * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [VerifyPanelBackend], [TopBackend],
+ * [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
  * authenticate with the service token of the bot. [calls] counts every request and how it ended.
  */
 class KtorBackendClient(
@@ -108,6 +112,7 @@ class KtorBackendClient(
     EmbassyBackend,
     FeatureBackend,
     HoneypotBackend,
+    VerifyPanelBackend,
     TopBackend,
     LanguageBackend,
     PresenceBackend,
@@ -314,6 +319,22 @@ class KtorBackendClient(
 
     override suspend fun reportHoneypotProblem(report: HoneypotProblemReport) {
         http.post("api/honeypot/problems") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun verifyPanel(): VerifyPanelState = http.get("api/verify-panel").body()
+
+    override suspend fun reportVerifyPanelMessage(report: VerifyPanelReport) {
+        http.put("api/verify-panel/message") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reportVerifyPanelProblem(report: VerifyPanelProblemReport) {
+        http.post("api/verify-panel/problems") {
             contentType(ContentType.Application.Json)
             setBody(report)
         }

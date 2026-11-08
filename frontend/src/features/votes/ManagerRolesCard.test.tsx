@@ -29,6 +29,7 @@ describe('roles that may manage votes', () => {
       'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
       'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
       'GET /web/admin/honeypot': () => json({ channelId: null, kicksPaused: false, channels: [] }),
+      'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),
       'GET /web/votes/options': () => json(options),
       'GET /web/admin/votes/manager-roles': () => json({ roleIds: ['r-congress'] }),
       'PUT /web/admin/votes/manager-roles': (init?: RequestInit) => {

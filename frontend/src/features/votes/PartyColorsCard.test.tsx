@@ -18,6 +18,7 @@ function stub(partyColors: () => Response, routes: Record<string, (init?: Reques
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/honeypot': () => json({ channelId: null, kicksPaused: false, channels: [] }),
+    'GET /web/admin/verify-panel': () => json({ channelId: null, channels: [] }),
     'GET /web/votes/options': () => json({ roles: [], channels: [] }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/votes/result-settings': () => json({ customBackground: false, updatedAt: null }),

@@ -143,6 +143,9 @@ enum class EntryKind(
 
     /** The bot cannot keep its warning in the honeypot. */
     HONEYPOT_WARNING_FAILED(Category.ERROR),
+
+    /** The bot cannot keep its message with the button to verify. */
+    VERIFY_PANEL_FAILED(Category.ERROR),
     ;
 
     enum class Category {

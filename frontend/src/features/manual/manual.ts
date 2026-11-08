@@ -47,7 +47,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Mit /verify zeigst du BITS, dass dir ein WarEra-Account gehört. Dafür schreibst du einen Code in den Namen ' +
           'einer deiner WarEra-Firmen.',
         steps: [
-          'Schreibe in Discord /verify und deinen Namen in WarEra.',
+          'Schreibe in Discord /verify und deinen Namen in WarEra. Oder klicke im Kanal für neue Mitglieder auf ' +
+            '„Jetzt verifizieren“ und gib deinen Namen dort ein.',
           'BITS antwortet nur dir mit einem Einmal-Code. Er ist 15 Minuten gültig.',
           'Benenne in WarEra eine deiner Firmen so um, dass der Code im Namen steht.',
           'Klicke in Discord auf „Prüfen“. BITS sucht den Code und verknüpft die Accounts.',
@@ -651,6 +652,30 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Notbremse: Nach 10 Kicks in 10 Minuten pausiert der Bot die Kicks und löscht nur noch. Prüfe im System-Log, ' +
             'ob es wirklich Bots waren, und setze die Kicks in der Karte fort. Eine neue Kanalwahl hebt die Pause auch auf.',
           'Das System-Log zeigt jeden Fall mit Ergebnis, aber nie den Inhalt der Nachricht.',
+        ],
+      },
+      {
+        id: 'verify-panel',
+        title: 'Kanal für neue Mitglieder',
+        intro:
+          'Neue Mitglieder wissen oft nicht, dass sie sich verifizieren müssen. Lege unter „Verwaltung › Server“ in der ' +
+          'Karte „Verifizierungs-Kanal“ einen Kanal fest: Der Bot postet dort eine Nachricht mit dem Button „Jetzt ' +
+          'verifizieren“.',
+        steps: [
+          'Gib dem Bot im Kanal die Rechte „Kanal ansehen“, „Nachrichten senden“, „Links einbetten“, „Dateien ' +
+            'anhängen“ und „Nachrichtenverlauf lesen“. Sonst steht der Kanal nicht zur Auswahl.',
+          'Wähle den Kanal und klicke auf „Speichern“. Innerhalb von 30 Sekunden postet der Bot dort seine Nachricht.',
+        ],
+        points: [
+          'Der Button öffnet ein Fenster für den Namen in WarEra und führt dann durch dieselbe Verifizierung wie ' +
+            '/verify. Alles danach sieht nur das Mitglied, in seiner Sprache.',
+          'Die Nachricht steht auf Deutsch und Englisch. Wird sie gelöscht, postet der Bot sie wieder. Wechselst du den ' +
+            'Kanal, löscht er sie im alten, statt eine zweite zu posten; ohne Kanal entfernt er sie.',
+          'Ist die Verifizierung ausgeschaltet, bleibt die Nachricht stehen, und der Button sagt, dass die Funktion ' +
+            'gerade aus ist.',
+          'Eine Rolle für alle, die sich noch nicht verifiziert haben, legst du unter „Rollen“ in der Karte ' +
+            '„Statusrollen“ fest. Mit Kanalrechten für diese Rolle steuerst du in Discord, was Unverifizierte sehen.',
+          'Kann der Bot seine Nachricht nicht halten, etwa weil ihm Rechte fehlen, steht das im System-Log.',
         ],
       },
       {

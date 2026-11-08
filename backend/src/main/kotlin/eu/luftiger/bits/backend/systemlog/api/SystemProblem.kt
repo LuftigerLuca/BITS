@@ -126,6 +126,12 @@ sealed interface SystemProblem {
         val reason: String,
     ) : SystemProblem
 
+    /** The bot cannot keep its message with the button to verify; [reason] is in German. */
+    @NamedInterface("api")
+    data class VerifyPanelFailed(
+        val reason: String,
+    ) : SystemProblem
+
     /** Events for the bot could not be written to Redis for a while. */
     @NamedInterface("api")
     data class OutboxStuck(
