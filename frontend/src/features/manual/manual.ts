@@ -255,12 +255,12 @@ export const MANUAL_PAGES: ManualPage[] = [
           'Gib optional einen Grund an; er steht in der Abschlussnachricht.',
           'Wähle bei „archive“ True, wenn der Post auch archiviert werden soll. Standard ist False: Der Post bleibt ' +
             'in der Liste des Forums sichtbar.',
-          'Der Bot postet „TOP geschlossen von @du“, setzt das Erledigt-Tag des Forums, falls eines gewählt ist, und ' +
-            'sperrt den Post.',
+          'Der Bot postet „TOP geschlossen“ mit deinem Namen und dem Grund, setzt das Erledigt-Tag des Forums, falls ' +
+            'eines gewählt ist, und sperrt den Post.',
         ],
         points: [
           '/topopen im geschlossenen Post öffnet ihn wieder: Der Bot holt ihn aus dem Archiv, entsperrt ihn, nimmt ' +
-            'das Erledigt-Tag ab und postet „TOP wieder geöffnet von @du“.',
+            'das Erledigt-Tag ab und postet „TOP wieder geöffnet“ mit deinem Namen.',
           'Ein gesperrter Post gilt als geschlossen. Einen geschlossenen TOP schließt /topclose nicht noch einmal, ' +
             'einen offenen öffnet /topopen nicht.',
           'Hat ein Post schon 5 Tags, das Maximum von Discord, schließt der Bot ihn ohne Erledigt-Tag und sagt dir das.',
@@ -535,7 +535,8 @@ export const MANUAL_PAGES: ManualPage[] = [
           'In der Karte „TOP-Foren“ unter „Verwaltung“ legst du fest, in welchen Foren /topclose und /topopen ' +
           'funktionieren, und pro Forum optional ein Erledigt-Tag.',
         points: [
-          'Wählbar sind nur Foren, in denen der Bot „Threads verwalten“ und „Nachrichten in Threads senden“ darf. ' +
+          'Wählbar sind nur Foren, in denen der Bot „Threads verwalten“, „Nachrichten in Threads senden“ und „Links ' +
+            'einbetten“ darf. ' +
             'Verliert er die Rechte später, bleibt das Forum gewählt, bis du es abwählst.',
           'Das Erledigt-Tag ist eines der Tags des Forums, die du in Discord anlegst. Löschst du es dort, schließt ' +
             'der Bot TOPs ohne Tag.',

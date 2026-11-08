@@ -7,6 +7,7 @@ import eu.luftiger.bits.shared.TopActionReport
 import eu.luftiger.bits.shared.TopPermissionResponse
 import eu.luftiger.bits.shared.VoteActor
 import kotlinx.coroutines.test.runTest
+import net.dv8tion.jda.api.entities.MessageEmbed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,7 +25,9 @@ class TopsTest {
             val reply = tops.close(post, actor, "<@42>", " Beschlossen ", archive = false, Language.GERMAN)
 
             assertEquals("Der TOP ist geschlossen.", reply)
-            assertEquals(listOf("TOP geschlossen von <@42>.\nGrund: Beschlossen"), post.messages)
+            val embed = post.embeds.single()
+            assertEquals("TOP geschlossen", embed.title)
+            assertEquals(listOf("Geschlossen von" to "<@42>", "Grund" to "Beschlossen"), embed.fields.map { it.name to it.value })
             assertEquals(listOf("t-urgent", "t-done"), post.appliedTagIds)
             assertTrue(post.locked)
             assertEquals(false, post.archived)
@@ -42,7 +45,13 @@ class TopsTest {
             val reply = tops.close(post, actor, "<@42>", null, archive = true, Language.ENGLISH)
 
             assertEquals("The agenda item is closed and archived.", reply)
-            assertEquals(listOf("TOP geschlossen von <@42>."), post.messages)
+            assertEquals(
+                listOf("Geschlossen von"),
+                post.embeds
+                    .single()
+                    .fields
+                    .map { it.name },
+            )
             assertEquals(1, post.updates)
             assertTrue(post.locked && post.archived)
         }
@@ -62,7 +71,7 @@ class TopsTest {
             val post = FakePost()
             assertEquals(Tops.notInTopMessage(Language.GERMAN), tops.close(post, actor, "<@42>", null, false, Language.GERMAN))
 
-            assertEquals(emptyList(), post.messages)
+            assertEquals(emptyList(), post.embeds)
             assertEquals(0, post.updates)
             assertEquals(emptyList(), backend.reports)
         }
@@ -119,7 +128,14 @@ class TopsTest {
             assertEquals("Der TOP ist wieder offen.", reply)
             assertEquals(listOf("t-urgent"), post.appliedTagIds)
             assertEquals(false, post.locked || post.archived)
-            assertEquals(listOf("TOP wieder geöffnet von <@42>."), post.messages)
+            assertEquals("TOP wieder geöffnet", post.embeds.single().title)
+            assertEquals(
+                listOf("<@42>"),
+                post.embeds
+                    .single()
+                    .fields
+                    .map { it.value },
+            )
             assertEquals(listOf(TopAction.REOPENED), backend.reports.map { it.action })
         }
 
@@ -168,12 +184,12 @@ class TopsTest {
         override val name = "TOP 3"
         override val forumId = "f-1"
         override val forumTagIds = setOf("t-urgent", "t-done") + List(5) { "t-$it" }
-        val messages = mutableListOf<String>()
+        val embeds = mutableListOf<MessageEmbed>()
         var updates = 0
 
-        override suspend fun send(message: String) {
+        override suspend fun send(embed: MessageEmbed) {
             if (failing) error("Missing access")
-            messages += message
+            embeds += embed
         }
 
         override suspend fun update(

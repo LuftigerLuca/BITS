@@ -57,7 +57,7 @@ class TopCommandTest {
             assertContains(replies.messages.single(), "geschlossen und archiviert")
             assertEquals(listOf("r-chair"), actor.captured.roleIds)
             assertEquals("Vertagt" to true, report.captured.reason to report.captured.archived)
-            coVerify { post.send("TOP geschlossen von <@42>.\nGrund: Vertagt") }
+            coVerify { post.send(TopMessages.closed("<@42>", "Vertagt")) }
         }
 
     @Test

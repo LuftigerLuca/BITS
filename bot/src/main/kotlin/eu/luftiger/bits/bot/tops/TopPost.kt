@@ -2,6 +2,7 @@ package eu.luftiger.bits.bot.tops
 
 import eu.luftiger.bits.bot.channels.ChannelReporter
 import kotlinx.coroutines.future.await
+import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel
 import net.dv8tion.jda.api.entities.channel.forums.ForumTagSnowflake
@@ -24,8 +25,7 @@ interface TopPost {
     /** Whether the bot may write in the post, tag, lock and archive it. */
     val botMayManage: Boolean
 
-    /** Posts [message] without pinging anybody it mentions. */
-    suspend fun send(message: String)
+    suspend fun send(embed: MessageEmbed)
 
     /** Sets the tags, the lock and the archive state in one request, so nothing has to change after archiving. */
     suspend fun update(
@@ -47,10 +47,9 @@ class JdaTopPost(
     override val forumTagIds: Set<String> get() = forum.availableTags.mapTo(HashSet()) { it.id }
     override val botMayManage: Boolean get() = forum.guild.selfMember.hasPermission(forum, ChannelReporter.TOP_PERMISSIONS)
 
-    override suspend fun send(message: String) {
+    override suspend fun send(embed: MessageEmbed) {
         thread
-            .sendMessage(message)
-            .setAllowedMentions(emptyList())
+            .sendMessageEmbeds(embed)
             .submit()
             .await()
     }

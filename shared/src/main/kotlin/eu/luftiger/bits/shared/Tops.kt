@@ -17,7 +17,7 @@ data class DiscordForumDto(
     val category: String?,
     /** Position in the channel list, categories first. */
     val position: Int,
-    /** Whether the bot may lock, archive and tag the posts there and write in them, as `/topclose` needs. */
+    /** Whether the bot may lock, archive and tag the posts there and post embeds in them, as `/topclose` needs. */
     val threadsManageable: Boolean,
     /** The tags posts can carry, in the order Discord shows them. */
     val tags: List<ForumTagDto> = emptyList(),

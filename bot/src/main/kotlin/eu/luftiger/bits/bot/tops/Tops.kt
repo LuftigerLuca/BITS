@@ -43,7 +43,7 @@ class Tops(
         val reasonText = reason?.trim()?.ifEmpty { null }
         val done =
             discord(post, "close") {
-                post.send("TOP geschlossen von $mention." + (reasonText?.let { "\nGrund: $it" } ?: ""))
+                post.send(TopMessages.closed(mention, reasonText))
                 post.update(tagIds, locked = true, archived = archive)
             }
         if (!done) return discordFailedMessage(language)
@@ -81,7 +81,7 @@ class Tops(
             discord(post, "reopen") {
                 // An archived post takes no message, so it is opened first.
                 post.update(post.appliedTagIds - setOfNotNull(doneTagId), locked = false, archived = false)
-                post.send("TOP wieder geöffnet von $mention.")
+                post.send(TopMessages.reopened(mention))
             }
         if (!done) return discordFailedMessage(language)
         report(TopActionReport(actor, post.forumId, post.id, post.name, TopAction.REOPENED))
@@ -130,10 +130,10 @@ class Tops(
 
         private fun missingPermissionsMessage(language: Language): String =
             language.text(
-                "In diesem Forum darf ich keine Posts verwalten. Ich brauche dort die Rechte, Threads zu verwalten und in " +
-                    "Threads Nachrichten zu senden.",
-                "I may not manage posts in this forum. I need the permissions to manage threads and to send messages in " +
-                    "threads there.",
+                "In diesem Forum darf ich keine Posts verwalten. Ich brauche dort die Rechte, Threads zu verwalten, in " +
+                    "Threads Nachrichten zu senden und Links einzubetten.",
+                "I may not manage posts in this forum. I need the permissions to manage threads, to send messages in " +
+                    "threads and to embed links there.",
             )
 
         private fun discordFailedMessage(language: Language): String =
