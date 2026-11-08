@@ -29,6 +29,10 @@ export type GovernmentOffice =
   | 'MINISTER_OF_ECONOMY'
   | 'MINISTER_OF_DEFENSE'
   | 'MINISTER_OF_FOREIGN_AFFAIRS'
+  | 'MINISTER_OF_INTERIOR'
+  | 'MINISTER_OF_COMMUNICATION'
+  | 'CHIEF_OF_STAFF'
+  | 'ADVISOR'
   | 'CONGRESS'
 
 /** A rank in a military unit, lowest first; each includes the ranks above it. */

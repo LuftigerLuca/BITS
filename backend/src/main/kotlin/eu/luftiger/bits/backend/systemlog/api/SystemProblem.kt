@@ -18,6 +18,16 @@ sealed interface SystemProblem {
         val countryName: String?,
     ) : SystemProblem
 
+    /**
+     * The government of a country lists ministers with titles BITS does not know, e.g. a ministry WarEra added; they
+     * hold no office in BITS. Recorded once per title while the backend runs.
+     */
+    @NamedInterface("api")
+    data class UnknownMinisterTitles(
+        val countryName: String,
+        val titles: List<String>,
+    ) : SystemProblem
+
     /** The parties of a country could not be loaded in a sync; the rules for [partyNames] were not run. */
     @NamedInterface("api")
     data class PartiesUnavailable(

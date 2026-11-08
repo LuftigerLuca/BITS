@@ -34,6 +34,7 @@ import eu.luftiger.bits.warera.WareraCountry
 import eu.luftiger.bits.warera.WareraGovernment
 import eu.luftiger.bits.warera.WareraMilitaryUnit
 import eu.luftiger.bits.warera.WareraMilitaryUnitRoles
+import eu.luftiger.bits.warera.WareraMinister
 import eu.luftiger.bits.warera.WareraNotFoundException
 import eu.luftiger.bits.warera.WareraParty
 import eu.luftiger.bits.warera.WareraSchemaException
@@ -965,7 +966,13 @@ class RoleSyncTest {
 
     @Test
     fun `an office rule with several offices gives the role to the holder of any of them`() {
-        warera.governments["de"] = WareraGovernment(country = "de", president = "w2", vicePresident = "w1", minOfEconomy = "w3")
+        warera.governments["de"] =
+            WareraGovernment(
+                country = "de",
+                president = "w2",
+                vicePresident = "w1",
+                ministers = listOf(WareraMinister("w3", "minOfEconomy")),
+            )
         link("1", "w1")
         link("2", "w2")
         // The preview judges the WarEra data loaded last.
@@ -996,6 +1003,47 @@ class RoleSyncTest {
         val presidentOnly =
             preview("""{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de","offices":["PRESIDENT"]}]]}""")
         assertEquals(listOf("1"), presidentOnly.losses.map { it.discordUserId })
+    }
+
+    @Test
+    fun `minister rules follow the titles in the minister list, also with several holders`() {
+        warera.governments["de"] =
+            WareraGovernment(
+                country = "de",
+                president = "w3",
+                ministers =
+                    listOf(
+                        WareraMinister("w1", "minOfInterior"),
+                        WareraMinister("w2", "minOfInterior"),
+                        WareraMinister("w3", "advisor"),
+                        WareraMinister("w1", "minOfTimeTravel"),
+                    ),
+            )
+        link("1", "w1")
+        link("2", "w2")
+        createRule(
+            """{"roleId":"r-minister","blocks":[[{"type":"GOVERNMENT_OFFICE","countryId":"de",""" +
+                """"offices":["ADVISOR","MINISTER_OF_INTERIOR"]}]]}""",
+        ).andExpect { jsonPath("$.label") { value("Innenminister oder Berater in Germany") } }
+
+        assertEquals(setOf("1", "2"), (awaitEvents(1).single() as RoleSyncEvent).members.keys)
+        assertEquals(
+            "MINISTER_OF_INTERIOR,ADVISOR",
+            jdbc.queryForObject("SELECT offices FROM role_rule_condition", String::class.java),
+        )
+        syncTrigger.hourly()
+        awaitBackgroundWork()
+        // The unknown title is recorded once, however often it is seen.
+        assertEquals(
+            listOf(
+                "Die Regierung von Germany hat Minister mit Ämtern, die BITS nicht kennt: minOfTimeTravel. Sie zählen für " +
+                    "Rollen-Regeln und Botschaften nicht als Regierungsamt, bis BITS die Ämter kennt.",
+            ),
+            jdbc.queryForList(
+                "SELECT message FROM system_log_entry WHERE kind = 'UNKNOWN_MINISTER_TITLES' AND message LIKE '%minOfTimeTravel%'",
+                String::class.java,
+            ),
+        )
     }
 
     @Test

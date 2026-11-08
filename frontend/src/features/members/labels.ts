@@ -12,6 +12,7 @@ const KINDS: Record<LogEntryType, string> = {
   ACCOUNT_REMOVED: 'Server verlassen',
   WARERA_USERS_UNAVAILABLE: 'WarEra-Daten nicht abrufbar',
   GOVERNMENT_UNAVAILABLE: 'Regierung nicht abrufbar',
+  UNKNOWN_MINISTER_TITLES: 'Unbekanntes Ministeramt',
   PARTIES_UNAVAILABLE: 'Parteien nicht abrufbar',
   MILITARY_UNIT_UNAVAILABLE: 'MU nicht abrufbar',
   ROLE_NOT_ASSIGNABLE: 'Rolle nicht vergebbar',
