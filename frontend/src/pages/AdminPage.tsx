@@ -4,6 +4,7 @@ import { FeaturesCard } from '@/features/feature-toggles/FeaturesCard'
 import { HoneypotCard } from '@/features/honeypot/HoneypotCard'
 import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
 import { TopForumsCard } from '@/features/tops/TopForumsCard'
+import { TopManagerRolesCard } from '@/features/tops/TopManagerRolesCard'
 import { ManagerRolesCard } from '@/features/votes/ManagerRolesCard'
 import { PartyColorsCard } from '@/features/votes/PartyColorsCard'
 import { ResultImageCard } from '@/features/votes/ResultImageCard'
@@ -50,7 +51,10 @@ export function AdminPage() {
           <ManagerRolesCard />
           <ResultImageCard />
           <PartyColorsCard />
+        </TabsContent>
+        <TabsContent value="tops" keepMounted className="flex flex-col gap-4">
           <TopForumsCard />
+          <TopManagerRolesCard />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,14 +1,14 @@
 package eu.luftiger.bits.bot.backend
 
 import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionResponse
-import eu.luftiger.bits.shared.VoteActor
 
 /** The part of the backend's REST API for `/topclose` and `/topopen`; [KtorBackendClient] implements it. */
 interface TopBackend {
     /** Whether [actor] may close or reopen a post of the forum [forumId], and which tag a closed one gets. */
     suspend fun topPermission(
-        actor: VoteActor,
+        actor: TopActor,
         forumId: String,
     ): TopPermissionResponse
 

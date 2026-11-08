@@ -54,6 +54,7 @@ import eu.luftiger.bits.shared.StartVerificationResponse
 import eu.luftiger.bits.shared.StartVoteRequest
 import eu.luftiger.bits.shared.StartVoteResponse
 import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionRequest
 import eu.luftiger.bits.shared.TopPermissionResponse
 import eu.luftiger.bits.shared.UndeliveredEventReport
@@ -198,7 +199,7 @@ class KtorBackendClient(
     }
 
     override suspend fun topPermission(
-        actor: VoteActor,
+        actor: TopActor,
         forumId: String,
     ): TopPermissionResponse = post("api/tops/permission", TopPermissionRequest(actor, forumId))
 

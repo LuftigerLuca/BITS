@@ -8,19 +8,18 @@ import eu.luftiger.bits.backend.shared.NotPossibleInDiscordException
 import eu.luftiger.bits.backend.top.domain.DiscordForum
 import eu.luftiger.bits.backend.top.domain.ForumTag
 import eu.luftiger.bits.backend.top.domain.TopForum
-import eu.luftiger.bits.backend.vote.api.VoteManagers
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
  * The agenda items (TOPs) in the forums an admin picked. The bot asks whether a member may close or reopen a post,
- * does that in Discord itself and then reports it here for the audit log. Who may is the same as for managing votes.
+ * does that in Discord itself and then reports it here for the audit log. Who may besides the admins is set in [TopManagerRoles].
  */
 @Service
 class TopService(
     private val forumRepository: DiscordForumRepository,
     private val topForumRepository: TopForumRepository,
-    private val voteManagers: VoteManagers,
+    private val managerRoles: TopManagerRoles,
     private val auditLog: AuditLog,
 ) {
     @Transactional
@@ -35,17 +34,17 @@ class TopService(
     fun topForums(): List<TopForum> = topForumRepository.findAll().sortedBy { it.forumId }
 
     fun permission(
-        actor: TopActor,
+        actor: TopMember,
         forumId: String,
     ): TopPermission {
         val forum = topForumRepository.findById(forumId).orElse(null) ?: return TopPermission.NotTopForum
-        if (!voteManagers.mayManage(actor.admin, actor.roleIds)) return TopPermission.Forbidden
+        if (!managerRoles.mayManage(actor.admin, actor.roleIds)) return TopPermission.Forbidden
         return TopPermission.Allowed(forum.doneTagId)
     }
 
     @Transactional
     fun record(
-        actor: TopActor,
+        actor: TopMember,
         forumId: String,
         threadName: String,
         action: TopRecord,
@@ -124,7 +123,7 @@ class TopService(
 }
 
 /** A member in Discord who closes or reopens a TOP. */
-data class TopActor(
+data class TopMember(
     val auditActor: AuditActor,
     val admin: Boolean,
     val roleIds: List<String>,

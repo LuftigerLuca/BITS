@@ -4,8 +4,8 @@ import eu.luftiger.bits.bot.backend.TopBackend
 import eu.luftiger.bits.shared.Language
 import eu.luftiger.bits.shared.TopAction
 import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionResponse
-import eu.luftiger.bits.shared.VoteActor
 import kotlinx.coroutines.test.runTest
 import net.dv8tion.jda.api.entities.MessageEmbed
 import kotlin.test.Test
@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class TopsTest {
     private val backend = FakeTopBackend()
     private val tops = Tops(backend)
-    private val actor = VoteActor("42", "Chair", null, emptyList(), administrator = false)
+    private val actor = TopActor("42", "Chair", null, emptyList(), administrator = false)
 
     @Test
     fun `closing posts the message with the reason, tags and locks the post and reports it`() =
@@ -65,7 +65,8 @@ class TopsTest {
             )
 
             backend.permission = TopPermissionResponse.Forbidden
-            assertTrue(tops.close(FakePost(), actor, "<@42>", null, false, Language.GERMAN).startsWith("TOPs schließen"))
+            val refusal = tops.close(FakePost(), actor, "<@42>", null, false, Language.GERMAN)
+            assertTrue(refusal.startsWith("TOPs schließen") && refusal.endsWith("die im Dashboard für TOPs freigegeben sind."))
 
             backend.permission = TopPermissionResponse.NotTopForum
             val post = FakePost()
@@ -163,7 +164,7 @@ class TopsTest {
         val reports = mutableListOf<TopActionReport>()
 
         override suspend fun topPermission(
-            actor: VoteActor,
+            actor: TopActor,
             forumId: String,
         ) = permission
 

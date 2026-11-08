@@ -2,11 +2,12 @@ package eu.luftiger.bits.bot.tops
 
 import eu.luftiger.bits.bot.commands.bitsUnavailableMessage
 import eu.luftiger.bits.bot.language.Languages
-import eu.luftiger.bits.bot.votes.VoteCommand
 import eu.luftiger.bits.shared.Language
+import eu.luftiger.bits.shared.TopActor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel
@@ -66,6 +67,16 @@ fun forumPost(event: SlashCommandInteractionEvent): TopPost? {
     return JdaTopPost(thread, forum)
 }
 
+/** The member as the backend needs them to decide whether they may manage TOPs. */
+internal fun topActor(member: Member) =
+    TopActor(
+        discordUserId = member.id,
+        name = member.effectiveName,
+        avatarUrl = member.effectiveAvatarUrl,
+        roleIds = member.roles.map { it.id },
+        administrator = member.hasPermission(Permission.ADMINISTRATOR),
+    )
+
 /** `/topclose [reason] [archive]` in a TOP post. */
 class TopCloseCommand(
     private val tops: Tops,
@@ -81,7 +92,7 @@ class TopCloseCommand(
     ): String =
         tops.close(
             post,
-            VoteCommand.actor(member),
+            topActor(member),
             member.asMention,
             event.getOption(OPTION_REASON)?.asString,
             event.getOption(OPTION_ARCHIVE)?.asBoolean ?: false,
@@ -120,7 +131,7 @@ class TopOpenCommand(
         post: TopPost,
         member: Member,
         language: Language,
-    ): String = tops.reopen(post, VoteCommand.actor(member), member.asMention, language)
+    ): String = tops.reopen(post, topActor(member), member.asMention, language)
 
     companion object {
         const val NAME = "topopen"

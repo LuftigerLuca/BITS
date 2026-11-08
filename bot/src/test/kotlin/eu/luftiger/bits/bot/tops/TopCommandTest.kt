@@ -5,8 +5,8 @@ import eu.luftiger.bits.bot.commands.Replies
 import eu.luftiger.bits.bot.commands.languages
 import eu.luftiger.bits.bot.commands.slashCommand
 import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionResponse
-import eu.luftiger.bits.shared.VoteActor
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -39,7 +39,7 @@ class TopCommandTest {
     @Test
     fun `closing sends the member with their roles and the options`() =
         runTest {
-            val actor = slot<VoteActor>()
+            val actor = slot<TopActor>()
             val report = slot<TopActionReport>()
             coEvery { backend.topPermission(capture(actor), "f-1") } returns TopPermissionResponse.Allowed(null)
             coEvery { backend.reportTopAction(capture(report)) } returns Unit

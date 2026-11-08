@@ -39,6 +39,7 @@ export type AuditAction =
   | 'TOP_FORUMS_CHANGED'
   | 'TOP_CLOSED'
   | 'TOP_REOPENED'
+  | 'TOP_MANAGER_ROLES_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'

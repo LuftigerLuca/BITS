@@ -7,9 +7,9 @@ import eu.luftiger.bits.backend.top.domain.ForumTag
 import eu.luftiger.bits.shared.DiscordForumsReport
 import eu.luftiger.bits.shared.TopAction
 import eu.luftiger.bits.shared.TopActionReport
+import eu.luftiger.bits.shared.TopActor
 import eu.luftiger.bits.shared.TopPermissionRequest
 import eu.luftiger.bits.shared.TopPermissionResponse
-import eu.luftiger.bits.shared.VoteActor
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -84,12 +84,12 @@ class TopBotController(
         service.record(actor(report.actor), report.forumId, report.threadName, action)
     }
 
-    private fun actor(actor: VoteActor): TopActor {
+    private fun actor(actor: TopActor): TopMember {
         BotInput.discordUserId(actor.discordUserId)
         BotInput.memberName(actor.name)
         actor.avatarUrl?.let(BotInput::avatarUrl)
         BotInput.roleCount(actor.roleIds.size)
         actor.roleIds.forEach(BotInput::roleId)
-        return TopActor(AuditActor("discord:${actor.discordUserId}", actor.name, actor.avatarUrl), actor.administrator, actor.roleIds)
+        return TopMember(AuditActor("discord:${actor.discordUserId}", actor.name, actor.avatarUrl), actor.administrator, actor.roleIds)
     }
 }

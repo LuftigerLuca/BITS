@@ -18,12 +18,15 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
-/** The TOP forums in the dashboard; only for admins, see the security config of `/web/admin/`. */
+/**
+ * The TOP forums and who may manage TOPs, in the dashboard; only for admins, see the security config of `/web/admin/`.
+ */
 @RestController
 @PreAuthorize("hasRole('ADMIN')")
 @RequestMapping("/web/admin/tops")
 class TopForumController(
     private val service: TopService,
+    private val managerRoles: TopManagerRoles,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -53,7 +56,49 @@ class TopForumController(
         service.setTopForums(request.forums.map { TopForumSelection(it.forumId, it.doneTagId) }, actor)
         log.info("TOP forums set by {}", session.subject)
     }
+
+    @GetMapping("/manager-roles")
+    fun managerRoles() =
+        TopManagerRolesView(
+            roles = managerRoles.roles().map { TopRoleOption(it.id, it.name, it.color) },
+            roleIds = managerRoles.managerRoleIds(),
+        )
+
+    @PutMapping("/manager-roles")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun setManagerRoles(
+        @Valid @RequestBody request: TopManagerRolesRequest,
+        @AuthenticationPrincipal session: Jwt,
+    ) {
+        val actor = SessionPrincipal.of(session).let { AuditActor(it.subject, it.name, it.avatarUrl) }
+        managerRoles.setManagerRoleIds(request.roleIds, actor)
+        log.info("TOP manager roles set by {}", session.subject)
+    }
 }
+
+@Serializable
+data class TopManagerRolesView(
+    /** The roles of the guild, highest first. */
+    val roles: List<TopRoleOption>,
+    /** The roles whose members may manage TOPs besides the admins. */
+    val roleIds: List<String>,
+)
+
+@Serializable
+data class TopRoleOption(
+    val id: String,
+    val name: String,
+    val color: Int?,
+)
+
+@Serializable
+data class TopManagerRolesRequest(
+    @field:Size(max = WebInput.MAX_ROLES)
+    val roleIds: List<
+        @Size(max = WebInput.MAX_ID_LENGTH)
+        String,
+    >,
+)
 
 @Serializable
 data class TopSettingsView(

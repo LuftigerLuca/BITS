@@ -30,6 +30,8 @@ function stub() {
       }),
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: ['r1'] }),
     'GET /web/admin/votes/result-settings': () => json({ customBackground: false, updatedAt: null }),
+    'GET /web/admin/tops/manager-roles': () =>
+      json({ roles: [{ id: 'r1', name: 'Bürger', color: null }], roleIds: ['r1'] }),
     'GET /web/admin/tops': () =>
       json({
         forums: [{ id: 'f1', name: 'tops', category: null, usable: true, tags: [{ id: 't1', name: 'Erledigt' }] }],
@@ -52,6 +54,7 @@ describe('admin page', () => {
     ['/admin?tab=funktionen', 'Funktionen'],
     ['/admin?tab=server', 'Server'],
     ['/admin?tab=abstimmungen', 'Abstimmungen'],
+    ['/admin?tab=tops', 'TOPs'],
   ])('opens %s on the tab %s', async (path, tab) => {
     stub()
     renderApp(path)
@@ -76,9 +79,12 @@ describe('admin page', () => {
       'Wer Abstimmungen verwalten darf',
       'Bild der Auswertung',
       'Parteifarben',
-      'TOP-Foren',
     ])
     expect(router.state.location.search).toBe('?tab=abstimmungen')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'TOPs' }))
+    expect(visibleCards()).toEqual(['TOP-Foren', 'Wer TOPs verwalten darf'])
+    expect(router.state.location.search).toBe('?tab=tops')
   })
 
   it('replaces the history entry on a switch, so that back leaves the page', async () => {
@@ -116,7 +122,7 @@ describe('admin page', () => {
     expect(screen.getByLabelText('Text der Aktivität')).toHaveValue('WarEra 2')
   })
 
-  it.each(['funktionen', 'server', 'abstimmungen'])(
+  it.each(['funktionen', 'server', 'abstimmungen', 'tops'])(
     'has no accessibility violations axe can find on the tab %s',
     async (tab) => {
       stub()
