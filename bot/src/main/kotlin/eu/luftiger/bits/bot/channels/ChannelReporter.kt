@@ -108,11 +108,12 @@ class ChannelReporter(
                 Permission.KICK_MEMBERS,
             )
 
-        /** What the bot needs to close and reopen a TOP post: write in it, tag, lock and archive it. */
+        /** What the bot needs to close and reopen a TOP post: post its embed there, tag, lock and archive it. */
         val TOP_PERMISSIONS =
             listOf(
                 Permission.VIEW_CHANNEL,
                 Permission.MESSAGE_SEND_IN_THREADS,
+                Permission.MESSAGE_EMBED_LINKS,
                 Permission.MANAGE_THREADS,
             )
 

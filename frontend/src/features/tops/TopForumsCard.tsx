@@ -84,7 +84,7 @@ function TopForumsForm({ settings }: { settings: TopSettings }) {
     return (
       <EmptyState
         title="Keine Foren verfügbar"
-        description="Lege in Discord ein Forum an und gib dem Bot dort die Rechte, Threads zu verwalten und in Threads Nachrichten zu senden."
+        description="Lege in Discord ein Forum an und gib dem Bot dort die Rechte, Threads zu verwalten, in Threads Nachrichten zu senden und Links einzubetten."
       />
     )
   }
@@ -94,7 +94,7 @@ function TopForumsForm({ settings }: { settings: TopSettings }) {
       <FieldSet>
         <FieldLegend variant="label">Foren</FieldLegend>
         <FieldDescription>
-          Wählbar sind Foren, in denen der Bot Threads verwalten und in Threads Nachrichten senden darf.
+          Wählbar sind Foren, in denen der Bot Threads verwalten, in Threads Nachrichten senden und Links einbetten darf.
         </FieldDescription>
         <FieldGroup data-slot="checkbox-group" className="gap-2">
           {forums.map((forum) => (
