@@ -30,6 +30,7 @@ function stub(save: (init?: RequestInit) => Response) {
     'GET /web/admin/votes/manager-roles': () => json({ roleIds: [] }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/tops/manager-roles': () => json(managerRoles),
+    'GET /web/admin/reprimands/settings': () => json({ roles: [], roleIds: [], timeoutMinutes: 10 }),
     'PUT /web/admin/tops/manager-roles': save,
   })
 }

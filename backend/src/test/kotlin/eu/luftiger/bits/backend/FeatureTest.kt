@@ -61,14 +61,14 @@ class FeatureTest {
     }
 
     @Test
-    fun `every feature is on until an admin switches it off`() {
+    fun `every feature but reprimands is on until an admin switches it`() {
         val features = mockMvc.get("/web/features") { cookie(user) }.andExpect { status { isOk() } }
 
         assertEquals(
-            listOf("VERIFICATION", "ROLE_SYNC", "NICKNAMES", "PROFILE", "VOTES", "EMBASSIES", "TOPS"),
+            listOf("VERIFICATION", "ROLE_SYNC", "NICKNAMES", "PROFILE", "VOTES", "EMBASSIES", "TOPS", "REPRIMANDS"),
             features.read("$[*].feature"),
         )
-        assertEquals(List(7) { true }, features.read("$[*].enabled"))
+        assertEquals(List(7) { true } + false, features.read("$[*].enabled"))
     }
 
     @Test

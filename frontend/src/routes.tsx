@@ -60,6 +60,10 @@ export const routes: RouteObject[] = [
                 lazy: async () => ({ Component: (await import('./pages/EmbassiesPage.tsx')).EmbassiesPage }),
               },
               {
+                path: 'admin/reprimands',
+                lazy: async () => ({ Component: (await import('./pages/ReprimandsPage.tsx')).ReprimandsPage }),
+              },
+              {
                 path: 'admin/api-tokens',
                 lazy: async () => ({ Component: (await import('./pages/ApiTokensPage.tsx')).ApiTokensPage }),
               },

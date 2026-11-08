@@ -24,6 +24,14 @@ fun entryOf(
             )
         is SystemProblem.HoneypotWarningFailed ->
             SystemLogEntry(now, EntryKind.HONEYPOT_WARNING_FAILED, message = problem.reason)
+        is SystemProblem.ReprimandTimeoutFailed ->
+            SystemLogEntry(
+                now,
+                EntryKind.REPRIMAND_TIMEOUT_FAILED,
+                discordUserId = problem.discordUserId,
+                discordName = problem.memberName,
+                message = problem.reason,
+            )
         is SystemProblem.WareraUsersUnavailable ->
             SystemLogEntry(
                 now,

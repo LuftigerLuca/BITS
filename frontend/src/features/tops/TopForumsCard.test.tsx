@@ -32,6 +32,7 @@ function stub(data: TopSettings, routes: Record<string, (init?: RequestInit) => 
     'GET /web/me': () => json(admin),
     'GET /web/votes/access': () => json({ canManage: false }),
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
+    'GET /web/admin/reprimands/settings': () => json({ roles: [], roleIds: [], timeoutMinutes: 10 }),
     'GET /web/admin/tops': () => json(data),
     ...routes,
   })

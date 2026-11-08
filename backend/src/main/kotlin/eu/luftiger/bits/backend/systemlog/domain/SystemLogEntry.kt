@@ -143,6 +143,9 @@ enum class EntryKind(
 
     /** The bot cannot keep its warning in the honeypot. */
     HONEYPOT_WARNING_FAILED(Category.ERROR),
+
+    /** The bot could not set or lift the timeout of a reprimand. */
+    REPRIMAND_TIMEOUT_FAILED(Category.ERROR),
     ;
 
     enum class Category {

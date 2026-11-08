@@ -40,6 +40,9 @@ export type AuditAction =
   | 'TOP_CLOSED'
   | 'TOP_REOPENED'
   | 'TOP_MANAGER_ROLES_CHANGED'
+  | 'REPRIMAND_GIVEN'
+  | 'REPRIMAND_WITHDRAWN'
+  | 'REPRIMAND_SETTINGS_CHANGED'
 
 /** `ADMIN_ACCOUNT` is the admin account from the environment, which has no Discord avatar. */
 export type ActorKind = 'DISCORD' | 'ADMIN_ACCOUNT'

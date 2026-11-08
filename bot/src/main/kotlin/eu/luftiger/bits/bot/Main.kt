@@ -29,6 +29,9 @@ import eu.luftiger.bits.bot.honeypot.JdaHoneypotGuild
 import eu.luftiger.bits.bot.language.Languages
 import eu.luftiger.bits.bot.members.MemberReporter
 import eu.luftiger.bits.bot.presence.PresenceUpdater
+import eu.luftiger.bits.bot.reprimands.JdaReprimandGuild
+import eu.luftiger.bits.bot.reprimands.ReprimandCommand
+import eu.luftiger.bits.bot.reprimands.Reprimands
 import eu.luftiger.bits.bot.roles.RoleReporter
 import eu.luftiger.bits.bot.roles.RoleSyncHandler
 import eu.luftiger.bits.bot.status.BackendCallCounter
@@ -46,6 +49,7 @@ import eu.luftiger.bits.shared.BotPresenceChangedEvent
 import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.EmbassyThreadCreationEvent
 import eu.luftiger.bits.shared.EmbassyThreadRenameEvent
+import eu.luftiger.bits.shared.ReprimandTimeoutEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.VoteClosedEvent
@@ -204,6 +208,25 @@ fun main() {
             systemLog::send,
         )
     jda.addEventListener(HoneypotListener(config.guildId, honeypot, scope))
+    val reprimands =
+        Reprimands(
+            backend,
+            JdaReprimandGuild(jda, config.guildId),
+            JdaDirectMessages(jda),
+            languages::ofDirectMessage,
+            { guild.name },
+            systemLog::send,
+        )
+    // Registered once the reprimands can reach Discord; until then, Discord answers that the bot did not respond.
+    jda.addEventListener(
+        FeatureGate(
+            features,
+            { it.reprimands },
+            ReprimandCommand.NAME,
+            languages = languages,
+            delegate = ReprimandCommand(reprimands, scope, languages),
+        ),
+    )
     honeypot.refreshPeriodically(scope)
     val votes = VoteEvents(jda, config.guildId, backend)
     val embassyGuild = JdaEmbassyGuild(jda, config.guildId)
@@ -224,6 +247,7 @@ fun main() {
                 is EmbassyThreadCreationEvent -> embassyThreads.handle(event)
                 is EmbassyThreadRenameEvent -> embassyRenames.handle(event)
                 is BotPresenceChangedEvent -> presence.handle(event)
+                is ReprimandTimeoutEvent -> reprimands.onTimeout(event)
                 else -> Unit
             }
         }

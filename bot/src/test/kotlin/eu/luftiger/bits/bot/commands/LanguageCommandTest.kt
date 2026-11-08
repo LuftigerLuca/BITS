@@ -88,7 +88,7 @@ class LanguageCommandTest {
     @Test
     fun `only the English commands are registered, with German descriptions`() {
         assertEquals(
-            setOf("ping", "verify", "unverify", "nickname", "profile", "roles", "language", "vote", "topclose", "topopen"),
+            setOf("ping", "verify", "unverify", "nickname", "profile", "roles", "language", "vote", "topclose", "topopen", "reprimand"),
             BOT_COMMANDS.mapTo(HashSet()) { it.name },
         )
         BOT_COMMANDS.forEach { command ->

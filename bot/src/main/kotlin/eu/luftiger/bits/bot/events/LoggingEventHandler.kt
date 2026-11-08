@@ -7,6 +7,7 @@ import eu.luftiger.bits.shared.EmbassySyncEvent
 import eu.luftiger.bits.shared.EmbassyThreadCreationEvent
 import eu.luftiger.bits.shared.EmbassyThreadRenameEvent
 import eu.luftiger.bits.shared.PingEvent
+import eu.luftiger.bits.shared.ReprimandTimeoutEvent
 import eu.luftiger.bits.shared.RoleSyncEvent
 import eu.luftiger.bits.shared.VerificationCheckedEvent
 import eu.luftiger.bits.shared.VoteClosedEvent
@@ -33,6 +34,7 @@ class LoggingEventHandler : EventHandler {
             is EmbassyThreadCreationEvent -> log.info("Embassy thread creation {} for {}", event.creationId, event.countryName)
             is EmbassyThreadRenameEvent -> log.info("Embassy thread rename of {} threads", event.threads.size)
             is BotPresenceChangedEvent -> log.info("Bot presence changed to {}", event.presence.status)
+            is ReprimandTimeoutEvent -> log.info("Timeout of user {} changed after a withdrawn reprimand", event.discordUserId)
         }
     }
 }

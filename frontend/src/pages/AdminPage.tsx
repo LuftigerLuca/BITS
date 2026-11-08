@@ -3,6 +3,7 @@ import { BotPresenceCard } from '@/features/bot-presence/BotPresenceCard'
 import { FeaturesCard } from '@/features/feature-toggles/FeaturesCard'
 import { HoneypotCard } from '@/features/honeypot/HoneypotCard'
 import { CountrySettingCard } from '@/features/overview/CountrySettingCard'
+import { ReprimandSettingsCard } from '@/features/reprimands/ReprimandSettingsCard'
 import { TopForumsCard } from '@/features/tops/TopForumsCard'
 import { TopManagerRolesCard } from '@/features/tops/TopManagerRolesCard'
 import { ManagerRolesCard } from '@/features/votes/ManagerRolesCard'
@@ -55,6 +56,9 @@ export function AdminPage() {
         <TabsContent value="tops" keepMounted className="flex flex-col gap-4">
           <TopForumsCard />
           <TopManagerRolesCard />
+        </TabsContent>
+        <TabsContent value="ruegen" keepMounted className="flex flex-col gap-4">
+          <ReprimandSettingsCard />
         </TabsContent>
       </Tabs>
     </div>

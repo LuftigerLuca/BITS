@@ -24,6 +24,7 @@ function stub(data: Honeypot, routes: Record<string, (init?: RequestInit) => Res
     'GET /web/me': () => json(admin),
     'GET /web/votes/access': () => json({ canManage: false }),
     'GET /web/admin/tops/manager-roles': () => json({ roles: [], roleIds: [] }),
+    'GET /web/admin/reprimands/settings': () => json({ roles: [], roleIds: [], timeoutMinutes: 10 }),
     'GET /web/admin/tops': () => json({ forums: [], selected: [] }),
     'GET /web/admin/honeypot': () => json(data),
     ...routes,

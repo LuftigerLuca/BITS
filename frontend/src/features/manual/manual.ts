@@ -1,4 +1,4 @@
-import { ListChecksIcon, SettingsIcon, UsersIcon, VoteIcon, type LucideIcon } from 'lucide-react'
+import { GavelIcon, ListChecksIcon, SettingsIcon, UsersIcon, VoteIcon, type LucideIcon } from 'lucide-react'
 
 /**
  * The user manual at /docs: its pages in reading order, each with the topics it explains. A topic has a title,
@@ -180,7 +180,7 @@ export const MANUAL_PAGES: ManualPage[] = [
           'deine Verknüpfung und wann alle Mitglieder zuletzt abgeglichen wurden',
           'die Rollen, die BITS verwaltet, mit Begründung wie bei /roles',
           '„Verknüpfung lösen“, das wie /unverify wirkt',
-          'einen Download als JSON-Datei mit allem, was BITS zu deiner Discord-ID speichert',
+          'einen Download als JSON-Datei mit allem, was BITS zu deiner Discord-ID speichert, auch deine Rügen',
         ],
       },
     ],
@@ -287,16 +287,50 @@ export const MANUAL_PAGES: ManualPage[] = [
     ],
   },
   {
+    slug: 'ruegen',
+    icon: GavelIcon,
+    title: 'Rügen',
+    summary: 'Mitglieder für Fehlverhalten rügen; jede Rüge bringt einen Timeout.',
+    intro:
+      'Mit /reprimand rügen Admins und die Rollen, die Admins unter „Verwaltung › Rügen“ freigeben, ein Mitglied. ' +
+      'BITS zählt die Rügen jedes Mitglieds, und jede Rüge bringt einen Timeout in der Dauer, die dort eingestellt ' +
+      'ist. Die Funktion ist ausgeschaltet, bis ein Admin sie unter „Verwaltung › Funktionen“ einschaltet.',
+    buildsOn: ['mitglieder'],
+    topics: [
+      {
+        id: 'reprimand',
+        title: 'Ein Mitglied rügen',
+        intro: 'Du rügst in dem Kanal, in dem das Fehlverhalten war; dort erscheint die Rüge auch.',
+        steps: [
+          'Gib /reprimand ein, wähle bei „member“ das Mitglied und schreib bei „reason“ den Grund, höchstens 500 Zeichen.',
+          'Der Bot setzt den Timeout, schreibt dem Mitglied eine Direktnachricht mit Grund, Anzahl seiner Rügen und ' +
+            'Dauer des Timeouts in seiner Sprache und postet die Rüge mit Mitglied, Grund, „x. Rüge“ und Timeout im Kanal.',
+          'Nur du siehst die Bestätigung, mit der Anzahl der Rügen und dem Timeout.',
+        ],
+        points: [
+          'Nicht rügen lassen sich Admins, Bots, Mitglieder, die selbst rügen dürfen, und du selbst.',
+          'Jede Rüge setzt den Timeout neu auf die volle Dauer, auch wenn noch einer läuft.',
+          'Rügen verfallen nicht. Es zählen alle, die kein Admin zurückgenommen hat, auch nachdem das Mitglied den ' +
+            'Server verlassen hat und wiederkommt.',
+          'Steht das Mitglied über der Rolle des Bots, zählt die Rüge trotzdem, nur der Timeout fehlt. Die Bestätigung ' +
+            'sagt dir das, und das System-Log hält es fest.',
+          'Nimmt das Mitglied keine Direktnachrichten an, läuft der Rest trotzdem.',
+          'Grund und Anzahl sind öffentlich: Alle im Kanal, Admins im Dashboard und das Mitglied selbst sehen sie.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'admins',
     icon: SettingsIcon,
     title: 'Admins',
     summary: 'Rollenregeln, Mitglieder, Botschaften, Einstellungen und Logs im Dashboard.',
     intro:
       'Wer auf dem Server die Berechtigung Administrator hat oder ihn besitzt, ist im Dashboard Admin und sieht in ' +
-      'der Seitenleiste die Bereiche „Admin“ mit Rollen, Mitgliedern, Botschaften und Abstimmungen und „System“ mit ' +
-      'Verwaltung und den Logs. Die Verwaltung gliedert sich in die Tabs „Funktionen“, „Server“, „Abstimmungen“ ' +
-      'und „TOPs“.',
-    buildsOn: ['mitglieder', 'abstimmungen', 'tops'],
+      'der Seitenleiste die Bereiche „Admin“ mit Rollen, Mitgliedern, Botschaften, Rügen und Abstimmungen und ' +
+      '„System“ mit Verwaltung und den Logs. Die Verwaltung gliedert sich in die Tabs „Funktionen“, „Server“, ' +
+      '„Abstimmungen“, „TOPs“ und „Rügen“.',
+    buildsOn: ['mitglieder', 'abstimmungen', 'tops', 'ruegen'],
     topics: [
       {
         id: 'overview',
@@ -322,7 +356,8 @@ export const MANUAL_PAGES: ManualPage[] = [
         title: 'Funktionen ein- und ausschalten',
         intro:
           'Unter „Verwaltung › Funktionen“ schaltest du einzelne Funktionen aus: Verifizierung, Rollen-Sync, ' +
-          'Nicknames, Profil, Abstimmungen, Botschaften und TOPs. Eine ausgeschaltete Funktion pausiert nur, gelöscht wird nichts.',
+          'Nicknames, Profil, Abstimmungen, Botschaften, TOPs und Rügen. Eine ausgeschaltete Funktion pausiert nur, ' +
+          'gelöscht wird nichts.',
         points: [
           'Ihre Befehle antworten in Discord mit „Diese Funktion ist gerade ausgeschaltet.“ Der Bot übernimmt eine ' +
             'Änderung innerhalb von 30 Sekunden.',
@@ -333,6 +368,8 @@ export const MANUAL_PAGES: ManualPage[] = [
             'ein, gleicht BITS sofort alle Mitglieder ab.',
           'Ohne Abstimmungen startet niemand eine neue. Laufende enden wie geplant und lassen sich in Discord mit ' +
             '/vote end oder cancel.',
+          'Rügen sind als einzige Funktion anfangs aus. Ohne sie geht /reprimand nicht; bestehende Rügen zählen weiter ' +
+            'und lassen sich zurücknehmen.',
         ],
         tips: ['Jedes Umschalten steht im Audit-Log.'],
       },
@@ -561,6 +598,23 @@ export const MANUAL_PAGES: ManualPage[] = [
           '„Wer TOPs verwalten darf“: die Rollen, die TOPs schließen und wieder öffnen dürfen. Admins dürfen das ' +
             'immer. Die Rollen sind unabhängig von denen für Abstimmungen.',
           'Jede Änderung steht im Audit-Log.',
+        ],
+      },
+      {
+        id: 'reprimands',
+        title: 'Rügen einstellen und zurücknehmen',
+        intro:
+          'Unter „Verwaltung › Rügen“ legst du fest, wer außer den Admins mit /reprimand rügen darf und wie lange ' +
+          'der Timeout jeder Rüge dauert: von 1 Minute bis 28 Tage, anfangs 10 Minuten.',
+        points: [
+          'Der Bot braucht auf dem Server das Recht „Mitglieder moderieren“ und eine Rolle über denen, die er ' +
+            'timeouten soll.',
+          'Die Seite „Rügen“ zeigt alle Rügen, neueste zuerst, mit Mitglied, Grund, wer gerügt hat und wann, und ' +
+            'darüber die Anzahl pro Mitglied.',
+          'Zurücknehmen: Die Rüge zählt nicht mehr, bleibt aber in der Liste. Läuft ihr Timeout noch, hebt der Bot ' +
+            'ihn auf oder kürzt ihn auf das, was andere Rügen des Mitglieds noch halten.',
+          'Rügen aus Discord, Rücknahmen und Änderungen an Rollen und Dauer stehen im Audit-Log, ein Timeout, den der ' +
+            'Bot nicht setzen konnte, im System-Log.',
         ],
       },
       {

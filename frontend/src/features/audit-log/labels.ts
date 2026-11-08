@@ -38,6 +38,9 @@ export const ACTIONS: Record<AuditAction, string> = {
   TOP_CLOSED: 'TOP geschlossen',
   TOP_REOPENED: 'TOP wieder geöffnet',
   TOP_MANAGER_ROLES_CHANGED: 'Rollen für TOPs geändert',
+  REPRIMAND_GIVEN: 'Rüge erteilt',
+  REPRIMAND_WITHDRAWN: 'Rüge zurückgenommen',
+  REPRIMAND_SETTINGS_CHANGED: 'Einstellungen für Rügen geändert',
 }
 
 const TIME = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })

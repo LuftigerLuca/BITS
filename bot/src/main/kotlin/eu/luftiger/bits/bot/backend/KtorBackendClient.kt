@@ -46,6 +46,9 @@ import eu.luftiger.bits.shared.PingResponse
 import eu.luftiger.bits.shared.ProfileRequest
 import eu.luftiger.bits.shared.ProfileResponse
 import eu.luftiger.bits.shared.ReportedMember
+import eu.luftiger.bits.shared.ReprimandRequest
+import eu.luftiger.bits.shared.ReprimandResponse
+import eu.luftiger.bits.shared.ReprimandTimeoutProblemReport
 import eu.luftiger.bits.shared.RoleExplanationRequest
 import eu.luftiger.bits.shared.RoleExplanationResponse
 import eu.luftiger.bits.shared.RoleSyncReport
@@ -94,7 +97,7 @@ import kotlinx.coroutines.CancellationException
 import java.time.Duration
 
 /**
- * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [TopBackend], [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
+ * [BackendClient], [VoteBackend], [EmbassyBackend], [FeatureBackend], [HoneypotBackend], [TopBackend], [ReprimandBackend], [LanguageBackend], [PresenceBackend] and [HeartbeatBackend] that
  * authenticate with the service token of the bot. [calls] counts every request and how it ended.
  */
 class KtorBackendClient(
@@ -109,6 +112,7 @@ class KtorBackendClient(
     FeatureBackend,
     HoneypotBackend,
     TopBackend,
+    ReprimandBackend,
     LanguageBackend,
     PresenceBackend,
     HeartbeatBackend,
@@ -205,6 +209,15 @@ class KtorBackendClient(
 
     override suspend fun reportTopAction(report: TopActionReport) {
         http.post("api/tops/actions") {
+            contentType(ContentType.Application.Json)
+            setBody(report)
+        }
+    }
+
+    override suspend fun reprimand(request: ReprimandRequest): ReprimandResponse = post("api/reprimands", request)
+
+    override suspend fun reportReprimandTimeoutProblem(report: ReprimandTimeoutProblemReport) {
+        http.post("api/reprimands/timeout-problems") {
             contentType(ContentType.Application.Json)
             setBody(report)
         }

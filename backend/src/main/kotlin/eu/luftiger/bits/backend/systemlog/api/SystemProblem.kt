@@ -126,6 +126,14 @@ sealed interface SystemProblem {
         val reason: String,
     ) : SystemProblem
 
+    /** The bot could not set or lift the timeout of a reprimand; [reason] is in German. */
+    @NamedInterface("api")
+    data class ReprimandTimeoutFailed(
+        val discordUserId: String,
+        val memberName: String,
+        val reason: String,
+    ) : SystemProblem
+
     /** Events for the bot could not be written to Redis for a while. */
     @NamedInterface("api")
     data class OutboxStuck(
